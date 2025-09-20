@@ -86,11 +86,13 @@ $page_title = "Login";
 include 'header.php';
 ?>
 
+<link rel="stylesheet" href="assets/css/auth-improvements.css">
+
 <!-- Login Page Container -->
 <div class="auth-page-container">
     <div class="container">
         <div class="row justify-content-center align-items-center min-vh-100">
-            <div class="col-md-6 col-lg-5 col-xl-4">
+            <div class="col-12">
                 <div class="auth-card">
                     <div class="auth-header">
                         <div class="auth-logo">
@@ -200,22 +202,96 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     
     if (minecraftNick.length < 3) {
         e.preventDefault();
-        showToast('Il nickname deve essere di almeno 3 caratteri.', 'error');
+        showAuthToast('Il nickname deve essere di almeno 3 caratteri.', 'error');
         return false;
     }
     
     if (password.length < 6) {
         e.preventDefault();
-        showToast('La password deve essere di almeno 6 caratteri.', 'error');
+        showAuthToast('La password deve essere di almeno 6 caratteri.', 'error');
         return false;
     }
     
     if (!mathAnswer || isNaN(mathAnswer)) {
         e.preventDefault();
-        showToast('Inserisci una risposta valida per la verifica.', 'error');
+        showAuthToast('Inserisci una risposta valida per la verifica.', 'error');
         return false;
     }
 });
+
+// Enhanced toast for auth pages
+function showAuthToast(message, type = 'success') {
+    // Remove existing toasts
+    const existingToasts = document.querySelectorAll('.auth-toast');
+    existingToasts.forEach(toast => toast.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = 'auth-toast';
+    
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+    const bgColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6';
+    
+    toast.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${bgColor};
+            color: white;
+            padding: 16px 24px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            animation: authToastSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+            max-width: 300px;
+        ">
+            <span style="font-size: 18px;">${icon}</span>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Remove after 4 seconds
+    setTimeout(() => {
+        toast.style.animation = 'authToastSlideOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards';
+        setTimeout(() => toast.remove(), 400);
+    }, 4000);
+}
+
+// Add CSS animations for toast
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes authToastSlideIn {
+        from {
+            opacity: 0;
+            transform: translateX(100%) scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+    
+    @keyframes authToastSlideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+        to {
+            opacity: 0;
+            transform: translateX(100%) scale(0.9);
+        }
+    }
+`;
+document.head.appendChild(style);
 </script>
 
 <?php include 'footer.php'; ?>

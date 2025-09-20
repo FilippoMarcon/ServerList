@@ -2127,7 +2127,17 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="index.php">
+                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'forum.php' ? 'active' : ''; ?>" href="forum.php">
+                            <i class="bi bi-chat-dots"></i> Forum
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'annunci.php' ? 'active' : ''; ?>" href="annunci.php">
+                            <i class="bi bi-megaphone"></i> Annunci
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="index.php">
                             <i class="bi bi-list-ul"></i> Lista Server
                         </a>
                     </li>
