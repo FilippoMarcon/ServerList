@@ -28,19 +28,7 @@ try {
 include 'header.php';
 ?>
 
-<!-- Hero Section -->
-<div class="hero-section">
-    <div class="container">
-        <div class="hero-content">
-            <h1 class="hero-title">Scopri i Migliori Server Minecraft</h1>
-            <p class="hero-subtitle">
-                Esplora centinaia di server unici, vota i tuoi preferiti e unisciti alla community più grande d'Italia
-            </p>
-        </div>
-    </div>
-</div>
-
-<div class="container">
+<div class="container" style="margin-top: 2rem;">
     <div class="row">
         <!-- Main Content -->
         <div class="col-lg-9">
@@ -116,11 +104,16 @@ include 'header.php';
                         }
                     ?>
                         <div class="server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>">
-                            <div class="server-rank <?php echo $rank_class; ?>">
-                                <?php if ($rank <= 3): ?>
-                                    <i class="bi bi-trophy-fill"></i>
+                            <div class="server-rank-container">
+                                <?php if ($rank > 3): ?>
+                                    <div class="rank-number-top"><?php echo $rank; ?>°</div>
                                 <?php endif; ?>
-                                +<?php echo $server['voti_totali']; ?>
+                                <div class="server-rank <?php echo $rank_class; ?>">
+                                    <?php if ($rank <= 3): ?>
+                                        <i class="bi bi-trophy-fill"></i>
+                                    <?php endif; ?>
+                                    +<?php echo $server['voti_totali']; ?>
+                                </div>
                             </div>
                             
                             <?php if ($server['logo_url']): ?>
@@ -134,7 +127,7 @@ include 'header.php';
                             <?php endif; ?>
                             
                             <div class="server-info">
-                                <a href="ServerList/server/<?php echo $server['id']; ?>" class="server-name">
+                                <a href="server.php?id=<?php echo $server['id']; ?>" class="server-name">
                                     <?php echo htmlspecialchars($server['nome']); ?> 
                                     <span style="font-size: 0.9rem; color: var(--text-muted);">
                                         <?php echo htmlspecialchars($server['versione'] ?: '1.20.2'); ?>
@@ -149,12 +142,8 @@ include 'header.php';
                             </div>
                             
                             <div class="server-players">
-                                <div class="player-count">
-                                    <?php 
-                                    // Generate random player count for demo
-                                    $players = rand(50, 1500);
-                                    echo number_format($players);
-                                    ?>
+                                <div class="player-count" data-playercounter-ip="<?php echo htmlspecialchars($server['ip']); ?>">
+                                    ...
                                 </div>
                                 <div class="player-status">online</div>
                                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
@@ -173,15 +162,18 @@ include 'header.php';
         <!-- Sidebar -->
         <div class="col-lg-3">
             <div class="filters-sidebar">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="filters-header">
                     <h4>Filtri</h4>
                     <button class="clear-filters">Rimuovi filtri</button>
                 </div>
                 
                 <div class="filter-group">
                     <h5>Modalità</h5>
+                    <div class="filter-status">
+                        <small class="text-muted">Nessun filtro selezionato</small>
+                    </div>
                     <div class="filter-tags">
-                        <span class="filter-tag active">Adventure</span>
+                        <span class="filter-tag">Adventure</span>
                         <span class="filter-tag">Survival</span>
                         <span class="filter-tag">Vanilla</span>
                         <span class="filter-tag">Factions</span>
@@ -226,6 +218,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inizializza animazioni
     initAnimations();
     
+    // Inizializza status filtri
+    updateFilterStatus();
+    
     // Filter tags
     const filterTags = document.querySelectorAll('.filter-tag');
     filterTags.forEach(tag => {
@@ -233,6 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.toggle('active');
             applyFilters();
             updateFilterCount();
+            updateFilterStatus();
         });
     });
     
@@ -244,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         document.getElementById('searchInput').value = '';
         updateFilterCount();
+        updateFilterStatus();
     });
     
     // Filters button toggle
@@ -295,6 +292,20 @@ function updateFilterCount() {
         filtersBtn.innerHTML = `<i class="bi bi-funnel-fill"></i> Filtri (${activeCount})`;
     } else {
         filtersBtn.innerHTML = `<i class="bi bi-funnel"></i> Filtri`;
+    }
+}
+
+function updateFilterStatus() {
+    const activeCount = document.querySelectorAll('.filter-tag.active').length;
+    const filterStatus = document.querySelector('.filter-status small');
+    
+    if (activeCount > 0) {
+        const activeFilters = Array.from(document.querySelectorAll('.filter-tag.active')).map(tag => tag.textContent);
+        filterStatus.textContent = `${activeCount} filtro${activeCount > 1 ? 'i' : ''} selezionato${activeCount > 1 ? 'i' : ''}: ${activeFilters.join(', ')}`;
+        filterStatus.className = 'text-primary';
+    } else {
+        filterStatus.textContent = 'Nessun filtro selezionato';
+        filterStatus.className = 'text-muted';
     }
 }
 

@@ -55,26 +55,31 @@ try {
     
     $user_id = $_SESSION['user_id'];
     
-    // Controlla se l'utente ha già votato per questo server nelle ultime 24 ore
-    $stmt = $pdo->prepare("SELECT data_voto FROM sl_votes 
-                          WHERE server_id = ? AND user_id = ? 
-                          AND data_voto >= DATE_SUB(NOW(), INTERVAL 24 HOUR) 
-                          ORDER BY data_voto DESC 
+    // NUOVO SISTEMA: Controlla se l'utente ha già votato QUALSIASI server oggi
+    $stmt = $pdo->prepare("SELECT v.server_id, s.nome, v.data_voto 
+                          FROM sl_votes v 
+                          JOIN sl_servers s ON v.server_id = s.id 
+                          WHERE v.user_id = ? 
+                          AND DATE(v.data_voto) = CURDATE() 
+                          ORDER BY v.data_voto DESC 
                           LIMIT 1");
-    $stmt->execute([$server_id, $user_id]);
-    $last_vote = $stmt->fetch();
+    $stmt->execute([$user_id]);
+    $today_vote = $stmt->fetch();
     
-    if ($last_vote) {
-        // Calcola il tempo rimanente
-        $last_vote_time = strtotime($last_vote['data_voto']);
-        $next_vote_time = $last_vote_time + (24 * 60 * 60); // 24 ore in secondi
-        $current_time = time();
-        $time_remaining = $next_vote_time - $current_time;
+    if ($today_vote) {
+        // L'utente ha già votato oggi
+        $voted_server_name = $today_vote['nome'];
+        $vote_time = date('H:i', strtotime($today_vote['data_voto']));
         
-        $hours = floor($time_remaining / 3600);
-        $minutes = floor(($time_remaining % 3600) / 60);
+        // Calcola il tempo fino a mezzanotte
+        $now = new DateTime();
+        $midnight = new DateTime('tomorrow midnight');
+        $time_until_midnight = $midnight->diff($now);
         
-        throw new Exception("Hai già votato per questo server. Riprova tra {$hours}h {$minutes}m.");
+        $hours = $time_until_midnight->h;
+        $minutes = $time_until_midnight->i;
+        
+        throw new Exception("Hai già votato oggi per '{$voted_server_name}' alle {$vote_time}. Potrai votare di nuovo tra {$hours}h {$minutes}m (a mezzanotte).");
     }
     
     // Inserisci il voto
@@ -116,33 +121,41 @@ try {
  * Funzione per ottenere lo stato di voto di un utente per un server specifico
  * Usata per verifiche aggiuntive o API
  */
-function getUserVoteStatus($user_id, $server_id) {
+function getUserVoteStatus($user_id, $server_id = null) {
     global $pdo;
     
     try {
-        $stmt = $pdo->prepare("SELECT data_voto FROM sl_votes 
-                              WHERE server_id = ? AND user_id = ? 
-                              AND data_voto >= DATE_SUB(NOW(), INTERVAL 24 HOUR) 
-                              ORDER BY data_voto DESC 
+        // Controlla se l'utente ha votato oggi (qualsiasi server)
+        $stmt = $pdo->prepare("SELECT v.server_id, s.nome, v.data_voto 
+                              FROM sl_votes v 
+                              JOIN sl_servers s ON v.server_id = s.id 
+                              WHERE v.user_id = ? 
+                              AND DATE(v.data_voto) = CURDATE() 
+                              ORDER BY v.data_voto DESC 
                               LIMIT 1");
-        $stmt->execute([$server_id, $user_id]);
-        $last_vote = $stmt->fetch();
+        $stmt->execute([$user_id]);
+        $today_vote = $stmt->fetch();
         
-        if ($last_vote) {
-            $last_vote_time = strtotime($last_vote['data_voto']);
-            $next_vote_time = $last_vote_time + (24 * 60 * 60);
-            $current_time = time();
-            $time_remaining = max(0, $next_vote_time - $current_time);
+        if ($today_vote) {
+            // Calcola il tempo fino a mezzanotte
+            $now = new DateTime();
+            $midnight = new DateTime('tomorrow midnight');
+            $time_until_midnight = $midnight->diff($now);
+            $time_remaining = ($time_until_midnight->h * 3600) + ($time_until_midnight->i * 60) + $time_until_midnight->s;
             
             return [
                 'can_vote' => false,
-                'last_vote_time' => $last_vote['data_voto'],
+                'voted_today' => true,
+                'voted_server_id' => $today_vote['server_id'],
+                'voted_server_name' => $today_vote['nome'],
+                'last_vote_time' => $today_vote['data_voto'],
                 'time_remaining' => $time_remaining,
-                'next_vote_time' => date('Y-m-d H:i:s', $next_vote_time)
+                'next_vote_time' => $midnight->format('Y-m-d H:i:s')
             ];
         } else {
             return [
                 'can_vote' => true,
+                'voted_today' => false,
                 'last_vote_time' => null,
                 'time_remaining' => 0,
                 'next_vote_time' => null

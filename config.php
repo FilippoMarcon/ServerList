@@ -36,7 +36,7 @@ date_default_timezone_set('Europe/Rome');
 // Costanti utili
 define('SITE_NAME', 'Minecraft Server List');
 define('SITE_URL', (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]");
-define('AVATAR_API', 'https://minotar.net/avatar');
+define('AVATAR_API', 'https://mc-heads.net/avatar');
 
 // Funzioni di utilità
 
@@ -84,25 +84,35 @@ function showMessage($message, $type = 'info') {
  * Ottieni avatar Minecraft
  */
 function getMinecraftAvatar($nickname, $size = 64) {
-    return AVATAR_API . "/" . urlencode($nickname) . "/$size.png";
+    return AVATAR_API . "/" . urlencode($nickname);
 }
 
 /**
- * Controllo voto giornaliero
+ * Controllo voto giornaliero - NUOVO SISTEMA: un voto al giorno per utente
  */
 function canVote($user_id, $server_id, $pdo) {
-    $stmt = $pdo->prepare("SELECT data_voto FROM sl_votes WHERE user_id = ? AND server_id = ? ORDER BY data_voto DESC LIMIT 1");
-    $stmt->execute([$user_id, $server_id]);
-    $last_vote = $stmt->fetch();
+    // Controlla se l'utente ha già votato oggi (qualsiasi server)
+    $stmt = $pdo->prepare("SELECT data_voto FROM sl_votes WHERE user_id = ? AND DATE(data_voto) = CURDATE() LIMIT 1");
+    $stmt->execute([$user_id]);
+    $today_vote = $stmt->fetch();
     
-    if ($last_vote) {
-        $last_vote_time = strtotime($last_vote['data_voto']);
-        $current_time = time();
-        $hours_diff = ($current_time - $last_vote_time) / 3600;
-        return $hours_diff >= 24;
-    }
-    
-    return true;
+    // Se ha già votato oggi, non può votare
+    return !$today_vote;
+}
+
+/**
+ * Ottieni informazioni sul voto giornaliero dell'utente
+ */
+function getUserDailyVoteInfo($user_id, $pdo) {
+    $stmt = $pdo->prepare("SELECT v.server_id, s.nome, v.data_voto 
+                          FROM sl_votes v 
+                          JOIN sl_servers s ON v.server_id = s.id 
+                          WHERE v.user_id = ? 
+                          AND DATE(v.data_voto) = CURDATE() 
+                          ORDER BY v.data_voto DESC 
+                          LIMIT 1");
+    $stmt->execute([$user_id]);
+    return $stmt->fetch();
 }
 
 ?>

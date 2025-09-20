@@ -21,13 +21,16 @@ CREATE TABLE IF NOT EXISTS `sl_servers` (
   `ip` varchar(255) NOT NULL,
   `versione` varchar(50) DEFAULT NULL,
   `logo_url` varchar(500) DEFAULT NULL,
+  `owner_id` int(11) DEFAULT NULL,
   `data_inserimento` datetime DEFAULT CURRENT_TIMESTAMP,
   `data_aggiornamento` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_active` tinyint(1) DEFAULT 1,
   PRIMARY KEY (`id`),
   KEY `idx_nome` (`nome`),
   KEY `idx_ip` (`ip`),
-  KEY `idx_active` (`is_active`)
+  KEY `idx_active` (`is_active`),
+  KEY `idx_owner_id` (`owner_id`),
+  FOREIGN KEY (`owner_id`) REFERENCES `sl_users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabella voti / Votes table

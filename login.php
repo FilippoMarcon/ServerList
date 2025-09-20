@@ -86,88 +86,89 @@ $page_title = "Login";
 include 'header.php';
 ?>
 
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow">
-            <div class="card-body p-5">
-                <div class="text-center mb-4">
-                    <h2 class="fw-bold text-primary">
-                        <i class="bi bi-box-arrow-in-right"></i> Login
-                    </h2>
-                    <p class="text-muted">Accedi al tuo account</p>
-                </div>
-                
-                <?php if (!empty($success)): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="bi bi-check-circle"></i> <?php echo $success; ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<!-- Login Page Container -->
+<div class="auth-page-container">
+    <div class="container">
+        <div class="row justify-content-center align-items-center min-vh-100">
+            <div class="col-md-6 col-lg-5 col-xl-4">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <div class="auth-logo">
+                            <i class="bi bi-boxes"></i>
+                        </div>
+                        <h1 class="auth-title">Benvenuto su Blocksy</h1>
+                        <p class="auth-subtitle">Accedi al tuo account per continuare</p>
                     </div>
-                <?php endif; ?>
                 
-                <?php if (!empty($error)): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="bi bi-exclamation-triangle"></i> <?php echo $error; ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                
-                <form method="POST" action="login.php" id="loginForm">
-                    <div class="mb-3">
-                        <label for="minecraft_nick" class="form-label">
-                            <i class="bi bi-person"></i> Nickname Minecraft
-                        </label>
-                        <input type="text" class="form-control" id="minecraft_nick" name="minecraft_nick" 
-                               value="<?php echo htmlspecialchars($_POST['minecraft_nick'] ?? ''); ?>" required
-                               placeholder="Inserisci il tuo nickname Minecraft">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="password" class="form-label">
-                            <i class="bi bi-lock"></i> Password
-                        </label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="password" name="password" required
-                                   placeholder="Inserisci la tua password">
-                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
-                                <i class="bi bi-eye"></i>
+                    <div class="auth-body">
+                        <?php if (!empty($success)): ?>
+                            <div class="auth-alert auth-alert-success">
+                                <i class="bi bi-check-circle"></i>
+                                <span><?php echo $success; ?></span>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <?php if (!empty($error)): ?>
+                            <div class="auth-alert auth-alert-error">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <span><?php echo $error; ?></span>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <form method="POST" action="login.php" id="loginForm" class="auth-form">
+                            <div class="form-group">
+                                <label for="minecraft_nick" class="form-label">
+                                    <i class="bi bi-person"></i> Nickname Minecraft
+                                </label>
+                                <input type="text" class="form-input" id="minecraft_nick" name="minecraft_nick" 
+                                       value="<?php echo htmlspecialchars($_POST['minecraft_nick'] ?? ''); ?>" required
+                                       placeholder="Il tuo nickname Minecraft">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="password" class="form-label">
+                                    <i class="bi bi-lock"></i> Password
+                                </label>
+                                <div class="password-input-group">
+                                    <input type="password" class="form-input" id="password" name="password" required
+                                           placeholder="La tua password">
+                                    <button type="button" class="password-toggle" id="togglePassword">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="math_answer" class="form-label">
+                                    <i class="bi bi-shield-check"></i> Verifica di sicurezza
+                                </label>
+                                <div class="captcha-group">
+                                    <span class="captcha-question">
+                                        <?php echo $_SESSION['math_text']; ?>
+                                    </span>
+                                    <input type="number" class="form-input captcha-input" id="math_answer" name="math_answer" required
+                                           placeholder="Risultato">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="auth-button">
+                                <i class="bi bi-box-arrow-in-right"></i>
+                                <span>Accedi</span>
                             </button>
-                        </div>
+                        </form>
                     </div>
                     
-                    <!-- CAPTCHA Fallback -->
-                    <div class="mb-3">
-                        <label for="math_answer" class="form-label">
-                            <i class="bi bi-shield-check"></i> Verifica umana
-                        </label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light">
-                                <?php echo $_SESSION['math_text']; ?>
-                            </span>
-                            <input type="number" class="form-control" id="math_answer" name="math_answer" required
-                                   placeholder="Risultato">
+                    <div class="auth-footer">
+                        <p class="auth-switch-text">Non hai un account?</p>
+                        <a href="register.php" class="auth-switch-link">
+                            <i class="bi bi-person-plus"></i> Registrati ora
+                        </a>
+                        
+                        <div class="auth-demo-info">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Demo: admin / admin123</span>
                         </div>
                     </div>
-                    
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-mc-primary btn-lg">
-                            <i class="bi bi-box-arrow-in-right"></i> Accedi
-                        </button>
-                    </div>
-                </form>
-                
-                <hr class="my-4">
-                
-                <div class="text-center">
-                    <p class="mb-0">Non hai un account?</p>
-                    <a href="register.php" class="btn btn-outline-primary">
-                        <i class="bi bi-person-plus"></i> Registrati
-                    </a>
-                </div>
-                
-                <div class="text-center mt-3">
-                    <small class="text-muted">
-                        <i class="bi bi-info-circle"></i> Prova ad accedere con: admin / admin123
-                    </small>
                 </div>
             </div>
         </div>

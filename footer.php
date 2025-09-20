@@ -141,6 +141,9 @@
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
+    <!-- MC Player Counter Script -->
+    <script src="https://cdn.jsdelivr.net/gh/leonardosnt/mc-player-counter/dist/mc-player-counter.min.js"></script>
+    
     <!-- Custom JavaScript -->
     <script>
         // Funzione per copiare l'IP del server
@@ -212,6 +215,24 @@
                     card.style.transform = 'translateY(0)';
                 }, index * 100);
             });
+            
+            // Initialize MC Player Counter
+            if (typeof MinecraftPlayerCounter !== 'undefined') {
+                // Find all elements with player counter
+                const playerCounters = document.querySelectorAll('[data-playercounter-ip]');
+                
+                playerCounters.forEach(element => {
+                    const serverIP = element.getAttribute('data-playercounter-ip');
+                    
+                    // Initialize the counter for each server
+                    MinecraftPlayerCounter.init({
+                        ip: serverIP,
+                        element: element,
+                        format: '{online}',
+                        fallback: '0'
+                    });
+                });
+            }
         });
     </script>
     
