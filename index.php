@@ -197,7 +197,7 @@ include 'header.php';
                             $tags[] = 'Vanilla';
                         }
                     ?>
-                        <div class="server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>">
+                        <div class="server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" data-server-id="<?php echo $server['id']; ?>" data-votes="<?php echo $server['voti_totali']; ?>">
                             <div class="server-rank-container">
                                 <?php if ($rank > 3): ?>
                                     <div class="rank-number-top"><?php echo $rank; ?>°</div>
@@ -366,6 +366,16 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Clear filters button found:', document.querySelector('.clear-filters'));
     console.log('Filter tags found:', document.querySelectorAll('.filter-tag').length);
     
+    // Debug: verifica server cards
+    const serverCards = document.querySelectorAll('.server-card');
+    console.log('Server cards found:', serverCards.length);
+    serverCards.forEach((card, index) => {
+        const serverId = card.getAttribute('data-server-id');
+        const votes = card.getAttribute('data-votes');
+        const name = card.getAttribute('data-name');
+        console.log(`Server ${index + 1}: ID=${serverId}, Votes=${votes}, Name=${name}`);
+    });
+    
     // Force floating dropdown z-index
     const dropdownToggle = document.querySelector('.floating-dropdown .dropdown-toggle');
     if (dropdownToggle) {
@@ -463,12 +473,75 @@ function applySorting(sortType) {
     // Aggiungi prima i server visibili ordinati, poi quelli nascosti
     visibleServers.forEach(server => serverList.appendChild(server));
     hiddenServers.forEach(server => serverList.appendChild(server));
+    
+    // Ricalcola i ranking dopo il riordinamento
+    updateRankings();
+}
+
+function updateRankings() {
+    const visibleServers = Array.from(document.querySelectorAll('.server-card')).filter(server => server.style.display !== 'none');
+    
+    visibleServers.forEach((server, index) => {
+        const rank = index + 1;
+        const rankContainer = server.querySelector('.server-rank-container');
+        const rankElement = server.querySelector('.server-rank');
+        const rankNumberTop = server.querySelector('.rank-number-top');
+        
+        if (!rankContainer || !rankElement) return;
+        
+        // Aggiorna il numero di ranking in alto (per rank > 3)
+        if (rank > 3) {
+            if (rankNumberTop) {
+                rankNumberTop.textContent = rank + '°';
+            } else {
+                // Crea l'elemento se non esiste
+                const newRankNumber = document.createElement('div');
+                newRankNumber.className = 'rank-number-top';
+                newRankNumber.textContent = rank + '°';
+                rankContainer.insertBefore(newRankNumber, rankElement);
+            }
+        } else {
+            // Rimuovi il numero se rank <= 3
+            if (rankNumberTop) {
+                rankNumberTop.remove();
+            }
+        }
+        
+        // Aggiorna le classi CSS per i colori
+        rankElement.className = 'server-rank';
+        if (rank === 1) {
+            rankElement.classList.add('gold');
+        } else if (rank === 2) {
+            rankElement.classList.add('silver');
+        } else if (rank === 3) {
+            rankElement.classList.add('bronze');
+        }
+        
+        // Aggiorna l'icona del trofeo
+        const trophyIcon = rankElement.querySelector('.bi-trophy-fill');
+        if (rank <= 3) {
+            if (!trophyIcon) {
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-trophy-fill';
+                rankElement.insertBefore(icon, rankElement.firstChild);
+            }
+        } else {
+            if (trophyIcon) {
+                trophyIcon.remove();
+            }
+        }
+    });
 }
 
 function getVotes(serverCard) {
+    // Usa il data attribute che è più affidabile
+    const votes = serverCard.getAttribute('data-votes');
+    if (votes) return parseInt(votes);
+    
+    // Fallback al testo dell'elemento
     const rankElement = serverCard.querySelector('.server-rank');
     if (!rankElement) return 0;
-    const voteText = rankElement.textContent.replace('+', '').trim();
+    const voteText = rankElement.textContent.replace('+', '').replace(/[^\d]/g, '').trim();
     return parseInt(voteText) || 0;
 }
 

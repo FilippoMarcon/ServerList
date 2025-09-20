@@ -26,6 +26,54 @@ try {
         redirect('index.php');
     }
     
+    // Calcola il ranking del server usando la stessa query dell'index.php
+    $stmt = $pdo->query("
+        SELECT s.id, COUNT(v.id) as voti_totali 
+        FROM sl_servers s 
+        LEFT JOIN sl_votes v ON s.id = v.server_id 
+        WHERE s.is_active = 1 
+        GROUP BY s.id 
+        ORDER BY voti_totali DESC, s.nome ASC
+    ");
+    $all_servers = $stmt->fetchAll();
+    
+    // Trova la posizione del server corrente nella classifica
+    $server_rank = 1;
+    foreach ($all_servers as $index => $ranked_server) {
+        if ($ranked_server['id'] == $server_id) {
+            $server_rank = $index + 1;
+            break;
+        }
+    }
+    
+    // Debug: verifica il calcolo del ranking
+    // Ottieni la classifica completa per debug
+    if (isset($_GET['debug'])) {
+        $debug_stmt = $pdo->query("
+            SELECT s.nome, s.id, COUNT(v.id) as voti_totali 
+            FROM sl_servers s 
+            LEFT JOIN sl_votes v ON s.id = v.server_id 
+            WHERE s.is_active = 1 
+            GROUP BY s.id 
+            ORDER BY voti_totali DESC, s.nome ASC
+        ");
+        $debug_servers = $debug_stmt->fetchAll();
+        
+        echo "<!-- DEBUG CLASSIFICA:\n";
+        foreach ($debug_servers as $i => $debug_server) {
+            $pos = $i + 1;
+            $current = ($debug_server['id'] == $server_id) ? " <-- QUESTO SERVER" : "";
+            echo "Pos {$pos}: {$debug_server['nome']} ({$debug_server['voti_totali']} voti){$current}\n";
+        }
+        echo "-->";
+    }
+    
+    // Determina la classe CSS per il ranking
+    $rank_class = '';
+    if ($server_rank == 1) $rank_class = 'gold';
+    elseif ($server_rank == 2) $rank_class = 'silver';
+    elseif ($server_rank == 3) $rank_class = 'bronze';
+    
     // Recupera gli utenti che hanno votato per questo server (ultimi 20 voti)
     $stmt = $pdo->prepare("SELECT u.minecraft_nick, v.data_voto 
                           FROM sl_votes v 
@@ -73,6 +121,37 @@ $page_title = htmlspecialchars($server['nome']);
 include 'header.php';
 ?>
 
+<style>
+/* Server rank badge styling */
+.server-rank-badge {
+    background: var(--gradient-secondary);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.server-rank-badge.gold {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    color: #1a1a2e;
+}
+
+.server-rank-badge.silver {
+    background: linear-gradient(135deg, #c0c0c0 0%, #e5e5e5 100%);
+    color: #1a1a2e;
+}
+
+.server-rank-badge.bronze {
+    background: linear-gradient(135deg, #cd7f32 0%, #daa520 100%);
+    color: white;
+}
+</style>
+
 <!-- Server Page Container -->
 <div class="server-page-container">
     <!-- Server Header with Banner -->
@@ -104,8 +183,11 @@ include 'header.php';
                     <div class="server-title-section">
                         <h1 class="server-title"><?php echo htmlspecialchars($server['nome']); ?></h1>
                         <div class="server-details-row">
-                            <div class="server-rank-badge">
-                                <i class="bi bi-trophy-fill"></i> 1°
+                            <div class="server-rank-badge <?php echo $rank_class; ?>">
+                                <?php if ($server_rank <= 3): ?>
+                                    <i class="bi bi-trophy-fill"></i>
+                                <?php endif; ?>
+                                <?php echo $server_rank; ?>°
                             </div>
                             <div class="server-ip-display" title="Clicca per copiare">
                                 <?php echo htmlspecialchars($server['ip']); ?>
