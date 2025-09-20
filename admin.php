@@ -183,8 +183,7 @@ include 'header.php';
     </div>
 </div>
 
-<div class="main-page-bg py-5" style="background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%); min-height: 100vh;">
-    <div class="container-lg">
+<div class="container-lg" style="margin-top: 2rem;">
         <?php if (!empty($message)): ?>
             <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
                 <i class="bi bi-check-circle"></i> <?php echo $message; ?>
@@ -201,50 +200,50 @@ include 'header.php';
         <!-- Statistiche -->
         <div class="row mb-4 g-3">
             <div class="col-md-2 col-6">
-                <div class="admin-stats-card card text-center mb-2 shadow-sm">
-                    <div class="card-body">
-                        <div class="display-6 fw-bold text-primary"><?php echo $stats['total_servers']; ?></div>
-                        <small class="text-secondary">Server Totali</small>
+                <div class="profile-stats-card" style="padding: 1.5rem; margin-bottom: 0;">
+                    <div class="text-center">
+                        <div class="display-6 fw-bold" style="color: var(--accent-purple); margin-bottom: 0.5rem;"><?php echo $stats['total_servers']; ?></div>
+                        <small style="color: var(--text-secondary);">Server Totali</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-2 col-6">
-                <div class="admin-stats-card card text-center mb-2 shadow-sm">
-                    <div class="card-body">
-                        <div class="display-6 fw-bold text-success"><?php echo $stats['total_users']; ?></div>
-                        <small class="text-secondary">Utenti Totali</small>
+                <div class="profile-stats-card" style="padding: 1.5rem; margin-bottom: 0;">
+                    <div class="text-center">
+                        <div class="display-6 fw-bold" style="color: var(--accent-green); margin-bottom: 0.5rem;"><?php echo $stats['total_users']; ?></div>
+                        <small style="color: var(--text-secondary);">Utenti Totali</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-2 col-6">
-                <div class="admin-stats-card card text-center mb-2 shadow-sm">
-                    <div class="card-body">
-                        <div class="display-6 fw-bold text-info"><?php echo $stats['total_votes']; ?></div>
-                        <small class="text-secondary">Voti Totali</small>
+                <div class="profile-stats-card" style="padding: 1.5rem; margin-bottom: 0;">
+                    <div class="text-center">
+                        <div class="display-6 fw-bold" style="color: var(--accent-cyan); margin-bottom: 0.5rem;"><?php echo $stats['total_votes']; ?></div>
+                        <small style="color: var(--text-secondary);">Voti Totali</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-2 col-6">
-                <div class="admin-stats-card card text-center mb-2 shadow-sm">
-                    <div class="card-body">
-                        <div class="display-6 fw-bold text-warning"><?php echo $stats['today_votes']; ?></div>
-                        <small class="text-secondary">Voti Oggi</small>
+                <div class="profile-stats-card" style="padding: 1.5rem; margin-bottom: 0;">
+                    <div class="text-center">
+                        <div class="display-6 fw-bold" style="color: var(--accent-orange); margin-bottom: 0.5rem;"><?php echo $stats['today_votes']; ?></div>
+                        <small style="color: var(--text-secondary);">Voti Oggi</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-2 col-6">
-                <div class="admin-stats-card card text-center mb-2 shadow-sm">
-                    <div class="card-body">
-                        <div class="display-6 fw-bold text-secondary"><?php echo $stats['today_users']; ?></div>
-                        <small class="text-secondary">Nuovi Oggi</small>
+                <div class="profile-stats-card" style="padding: 1.5rem; margin-bottom: 0;">
+                    <div class="text-center">
+                        <div class="display-6 fw-bold" style="color: var(--text-primary); margin-bottom: 0.5rem;"><?php echo $stats['today_users']; ?></div>
+                        <small style="color: var(--text-secondary);">Nuovi Oggi</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-2 col-6">
-                <div class="admin-stats-card card text-center mb-2 shadow-sm">
-                    <div class="card-body">
-                        <div class="display-6"><i class="bi bi-person-circle text-dark"></i></div>
-                        <small class="text-secondary"><?php echo htmlspecialchars($_SESSION['minecraft_nick']); ?></small>
+                <div class="profile-stats-card" style="padding: 1.5rem; margin-bottom: 0;">
+                    <div class="text-center">
+                        <div class="display-6" style="color: var(--accent-purple); margin-bottom: 0.5rem;"><i class="bi bi-person-circle"></i></div>
+                        <small style="color: var(--text-secondary);"><?php echo htmlspecialchars($_SESSION['minecraft_nick']); ?></small>
                     </div>
                 </div>
             </div>
@@ -253,22 +252,25 @@ include 'header.php';
         <!-- Menu Admin -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="btn-group flex-wrap" role="group">
-                    <a href="admin.php?action=list" class="admin-menu-btn btn btn-outline-primary<?php echo $action === 'list' ? ' active' : ''; ?>">
-                        <i class="bi bi-list"></i> Lista Server
-                    </a>
-                    <a href="admin.php?action=add" class="admin-menu-btn btn btn-outline-success<?php echo $action === 'add' ? ' active' : ''; ?>">
-                        <i class="bi bi-plus-circle"></i> Aggiungi Server
-                    </a>
-                    <a href="admin.php?action=webhooks" class="admin-menu-btn btn btn-outline-warning<?php echo $action === 'webhooks' ? ' active' : ''; ?>">
-                        <i class="bi bi-webhook"></i> Webhook
-                    </a>
-                    <a href="index.php" class="admin-menu-btn btn btn-outline-info">
-                        <i class="bi bi-house"></i> Vai al Sito
-                    </a>
-                    <a href="logout.php" class="admin-menu-btn btn btn-outline-danger">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
+                <div class="profile-section" style="padding: 1.5rem;">
+                    <h5 class="mb-3" style="color: var(--text-primary);"><i class="bi bi-gear-fill me-2"></i>Gestione Admin</h5>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <a href="admin.php?action=list" class="btn btn-primary<?php echo $action === 'list' ? ' active' : ''; ?>">
+                            <i class="bi bi-list"></i> Lista Server
+                        </a>
+                        <a href="admin.php?action=add" class="btn btn-success<?php echo $action === 'add' ? ' active' : ''; ?>">
+                            <i class="bi bi-plus-circle"></i> Aggiungi Server
+                        </a>
+                        <a href="admin.php?action=webhooks" class="btn btn-warning<?php echo $action === 'webhooks' ? ' active' : ''; ?>">
+                            <i class="bi bi-webhook"></i> Webhook
+                        </a>
+                        <a href="index.php" class="btn btn-info">
+                            <i class="bi bi-house"></i> Vai al Sito
+                        </a>
+                        <a href="logout.php" class="btn btn-danger">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -277,176 +279,149 @@ include 'header.php';
 
 <?php if ($action === 'list'): ?>
     <!-- Lista Server -->
-    <div class="card shadow">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">
-                <i class="bi bi-server"></i> Gestione Server (<?php echo count($servers); ?>)
-            </h5>
+    <div class="profile-section">
+        <div class="d-flex align-items-center mb-4">
+            <h5 class="mb-0" style="color: var(--text-primary);"><i class="bi bi-server me-2"></i>Gestione Server <span class="badge bg-secondary"><?php echo count($servers); ?></span></h5>
         </div>
-        <div class="card-body">
-            <?php if (count($servers) > 0): ?>
-                <div class="servers-grid">
-                    <?php foreach ($servers as $server): ?>
-                        <div class="server-card-profile">
-                            <div class="server-card-header">
-                                <?php if ($server['logo_url']): ?>
-                                    <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" alt="Logo" class="server-logo-small">
-                                <?php else: ?>
-                                    <div class="server-logo-small default-logo"><i class="bi bi-cube"></i></div>
-                                <?php endif; ?>
-                                <div class="server-info-small">
-                                    <div class="server-name-small">
-                                        <a href="server.php?id=<?php echo $server['id']; ?>" target="_blank">
-                                            <?php echo htmlspecialchars($server['nome']); ?>
-                                        </a>
-                                    </div>
-                                    <div class="server-ip-small">
-                                        <i class="bi bi-server"></i> <?php echo htmlspecialchars($server['ip']); ?>
-                                    </div>
-                                    <div class="server-description-small">
-                                        <?php echo htmlspecialchars($server['descrizione']); ?>
-                                    </div>
+        <?php if (count($servers) > 0): ?>
+            <div class="servers-grid">
+                <?php foreach ($servers as $server): ?>
+                    <div class="server-card-profile" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+                        <div class="server-card-header">
+                            <?php if ($server['logo_url']): ?>
+                                <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" alt="Logo" class="server-logo-small">
+                            <?php else: ?>
+                                <div class="server-logo-small default-logo" style="background: var(--dark-bg);"><i class="bi bi-cube"></i></div>
+                            <?php endif; ?>
+                            <div class="server-info-small">
+                                <div class="server-name-small">
+                                    <a href="server.php?id=<?php echo $server['id']; ?>" target="_blank" style="color: var(--text-primary);">
+                                        <?php echo htmlspecialchars($server['nome']); ?>
+                                    </a>
                                 </div>
-                                <div class="server-stats-small">
-                                    <div class="stat-item-small">
-                                        <span class="stat-number-small"><i class="bi bi-bar-chart"></i> <?php echo number_format($server['vote_count']); ?></span>
-                                        <span class="stat-label-small">Voti Totali</span>
-                                    </div>
-                                    <div class="stat-item-small">
-                                        <span class="stat-number-small text-warning"><i class="bi bi-star"></i> <?php echo number_format($server['today_votes']); ?></span>
-                                        <span class="stat-label-small">Voti Oggi</span>
-                                    </div>
-                                    <div class="stat-item-small">
-                                        <span class="stat-label-small"><i class="bi bi-calendar"></i> <?php echo date('d/m/Y', strtotime($server['data_inserimento'])); ?></span>
-                                    </div>
+                                <div class="server-ip-small" style="color: var(--text-secondary);">
+                                    <i class="bi bi-server"></i> <?php echo htmlspecialchars($server['ip']); ?>
+                                </div>
+                                <div class="server-description-small" style="color: var(--text-secondary);">
+                                    <?php echo htmlspecialchars($server['descrizione']); ?>
                                 </div>
                             </div>
-                            <div class="server-actions mt-2">
-                                <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server" target="_blank">
-                                    <i class="bi bi-eye"></i> Vedi
-                                </a>
-                                <a href="admin.php?action=edit&id=<?php echo $server['id']; ?>" class="btn-edit-server">
-                                    <i class="bi bi-pencil"></i> Modifica
-                                </a>
-                                <button type="button" class="btn btn-outline-danger" onclick="confirmDelete(<?php echo $server['id']; ?>, '<?php echo addslashes($server['nome']); ?>')">
-                                    <i class="bi bi-trash"></i> Elimina
-                                </button>
+                            <div class="server-stats-small">
+                                <div class="stat-item-small">
+                                    <span class="stat-number-small" style="color: var(--accent-cyan);"><i class="bi bi-bar-chart"></i> <?php echo number_format($server['vote_count']); ?></span>
+                                    <span class="stat-label-small" style="color: var(--text-secondary);">Voti Totali</span>
+                                </div>
+                                <div class="stat-item-small">
+                                    <span class="stat-number-small" style="color: var(--accent-orange);"><i class="bi bi-star"></i> <?php echo number_format($server['today_votes']); ?></span>
+                                    <span class="stat-label-small" style="color: var(--text-secondary);">Oggi</span>
+                                </div>
+                                <div class="stat-item-small">
+                                    <span class="stat-label-small" style="color: var(--text-secondary);"><i class="bi bi-calendar"></i> <?php echo date('d/m/Y', strtotime($server['data_inserimento'])); ?></span>
+                                </div>
                             </div>
                         </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <div class="text-center py-5">
-                    <i class="bi bi-inbox display-4 text-muted"></i>
-                    <p class="text-muted mt-3">Nessun server registrato.</p>
-                    <a href="admin.php?action=add" class="btn btn-success">
-                        <i class="bi bi-plus-circle"></i> Aggiungi il primo server
-                    </a>
-                </div>
-            <?php endif; ?>
-        </div>
+                        <div class="server-actions mt-2">
+                            <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server" target="_blank" style="background: var(--accent-purple); color: #fff;">
+                                <i class="bi bi-eye"></i> Vedi
+                            </a>
+                            <a href="admin.php?action=edit&id=<?php echo $server['id']; ?>" class="btn-edit-server" style="background: var(--accent-yellow); color: #000;">
+                                <i class="bi bi-pencil"></i> Modifica
+                            </a>
+                            <button type="button" class="btn btn-outline-danger" onclick="confirmDelete(<?php echo $server['id']; ?>, '<?php echo addslashes($server['nome']); ?>')">
+                                <i class="bi bi-trash"></i> Elimina
+                            </button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php else: ?>
+            <div class="profile-stats-card" style="padding: 2rem; text-align: center;">
+                <i class="bi bi-inbox" style="font-size: 2rem; color: var(--text-secondary); margin-bottom: 1rem;"></i>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Nessun server registrato.</p>
+                <a href="admin.php?action=add" class="btn btn-success">
+                    <i class="bi bi-plus-circle"></i> Aggiungi il primo server
+                </a>
+            </div>
+        <?php endif; ?>
     </div>
 <?php elseif ($action === 'add' || $action === 'edit'): ?>
     <!-- Form Aggiungi/Modifica Server -->
-    <div class="card shadow">
-        <div class="card-header bg-<?php echo $action === 'add' ? 'success' : 'primary'; ?> text-white">
-            <h5 class="mb-0">
-                <i class="bi bi-<?php echo $action === 'add' ? 'plus-circle' : 'pencil'; ?>"></i> 
-                <?php echo $action === 'add' ? 'Aggiungi Nuovo Server' : 'Modifica Server'; ?>
+    <div class="profile-section">
+        <div class="d-flex align-items-center mb-4">
+            <h5 class="mb-0" style="color: var(--text-primary);">
+                <i class="bi bi-<?php echo $action === 'edit' ? 'pencil' : 'plus-circle'; ?> me-2"></i>
+                <?php echo $action === 'edit' ? 'Modifica Server' : 'Aggiungi Nuovo Server'; ?>
             </h5>
         </div>
-        <div class="card-body">
-            <form method="POST" action="admin.php?action=<?php echo $action; ?>" id="serverForm">
-                <?php if ($action === 'edit' && $server_to_edit): ?>
-                    <input type="hidden" name="server_id" value="<?php echo $server_to_edit['id']; ?>">
-                <?php endif; ?>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="nome" class="form-label">
-                                <i class="bi bi-tag"></i> Nome Server *
-                            </label>
-                            <input type="text" class="form-control" id="nome" name="nome" required
-                                   value="<?php echo htmlspecialchars($server_to_edit['nome'] ?? ''); ?>"
-                                   placeholder="Es: Server Minecraft Italia">
-                        </div>
+        <form method="POST" enctype="multipart/form-data" id="serverForm">
+            <?php if ($action === 'edit'): ?>
+                <input type="hidden" name="id" value="<?php echo $server['id']; ?>">
+            <?php endif; ?>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label" style="color: var(--text-primary);">Nome Server *</label>
+                        <input type="text" class="form-control" id="nome" name="nome" value="<?php echo htmlspecialchars($server['nome'] ?? ''); ?>" required style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);">
                     </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="ip" class="form-label">
-                                <i class="bi bi-server"></i> IP Server *
-                            </label>
-                            <input type="text" class="form-control" id="ip" name="ip" required
-                                   value="<?php echo htmlspecialchars($server_to_edit['ip'] ?? ''); ?>"
-                                   placeholder="Es: mc.server.com:25565">
-                        </div>
+                    <div class="mb-3">
+                        <label for="ip" class="form-label" style="color: var(--text-primary);">IP Server *</label>
+                        <input type="text" class="form-control" id="ip" name="ip" value="<?php echo htmlspecialchars($server['ip'] ?? ''); ?>" required style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);">
                     </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="versione" class="form-label">
-                                <i class="bi bi-code-slash"></i> Versione *
-                            </label>
-                            <input type="text" class="form-control" id="versione" name="versione" required
-                                   value="<?php echo htmlspecialchars($server_to_edit['versione'] ?? ''); ?>"
-                                   placeholder="Es: 1.20.4">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="tipo_server" class="form-label">
-                                <i class="bi bi-hdd-stack"></i> Tipo Server *
-                            </label>
-                            <select class="form-control" id="tipo_server" name="tipo_server" required>
-                                <option value="Java" <?php echo (isset($server_to_edit) && $server_to_edit['tipo_server'] == 'Java') ? 'selected' : ''; ?>>Java</option>
-                                <option value="Bedrock" <?php echo (isset($server_to_edit) && $server_to_edit['tipo_server'] == 'Bedrock') ? 'selected' : ''; ?>>Bedrock</option>
-                                <option value="Java & Bedrock" <?php echo (!isset($server_to_edit) || $server_to_edit['tipo_server'] == 'Java & Bedrock') ? 'selected' : ''; ?>>Java & Bedrock</option>
-                            </select>
-                        </div>
+                    <div class="mb-3">
+                        <label for="porta" class="form-label" style="color: var(--text-primary);">Porta *</label>
+                        <input type="number" class="form-control" id="porta" name="porta" value="<?php echo htmlspecialchars($server['porta'] ?? '25565'); ?>" required style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);">
                     </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="logo_url" class="form-label">
-                                <i class="bi bi-image"></i> URL Logo
-                            </label>
-                            <input type="url" class="form-control" id="logo_url" name="logo_url"
-                                   value="<?php echo htmlspecialchars($server_to_edit['logo_url'] ?? ''); ?>"
-                                   placeholder="https://example.com/logo.png">
-                        </div>
+                    <div class="mb-3">
+                        <label for="versione" class="form-label" style="color: var(--text-primary);">Versione</label>
+                        <input type="text" class="form-control" id="versione" name="versione" value="<?php echo htmlspecialchars($server['versione'] ?? ''); ?>" style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);">
+                    </div>
+                    <div class="mb-3">
+                        <label for="tipo" class="form-label" style="color: var(--text-primary);">Tipo Server</label>
+                        <select class="form-select" id="tipo" name="tipo" style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);">
+                            <option value="vanilla" <?php echo (isset($server['tipo']) && $server['tipo'] === 'vanilla') ? 'selected' : ''; ?>>Vanilla</option>
+                            <option value="modded" <?php echo (isset($server['tipo']) && $server['tipo'] === 'modded') ? 'selected' : ''; ?>>Modded</option>
+                            <option value="minigames" <?php echo (isset($server['tipo']) && $server['tipo'] === 'minigames') ? 'selected' : ''; ?>>Minigames</option>
+                            <option value="pvp" <?php echo (isset($server['tipo']) && $server['tipo'] === 'pvp') ? 'selected' : ''; ?>>PvP</option>
+                            <option value="pve" <?php echo (isset($server['tipo']) && $server['tipo'] === 'pve') ? 'selected' : ''; ?>>PvE</option>
+                            <option value="roleplay" <?php echo (isset($server['tipo']) && $server['tipo'] === 'roleplay') ? 'selected' : ''; ?>>Roleplay</option>
+                        </select>
                     </div>
                 </div>
-                
-                <div class="mb-3">
-                    <label for="banner_url" class="form-label">
-                        <i class="bi bi-card-image"></i> URL Banner
-                    </label>
-                    <input type="url" class="form-control" id="banner_url" name="banner_url"
-                           value="<?php echo htmlspecialchars($server_to_edit['banner_url'] ?? ''); ?>"
-                           placeholder="https://example.com/banner.gif">
-                    <div class="form-text">Banner consigliato: 468x60px o 728x90px</div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="logo_url" class="form-label" style="color: var(--text-primary);">URL Logo</label>
+                        <input type="url" class="form-control" id="logo_url" name="logo_url" value="<?php echo htmlspecialchars($server['logo_url'] ?? ''); ?>" style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        <small style="color: var(--text-secondary);">Inserisci l'URL completo del logo (https://...)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="banner_url" class="form-label" style="color: var(--text-primary);">URL Banner</label>
+                        <input type="url" class="form-control" id="banner_url" name="banner_url" value="<?php echo htmlspecialchars($server['banner_url'] ?? ''); ?>" style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        <small style="color: var(--text-secondary);">Inserisci l'URL completo del banner (https://...)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descrizione" class="form-label" style="color: var(--text-primary);">Descrizione</label>
+                        <textarea class="form-control" id="descrizione" name="descrizione" rows="4" style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);"><?php echo htmlspecialchars($server['descrizione'] ?? ''); ?></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="server_order" class="form-label" style="color: var(--text-primary);">Ordine</label>
+                        <input type="number" class="form-control" id="server_order" name="server_order" value="<?php echo htmlspecialchars($server['server_order'] ?? '0'); ?>" style="background: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        <small style="color: var(--text-secondary);">Numero per ordinare i server (più alto = prima)</small>
+                    </div>
                 </div>
-                
-                <div class="mb-3">
-                    <label for="descrizione" class="form-label">
-                        <i class="bi bi-file-text"></i> Descrizione
-                    </label>
-                    <textarea class="form-control" id="descrizione" name="descrizione" rows="4"
-                              placeholder="Descrivi il server, le sue caratteristiche, modalità di gioco, ecc."><?php echo htmlspecialchars($server_to_edit['descrizione'] ?? ''); ?></textarea>
-                </div>
-                
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-<?php echo $action === 'add' ? 'success' : 'primary'; ?>">
-                        <i class="bi bi-<?php echo $action === 'add' ? 'plus-circle' : 'check-circle'; ?>"></i> 
-                        <?php echo $action === 'add' ? 'Aggiungi Server' : 'Salva Modifiche'; ?>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <button type="submit" name="save_server" class="btn btn-success">
+                        <i class="bi bi-check-circle me-2"></i><?php echo $action === 'edit' ? 'Aggiorna Server' : 'Aggiungi Server'; ?>
                     </button>
-                    <a href="admin.php?action=list" class="btn btn-secondary">
-                        <i class="bi bi-x-circle"></i> Annulla
+                    <a href="admin.php?action=list" class="btn btn-secondary ms-2">
+                        <i class="bi bi-arrow-left me-2"></i>Torna alla Lista
                     </a>
                 </div>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 <?php elseif ($action === 'webhooks'): ?>
     <!-- Gestione Webhook -->
@@ -590,7 +565,7 @@ include 'header.php';
                         </button>
                         <a href="admin.php?action=list" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Torna alla lista
-                        </button>
+                        </a>
                     </div>
                 <?php endif; ?>
             </form>
@@ -602,20 +577,20 @@ include 'header.php';
 <!-- Modal di Conferma Eliminazione -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
+        <div class="modal-content" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+            <div class="modal-header" style="background: var(--danger-color); color: white; border-bottom: 1px solid var(--border-color);">
                 <h5 class="modal-title">
                     <i class="bi bi-exclamation-triangle"></i> Conferma Eliminazione
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p>Sei sicuro di voler eliminare il server <strong id="deleteServerName"></strong>?</p>
-                <p class="text-danger">
+            <div class="modal-body" style="color: var(--text-primary);">
+                <p>Sei sicuro di voler eliminare il server <strong id="deleteServerName" style="color: var(--text-primary);"></strong>?</p>
+                <p style="color: var(--text-secondary);">
                     <i class="bi bi-warning"></i> Questa azione eliminerà anche tutti i voti associati al server e non può essere annullata.
                 </p>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
                 <form method="POST" action="admin.php?action=delete" id="deleteForm">
                     <input type="hidden" name="server_id" id="deleteServerId">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -664,6 +639,30 @@ document.getElementById('serverForm')?.addEventListener('submit', function(e) {
         return false;
     }
 });
+
+// Aggiungi stili CSS per il tema scuro ai form
+const style = document.createElement('style');
+style.textContent = `
+    .form-control:focus, .form-select:focus {
+        background: var(--dark-bg) !important;
+        border-color: var(--accent-purple) !important;
+        color: var(--text-primary) !important;
+        box-shadow: 0 0 0 0.25rem rgba(147, 51, 234, 0.25) !important;
+    }
+    .form-control::placeholder, .form-select::placeholder {
+        color: var(--text-secondary) !important;
+    }
+    .form-text {
+        color: var(--text-secondary) !important;
+    }
+    .invalid-feedback {
+        color: var(--danger-color) !important;
+    }
+    .valid-feedback {
+        color: var(--accent-green) !important;
+    }
+`;
+document.head.appendChild(style);
 </script>
 
 <?php include 'footer.php'; ?>

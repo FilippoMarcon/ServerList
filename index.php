@@ -202,12 +202,18 @@ include 'header.php';
                                 <?php if ($rank > 3): ?>
                                     <div class="rank-number-top"><?php echo $rank; ?>°</div>
                                 <?php endif; ?>
-                                <div class="server-rank <?php echo $rank_class; ?>">
+                                <div class="server-rank <?php echo ($rank > 3) ? 'outlined' : $rank_class; ?>">
                                     <?php if ($rank <= 3): ?>
-                                        <i class="bi bi-trophy-fill"></i>
+                                        <?php echo $rank; ?>°
+                                    <?php else: ?>
+                                        +<?php echo $server['voti_totali']; ?>
                                     <?php endif; ?>
-                                    +<?php echo $server['voti_totali']; ?>
                                 </div>
+                                <?php if ($rank <= 3): ?>
+                                    <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;">
+                                        +<?php echo $server['voti_totali']; ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                             
                             <?php if ($server['logo_url']): ?>
@@ -508,7 +514,7 @@ function updateRankings() {
         }
         
         // Aggiorna le classi CSS per i colori
-        rankElement.className = 'server-rank';
+        rankElement.className = 'server-rank' . ($rank > 3 ? ' outlined' : '');
         if (rank === 1) {
             rankElement.classList.add('gold');
         } else if (rank === 2) {

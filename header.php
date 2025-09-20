@@ -290,6 +290,13 @@
             min-width: 80px;
             min-height: 40px;
         }
+
+        .server-rank.outlined {
+            background: transparent !important;
+            border: 2px solid var(--border-color) !important;
+            color: var(--text-primary) !important;
+            box-shadow: none !important;
+        }
         
         .server-logo {
             width: 80px;
@@ -2142,13 +2149,7 @@
                             <i class="bi bi-list-ul"></i> Lista Server
                         </a>
                     </li>
-                    <?php if (isLoggedIn() && isAdmin()): ?>
-                    <li class="nav-item">
-                        <a class="nav-link" href="admin.php">
-                            <i class="bi bi-gear"></i> Admin
-                        </a>
-                    </li>
-                    <?php endif; ?>
+
                 </ul>
                 
                 <ul class="navbar-nav">
