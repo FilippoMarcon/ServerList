@@ -514,7 +514,7 @@ function updateRankings() {
         }
         
         // Aggiorna le classi CSS per i colori
-        rankElement.className = 'server-rank' . ($rank > 3 ? ' outlined' : '');
+        rankElement.className = 'server-rank' + (rank > 3 ? ' outlined' : '');
         if (rank === 1) {
             rankElement.classList.add('gold');
         } else if (rank === 2) {

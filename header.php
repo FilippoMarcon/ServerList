@@ -293,9 +293,11 @@
 
         .server-rank.outlined {
             background: transparent !important;
-            border: 2px solid var(--border-color) !important;
+            border: 2px solid;
+            border-image: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) 1 !important;
             color: var(--text-primary) !important;
             box-shadow: none !important;
+            border-radius: 12px;
         }
         
         .server-logo {
