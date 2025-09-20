@@ -183,96 +183,97 @@ include 'header.php';
     </div>
 </div>
 
-<?php if (!empty($message)): ?>
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="bi bi-check-circle"></i> <?php echo $message; ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-<?php endif; ?>
+<div class="main-page-bg py-5" style="background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%); min-height: 100vh;">
+    <div class="container-lg">
+        <?php if (!empty($message)): ?>
+            <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
+                <i class="bi bi-check-circle"></i> <?php echo $message; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> <?php echo $error; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
 
-<?php if (!empty($error)): ?>
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="bi bi-exclamation-triangle"></i> <?php echo $error; ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-<?php endif; ?>
-
-<!-- Statistiche -->
-<div class="row mb-4">
-    <div class="col-md-2 col-6">
-        <div class="card bg-primary text-white">
-            <div class="card-body text-center">
-                <div class="display-6"><?php echo $stats['total_servers']; ?></div>
-                <small>Server Totali</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2 col-6">
-        <div class="card bg-success text-white">
-            <div class="card-body text-center">
-                <div class="display-6"><?php echo $stats['total_users']; ?></div>
-                <small>Utenti Totali</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2 col-6">
-        <div class="card bg-info text-white">
-            <div class="card-body text-center">
-                <div class="display-6"><?php echo $stats['total_votes']; ?></div>
-                <small>Voti Totali</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2 col-6">
-        <div class="card bg-warning text-white">
-            <div class="card-body text-center">
-                <div class="display-6"><?php echo $stats['today_votes']; ?></div>
-                <small>Voti Oggi</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2 col-6">
-        <div class="card bg-secondary text-white">
-            <div class="card-body text-center">
-                <div class="display-6"><?php echo $stats['today_users']; ?></div>
-                <small>Nuovi Oggi</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2 col-6">
-        <div class="card bg-dark text-white">
-            <div class="card-body text-center">
-                <div class="display-6">
-                    <i class="bi bi-person-circle"></i>
+        <!-- Statistiche -->
+        <div class="row mb-4 g-3">
+            <div class="col-md-2 col-6">
+                <div class="admin-stats-card card text-center mb-2 shadow-sm">
+                    <div class="card-body">
+                        <div class="display-6 fw-bold text-primary"><?php echo $stats['total_servers']; ?></div>
+                        <small class="text-secondary">Server Totali</small>
+                    </div>
                 </div>
-                <small><?php echo htmlspecialchars($_SESSION['minecraft_nick']); ?></small>
+            </div>
+            <div class="col-md-2 col-6">
+                <div class="admin-stats-card card text-center mb-2 shadow-sm">
+                    <div class="card-body">
+                        <div class="display-6 fw-bold text-success"><?php echo $stats['total_users']; ?></div>
+                        <small class="text-secondary">Utenti Totali</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 col-6">
+                <div class="admin-stats-card card text-center mb-2 shadow-sm">
+                    <div class="card-body">
+                        <div class="display-6 fw-bold text-info"><?php echo $stats['total_votes']; ?></div>
+                        <small class="text-secondary">Voti Totali</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 col-6">
+                <div class="admin-stats-card card text-center mb-2 shadow-sm">
+                    <div class="card-body">
+                        <div class="display-6 fw-bold text-warning"><?php echo $stats['today_votes']; ?></div>
+                        <small class="text-secondary">Voti Oggi</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 col-6">
+                <div class="admin-stats-card card text-center mb-2 shadow-sm">
+                    <div class="card-body">
+                        <div class="display-6 fw-bold text-secondary"><?php echo $stats['today_users']; ?></div>
+                        <small class="text-secondary">Nuovi Oggi</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 col-6">
+                <div class="admin-stats-card card text-center mb-2 shadow-sm">
+                    <div class="card-body">
+                        <div class="display-6"><i class="bi bi-person-circle text-dark"></i></div>
+                        <small class="text-secondary"><?php echo htmlspecialchars($_SESSION['minecraft_nick']); ?></small>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Menu Admin -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="btn-group" role="group">
-            <a href="admin.php?action=list" class="btn btn-outline-primary <?php echo $action === 'list' ? 'active' : ''; ?>">
-                <i class="bi bi-list"></i> Lista Server
-            </a>
-            <a href="admin.php?action=add" class="btn btn-outline-success <?php echo $action === 'add' ? 'active' : ''; ?>">
-                <i class="bi bi-plus-circle"></i> Aggiungi Server
-            </a>
-            <a href="admin.php?action=webhooks" class="btn btn-outline-warning <?php echo $action === 'webhooks' ? 'active' : ''; ?>">
-                <i class="bi bi-webhook"></i> Webhook
-            </a>
-            <a href="index.php" class="btn btn-outline-info">
-                <i class="bi bi-house"></i> Vai al Sito
-            </a>
-            <a href="logout.php" class="btn btn-outline-danger">
-                <i class="bi bi-box-arrow-right"></i> Logout
-            </a>
+        <!-- Menu Admin -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="btn-group flex-wrap" role="group">
+                    <a href="admin.php?action=list" class="admin-menu-btn btn btn-outline-primary<?php echo $action === 'list' ? ' active' : ''; ?>">
+                        <i class="bi bi-list"></i> Lista Server
+                    </a>
+                    <a href="admin.php?action=add" class="admin-menu-btn btn btn-outline-success<?php echo $action === 'add' ? ' active' : ''; ?>">
+                        <i class="bi bi-plus-circle"></i> Aggiungi Server
+                    </a>
+                    <a href="admin.php?action=webhooks" class="admin-menu-btn btn btn-outline-warning<?php echo $action === 'webhooks' ? ' active' : ''; ?>">
+                        <i class="bi bi-webhook"></i> Webhook
+                    </a>
+                    <a href="index.php" class="admin-menu-btn btn btn-outline-info">
+                        <i class="bi bi-house"></i> Vai al Sito
+                    </a>
+                    <a href="logout.php" class="admin-menu-btn btn btn-outline-danger">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </a>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
+
+        <!-- ...existing code... -->
 
 <?php if ($action === 'list'): ?>
     <!-- Lista Server -->
@@ -282,55 +283,57 @@ include 'header.php';
                 <i class="bi bi-server"></i> Gestione Server (<?php echo count($servers); ?>)
             </h5>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body">
             <?php if (count($servers) > 0): ?>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>ID</th>
-                                <th>Nome</th>
-                                <th>IP</th>
-                                <th>Versione</th>
-                                <th>Voti Totali</th>
-                                <th>Voti Oggi</th>
-                                <th>Data Inserimento</th>
-                                <th>Azioni</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($servers as $server): ?>
-                                <tr>
-                                    <td><?php echo $server['id']; ?></td>
-                                    <td>
-                                        <strong><?php echo htmlspecialchars($server['nome']); ?></strong>
-                                        <?php if ($server['logo_url']): ?>
-                                            <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" 
-                                                 alt="Logo" class="rounded" style="max-height: 24px; margin-left: 8px;">
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><code><?php echo htmlspecialchars($server['ip']); ?></code></td>
-                                    <td><span class="badge bg-secondary"><?php echo htmlspecialchars($server['versione']); ?></span></td>
-                                    <td><span class="badge bg-primary"><?php echo number_format($server['vote_count']); ?></span></td>
-                                    <td><span class="badge bg-warning text-dark"><?php echo number_format($server['today_votes']); ?></span></td>
-                                    <td><?php echo date('d/m/Y', strtotime($server['data_inserimento'])); ?></td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="server.php?id=<?php echo $server['id']; ?>" class="btn btn-outline-info" target="_blank">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            <a href="admin.php?action=edit&id=<?php echo $server['id']; ?>" class="btn btn-outline-primary">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <button type="button" class="btn btn-outline-danger" onclick="confirmDelete(<?php echo $server['id']; ?>, '<?php echo addslashes($server['nome']); ?>')">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                <div class="servers-grid">
+                    <?php foreach ($servers as $server): ?>
+                        <div class="server-card-profile">
+                            <div class="server-card-header">
+                                <?php if ($server['logo_url']): ?>
+                                    <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" alt="Logo" class="server-logo-small">
+                                <?php else: ?>
+                                    <div class="server-logo-small default-logo"><i class="bi bi-cube"></i></div>
+                                <?php endif; ?>
+                                <div class="server-info-small">
+                                    <div class="server-name-small">
+                                        <a href="server.php?id=<?php echo $server['id']; ?>" target="_blank">
+                                            <?php echo htmlspecialchars($server['nome']); ?>
+                                        </a>
+                                    </div>
+                                    <div class="server-ip-small">
+                                        <i class="bi bi-server"></i> <?php echo htmlspecialchars($server['ip']); ?>
+                                    </div>
+                                    <div class="server-description-small">
+                                        <?php echo htmlspecialchars($server['descrizione']); ?>
+                                    </div>
+                                </div>
+                                <div class="server-stats-small">
+                                    <div class="stat-item-small">
+                                        <span class="stat-number-small"><i class="bi bi-bar-chart"></i> <?php echo number_format($server['vote_count']); ?></span>
+                                        <span class="stat-label-small">Voti Totali</span>
+                                    </div>
+                                    <div class="stat-item-small">
+                                        <span class="stat-number-small text-warning"><i class="bi bi-star"></i> <?php echo number_format($server['today_votes']); ?></span>
+                                        <span class="stat-label-small">Voti Oggi</span>
+                                    </div>
+                                    <div class="stat-item-small">
+                                        <span class="stat-label-small"><i class="bi bi-calendar"></i> <?php echo date('d/m/Y', strtotime($server['data_inserimento'])); ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="server-actions mt-2">
+                                <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server" target="_blank">
+                                    <i class="bi bi-eye"></i> Vedi
+                                </a>
+                                <a href="admin.php?action=edit&id=<?php echo $server['id']; ?>" class="btn-edit-server">
+                                    <i class="bi bi-pencil"></i> Modifica
+                                </a>
+                                <button type="button" class="btn btn-outline-danger" onclick="confirmDelete(<?php echo $server['id']; ?>, '<?php echo addslashes($server['nome']); ?>')">
+                                    <i class="bi bi-trash"></i> Elimina
+                                </button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             <?php else: ?>
                 <div class="text-center py-5">
