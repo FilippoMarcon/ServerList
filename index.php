@@ -241,7 +241,7 @@ include 'header.php';
                                 </div>
                                 <div class="player-status">online</div>
                                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
-                                    Java & Bedrock
+                                    <?php echo htmlspecialchars($server['tipo_server'] ?? 'Java & Bedrock'); ?>
                                 </div>
                             </div>
                         </div>

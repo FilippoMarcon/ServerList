@@ -319,7 +319,7 @@ include 'header.php';
                     
                     <div class="info-item">
                         <span class="info-label">Edizione:</span>
-                        <span class="info-value">Java</span>
+                        <span class="info-value"><?php echo htmlspecialchars($server['tipo_server'] ?? 'Java & Bedrock'); ?></span>
                     </div>
                     
                     <div class="info-item">

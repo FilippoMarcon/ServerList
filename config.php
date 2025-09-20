@@ -34,9 +34,13 @@ if (session_status() === PHP_SESSION_NONE) {
 date_default_timezone_set('Europe/Rome');
 
 // Costanti utili
-define('SITE_NAME', 'Minecraft Server List');
+define('SITE_NAME', 'Blocksy');
 define('SITE_URL', (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]");
 define('AVATAR_API', 'https://mc-heads.net/avatar');
+
+// Configurazione reCAPTCHA Google
+define('RECAPTCHA_SITE_KEY', '6Lcm188rAAAAAK0x_JWgJjNii5XY6rkoqPA-i7fJ'); // Sostituisci con la tua Site Key
+define('RECAPTCHA_SECRET_KEY', '6Lcm188rAAAAAHlpFg9bYpicG-FspVf6Gq50QJ4r'); // Sostituisci con la tua Secret Key
 
 // Funzioni di utilità
 
@@ -58,7 +62,7 @@ function isLoggedIn() {
  * Verifica se l'utente è admin
  */
 function isAdmin() {
-    return isset($_SESSION['is_admin']) && $_SESSION['is_admin'] === true;
+    return isset($_SESSION['is_admin']) && ($_SESSION['is_admin'] === true || $_SESSION['is_admin'] === 1 || $_SESSION['is_admin'] === '1');
 }
 
 /**

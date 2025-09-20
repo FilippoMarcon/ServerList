@@ -33,24 +33,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!preg_match('/^[a-zA-Z0-9_]+$/', $minecraft_nick)) {
         $error = 'Il nickname può contenere solo lettere, numeri e underscore.';
     } else {
-        // Verifica CAPTCHA (usa reCAPTCHA di Google)
-        $secret_key = 'YOUR_RECAPTCHA_SECRET_KEY'; // Sostituisci con la tua chiave segreta
+        // Verifica reCAPTCHA di Google
+        $secret_key = RECAPTCHA_SECRET_KEY;
         
         if (!empty($captcha_response)) {
-            $verify = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret={$secret_key}&response={$captcha_response}");
-            $captcha_success = json_decode($verify);
+            $verify_url = "https://www.google.com/recaptcha/api/siteverify";
+            $verify_data = [
+                'secret' => $secret_key,
+                'response' => $captcha_response,
+                'remoteip' => $_SERVER['REMOTE_ADDR']
+            ];
             
-            if (!$captcha_success->success) {
-                $error = 'Verifica CAPTCHA fallita. Riprova.';
+            $verify_request = curl_init();
+            curl_setopt($verify_request, CURLOPT_URL, $verify_url);
+            curl_setopt($verify_request, CURLOPT_POST, true);
+            curl_setopt($verify_request, CURLOPT_POSTFIELDS, http_build_query($verify_data));
+            curl_setopt($verify_request, CURLOPT_RETURNTRANSFER, true);
+            
+            $verify_response = curl_exec($verify_request);
+            curl_close($verify_request);
+            
+            $captcha_result = json_decode($verify_response, true);
+            
+            if (!$captcha_result['success']) {
+                $error = 'Verifica reCAPTCHA fallita. Riprova.';
             }
         } else {
-            // Se non c'è reCAPTCHA, usa una semplice verifica matematica come fallback
-            $math_answer = $_POST['math_answer'] ?? '';
-            $math_question = $_SESSION['math_question'] ?? '';
-            
-            if (empty($math_answer) || $math_answer != $math_question) {
-                $error = 'Risposta matematica errata.';
-            }
+            $error = 'Completa la verifica reCAPTCHA.';
         }
         
         if (empty($error)) {
@@ -71,9 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $success = 'Registrazione completata con successo! Ora puoi effettuare il login.';
                     
-                    // Rimuovi la domanda matematica dalla sessione
-                    unset($_SESSION['math_question']);
-                    
                     // Reindirizza al login dopo 3 secondi
                     echo '<meta http-equiv="refresh" content="3;url=login.php">';
                 }
@@ -84,19 +90,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Genera una domanda matematica semplice per il CAPTCHA fallback
-if (!isset($_SESSION['math_question'])) {
-    $num1 = rand(1, 10);
-    $num2 = rand(1, 10);
-    $_SESSION['math_question'] = $num1 + $num2;
-    $_SESSION['math_text'] = "Quanto fa {$num1} + {$num2}?";
-}
+
 
 $page_title = "Registrazione";
 include 'header.php';
 ?>
 
 <link rel="stylesheet" href="assets/css/auth-improvements.css">
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<style>
+/* Force center alignment - Override any conflicting styles */
+.auth-header {
+    text-align: center !important;
+}
+
+.auth-logo {
+    margin: 0 auto 2rem auto !important;
+    display: flex !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.auth-body {
+    margin-bottom: 0 !important;
+}
+
+@media (min-width: 769px) {
+    .auth-header {
+        text-align: center !important;
+    }
+    
+    .auth-body {
+        margin-bottom: 0 !important;
+    }
+}
+</style>
 
 <!-- Register Page Container -->
 <div class="auth-page-container">
@@ -166,15 +194,14 @@ include 'header.php';
                             </div>
                             
                             <div class="form-group">
-                                <label for="math_answer" class="form-label">
+                                <label class="form-label">
                                     <i class="bi bi-shield-check"></i> Verifica di sicurezza
                                 </label>
-                                <div class="captcha-group">
-                                    <span class="captcha-question">
-                                        <?php echo $_SESSION['math_text']; ?>
-                                    </span>
-                                    <input type="number" class="form-input captcha-input" id="math_answer" name="math_answer" required
-                                           placeholder="Risultato">
+                                <div class="recaptcha-container" style="display: flex; justify-content: center; margin: 1rem 0;">
+                                    <div class="g-recaptcha" data-sitekey="<?php echo RECAPTCHA_SITE_KEY; ?>"></div>
+                                </div>
+                                <div class="form-hint" style="text-align: center;">
+                                    Completa la verifica reCAPTCHA per continuare
                                 </div>
                             </div>
                             
@@ -234,7 +261,7 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
     const minecraftNick = document.getElementById('minecraft_nick').value.trim();
     const password = document.getElementById('password').value;
     const passwordConfirm = document.getElementById('password_confirm').value;
-    const mathAnswer = document.getElementById('math_answer').value;
+    const recaptchaResponse = grecaptcha.getResponse();
     
     if (minecraftNick.length < 3 || minecraftNick.length > 16) {
         e.preventDefault();
@@ -260,9 +287,9 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
         return false;
     }
     
-    if (!mathAnswer || isNaN(mathAnswer)) {
+    if (!recaptchaResponse) {
         e.preventDefault();
-        showAuthToast('Inserisci una risposta valida per la verifica.', 'error');
+        showAuthToast('Completa la verifica reCAPTCHA.', 'error');
         return false;
     }
 });

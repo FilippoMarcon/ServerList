@@ -34,14 +34,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$captcha_success->success) {
                 $error = 'Verifica CAPTCHA fallita. Riprova.';
             }
-        } else {
-            // Se non c'è reCAPTCHA, usa una semplice verifica matematica come fallback
-            $math_answer = $_POST['math_answer'] ?? '';
-            $math_question = $_SESSION['math_question'] ?? '';
-            
-            if (empty($math_answer) || $math_answer != $math_question) {
-                $error = 'Risposta matematica errata.';
-            }
         }
         
         if (empty($error)) {
@@ -56,9 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['minecraft_nick'] = $user['minecraft_nick'];
                     $_SESSION['is_admin'] = $user['is_admin'];
-                    
-                    // Rimuovi la domanda matematica dalla sessione
-                    unset($_SESSION['math_question']);
+
                     
                     $success = 'Login effettuato con successo! Reindirizzamento...';
                     
@@ -74,19 +64,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Genera una domanda matematica semplice per il CAPTCHA fallback
-if (!isset($_SESSION['math_question'])) {
-    $num1 = rand(1, 10);
-    $num2 = rand(1, 10);
-    $_SESSION['math_question'] = $num1 + $num2;
-    $_SESSION['math_text'] = "Quanto fa {$num1} + {$num2}?";
-}
+
 
 $page_title = "Login";
 include 'header.php';
 ?>
 
 <link rel="stylesheet" href="assets/css/auth-improvements.css">
+<style>
+/* Force center alignment - Override any conflicting styles */
+.auth-header {
+    text-align: center !important;
+}
+
+.auth-logo {
+    margin: 0 auto 2rem auto !important;
+    display: flex !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.auth-body {
+    margin-bottom: 0 !important;
+}
+
+@media (min-width: 769px) {
+    .auth-header {
+        text-align: center !important;
+    }
+    
+    .auth-body {
+        margin-bottom: 0 !important;
+    }
+}
+</style>
 
 <!-- Login Page Container -->
 <div class="auth-page-container">
@@ -140,18 +151,7 @@ include 'header.php';
                                 </div>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="math_answer" class="form-label">
-                                    <i class="bi bi-shield-check"></i> Verifica di sicurezza
-                                </label>
-                                <div class="captcha-group">
-                                    <span class="captcha-question">
-                                        <?php echo $_SESSION['math_text']; ?>
-                                    </span>
-                                    <input type="number" class="form-input captcha-input" id="math_answer" name="math_answer" required
-                                           placeholder="Risultato">
-                                </div>
-                            </div>
+
                             
                             <button type="submit" class="auth-button">
                                 <i class="bi bi-box-arrow-in-right"></i>
@@ -198,7 +198,6 @@ document.getElementById('togglePassword').addEventListener('click', function() {
 document.getElementById('loginForm').addEventListener('submit', function(e) {
     const minecraftNick = document.getElementById('minecraft_nick').value.trim();
     const password = document.getElementById('password').value;
-    const mathAnswer = document.getElementById('math_answer').value;
     
     if (minecraftNick.length < 3) {
         e.preventDefault();
@@ -209,12 +208,6 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     if (password.length < 6) {
         e.preventDefault();
         showAuthToast('La password deve essere di almeno 6 caratteri.', 'error');
-        return false;
-    }
-    
-    if (!mathAnswer || isNaN(mathAnswer)) {
-        e.preventDefault();
-        showAuthToast('Inserisci una risposta valida per la verifica.', 'error');
         return false;
     }
 });

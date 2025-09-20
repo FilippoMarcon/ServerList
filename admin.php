@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nome = sanitize($_POST['nome'] ?? '');
             $ip = sanitize($_POST['ip'] ?? '');
             $versione = sanitize($_POST['versione'] ?? '');
+            $tipo_server = sanitize($_POST['tipo_server'] ?? 'Java & Bedrock');
             $descrizione = sanitize($_POST['descrizione'] ?? '');
             $banner_url = sanitize($_POST['banner_url'] ?? '');
             $logo_url = sanitize($_POST['logo_url'] ?? '');
@@ -33,8 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Nome, IP e Versione sono campi obbligatori.';
             } else {
                 try {
-                    $stmt = $pdo->prepare("INSERT INTO sl_servers (nome, ip, versione, descrizione, banner_url, logo_url, data_inserimento) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-                    $stmt->execute([$nome, $ip, $versione, $descrizione, $banner_url, $logo_url]);
+                    $stmt = $pdo->prepare("INSERT INTO sl_servers (nome, ip, versione, tipo_server, descrizione, banner_url, logo_url, data_inserimento) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url]);
                     $message = 'Server aggiunto con successo!';
                     $action = 'list';
                 } catch (PDOException $e) {
@@ -49,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nome = sanitize($_POST['nome'] ?? '');
             $ip = sanitize($_POST['ip'] ?? '');
             $versione = sanitize($_POST['versione'] ?? '');
+            $tipo_server = sanitize($_POST['tipo_server'] ?? 'Java & Bedrock');
             $descrizione = sanitize($_POST['descrizione'] ?? '');
             $banner_url = sanitize($_POST['banner_url'] ?? '');
             $logo_url = sanitize($_POST['logo_url'] ?? '');
@@ -57,8 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Tutti i campi obbligatori devono essere compilati.';
             } else {
                 try {
-                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, descrizione = ?, banner_url = ?, logo_url = ? WHERE id = ?");
-                    $stmt->execute([$nome, $ip, $versione, $descrizione, $banner_url, $logo_url, $server_id]);
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ? WHERE id = ?");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $server_id]);
                     $message = 'Server modificato con successo!';
                     $action = 'list';
                 } catch (PDOException $e) {
@@ -388,6 +390,17 @@ include 'header.php';
                             <input type="text" class="form-control" id="versione" name="versione" required
                                    value="<?php echo htmlspecialchars($server_to_edit['versione'] ?? ''); ?>"
                                    placeholder="Es: 1.20.4">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="tipo_server" class="form-label">
+                                <i class="bi bi-hdd-stack"></i> Tipo Server *
+                            </label>
+                            <select class="form-control" id="tipo_server" name="tipo_server" required>
+                                <option value="Java" <?php echo (isset($server_to_edit) && $server_to_edit['tipo_server'] == 'Java') ? 'selected' : ''; ?>>Java</option>
+                                <option value="Bedrock" <?php echo (isset($server_to_edit) && $server_to_edit['tipo_server'] == 'Bedrock') ? 'selected' : ''; ?>>Bedrock</option>
+                                <option value="Java & Bedrock" <?php echo (!isset($server_to_edit) || $server_to_edit['tipo_server'] == 'Java & Bedrock') ? 'selected' : ''; ?>>Java & Bedrock</option>
+                            </select>
                         </div>
                     </div>
                     <div class="col-md-6">

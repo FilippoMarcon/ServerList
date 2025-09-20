@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS `sl_servers` (
   `ip` varchar(255) NOT NULL,
   `versione` varchar(50) DEFAULT NULL,
   `logo_url` varchar(500) DEFAULT NULL,
+  `tipo_server` enum('Java', 'Bedrock', 'Java & Bedrock') DEFAULT 'Java & Bedrock',
   `owner_id` int(11) DEFAULT NULL,
   `data_inserimento` datetime DEFAULT CURRENT_TIMESTAMP,
   `data_aggiornamento` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `sl_servers` (
   KEY `idx_nome` (`nome`),
   KEY `idx_ip` (`ip`),
   KEY `idx_active` (`is_active`),
+  KEY `idx_tipo_server` (`tipo_server`),
   KEY `idx_owner_id` (`owner_id`),
   FOREIGN KEY (`owner_id`) REFERENCES `sl_users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -105,10 +107,19 @@ INSERT INTO `sl_users` (`minecraft_nick`, `password_hash`, `is_admin`) VALUES
 ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 1);
 
 -- Inserimento server di esempio / Sample server insertion
-INSERT INTO `sl_servers` (`nome`, `banner_url`, `descrizione`, `ip`, `versione`, `logo_url`) VALUES 
-('Server Epico', 'https://via.placeholder.com/468x60.png?text=Server+Epico', 'Un server Minecraft epico con tante modalità di gioco!', 'play.serverepico.it', '1.20.4', 'https://via.placeholder.com/100x100.png?text=Logo'),
-('Creative Building', 'https://via.placeholder.com/468x60.png?text=Creative+Building', 'Server creativo per costruttori di ogni livello!', 'creative.building.com', '1.20.1', 'https://via.placeholder.com/100x100.png?text=CB'),
-('PVP Arena', 'https://via.placeholder.com/468x60.png?text=PVP+Arena', 'Il miglior server PVP con arene personalizzate!', 'pvp.arena.net', '1.19.4', 'https://via.placeholder.com/100x100.png?text=PVP');
+INSERT INTO `sl_servers` (`nome`, `banner_url`, `descrizione`, `ip`, `versione`, `logo_url`, `tipo_server`) VALUES 
+('Server Epico', 'https://via.placeholder.com/468x60.png?text=Server+Epico', 'Un server Minecraft epico con tante modalità di gioco!', 'play.serverepico.it', '1.20.4', 'https://via.placeholder.com/100x100.png?text=Logo', 'Java & Bedrock'),
+('Creative Building', 'https://via.placeholder.com/468x60.png?text=Creative+Building', 'Server creativo per costruttori di ogni livello!', 'creative.building.com', '1.20.1', 'https://via.placeholder.com/100x100.png?text=CB', 'Java'),
+('PVP Arena', 'https://via.placeholder.com/468x60.png?text=PVP+Arena', 'Il miglior server PVP con arene personalizzate!', 'pvp.arena.net', '1.19.4', 'https://via.placeholder.com/100x100.png?text=PVP', 'Bedrock');
+
+-- Script di aggiornamento per database esistenti
+-- Update script for existing databases
+ALTER TABLE `sl_servers` ADD COLUMN `tipo_server` enum('Java', 'Bedrock', 'Java & Bedrock') DEFAULT 'Java & Bedrock' AFTER `logo_url`;
+ALTER TABLE `sl_servers` ADD KEY `idx_tipo_server` (`tipo_server`);
+
+-- Aggiorna i server esistenti con valori di default
+-- Update existing servers with default values
+UPDATE `sl_servers` SET `tipo_server` = 'Java & Bedrock' WHERE `tipo_server` IS NULL;
 
 -- Permessi e ottimizzazioni / Permissions and optimizations
 -- Assicurati che l'utente MySQL abbia i permessi necessari

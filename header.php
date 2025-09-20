@@ -865,6 +865,7 @@
             background: var(--primary-bg);
             position: relative;
             overflow: hidden;
+            margin-bottom: -4rem;
         }
         
         .auth-page-container::before {
@@ -2162,6 +2163,11 @@
                             <li><a class="dropdown-item" href="profile.php">
                                 <i class="bi bi-person"></i> Profilo
                             </a></li>
+                            <?php if (isAdmin()): ?>
+                            <li><a class="dropdown-item" href="admin.php">
+                                <i class="bi bi-gear-fill"></i> Admin Dashboard
+                            </a></li>
+                            <?php endif; ?>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="logout.php">
                                 <i class="bi bi-box-arrow-right"></i> Logout
