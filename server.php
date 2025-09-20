@@ -74,7 +74,7 @@ include 'header.php';
 ?>
 
 <!-- Server Page Container -->
-<div class="server-page-container" style="margin-top: 80px;">
+<div class="server-page-container">
     <!-- Server Header with Banner -->
     <div class="server-header">
         <?php if ($server['banner_url']): ?>
@@ -87,8 +87,8 @@ include 'header.php';
             </div>
         <?php endif; ?>
         
-        <div class="container">
-            <div class="server-header-content">
+        <div class="container" style="display: flex !important; align-items: center !important; justify-content: center !important; height: 100% !important; min-height: 400px !important;">
+            <div class="server-header-content" style="display: flex !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; max-width: 1200px !important;">
                 <div class="server-main-info">
                     <div class="server-logo-section">
                         <?php if ($server['logo_url']): ?>
@@ -107,7 +107,7 @@ include 'header.php';
                             <div class="server-rank-badge">
                                 <i class="bi bi-trophy-fill"></i> 1°
                             </div>
-                            <div class="server-ip-display" onclick="copyToClipboard('<?php echo htmlspecialchars($server['ip']); ?>')" title="Clicca per copiare">
+                            <div class="server-ip-display" title="Clicca per copiare">
                                 <?php echo htmlspecialchars($server['ip']); ?>
                             </div>
                         </div>
@@ -134,6 +134,7 @@ include 'header.php';
                     <div class="vote-count">
                         <?php echo number_format($server['vote_count']); ?> voti
                     </div>
+                    <?php if ($can_vote): ?>
                         <div class="vote-action">
                             <button class="vote-increment" onclick="voteServer(<?php echo $server_id; ?>)">
                                 +1
@@ -295,8 +296,7 @@ include 'header.php';
                         ?>
                             <div class="voter-avatar-modern" 
                                  title="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
-                                 onmouseover="showVoterTooltip(this, '<?php echo htmlspecialchars($voter['minecraft_nick']); ?>')"
-                                 onmouseout="hideVoterTooltip()">
+                                 data-nickname="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>">
                                 <img src="https://mc-heads.net/avatar/<?php echo urlencode($voter['minecraft_nick']); ?>" 
                                      alt="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
                                      onerror="this.src='https://via.placeholder.com/32x32/6c757d/ffffff?text=?';">
@@ -326,23 +326,23 @@ function voteServer(serverId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showToast('Voto registrato con successo!', 'success');
+            showCustomToast('Voto registrato con successo!', 'success');
             setTimeout(() => {
                 location.reload();
             }, 1500);
         } else {
-            showToast(data.message || 'Errore durante la votazione.', 'error');
+            showCustomToast(data.message || 'Errore durante la votazione.', 'error');
         }
     })
     .catch(error => {
-        showToast('Errore di connessione. Riprova.', 'error');
+        showCustomToast('Errore di connessione. Riprova.', 'error');
     });
 }
 
 // Funzione per copiare l'IP del server
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(function() {
-        showToast('IP copiato negli appunti!', 'success');
+        showCustomToast('IP copiato negli appunti!', 'success');
     }).catch(function() {
         // Fallback per browser più vecchi
         const textArea = document.createElement('textarea');
@@ -351,8 +351,53 @@ function copyToClipboard(text) {
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        showToast('IP copiato negli appunti!', 'success');
+        showCustomToast('IP copiato negli appunti!', 'success');
     });
+}
+
+// Toast personalizzato con grafica migliore
+function showCustomToast(message, type = 'success') {
+    // Rimuovi toast esistenti
+    const existingToasts = document.querySelectorAll('.custom-toast');
+    existingToasts.forEach(toast => toast.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = 'custom-toast';
+    
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+    const bgColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6';
+    
+    toast.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${bgColor};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            animation: slideInToast 0.3s ease-out;
+        ">
+            <span style="font-size: 16px;">${icon}</span>
+            ${message}
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Rimuovi dopo 3 secondi
+    setTimeout(() => {
+        toast.style.animation = 'slideOutToast 0.3s ease-in forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 // Funzione per condividere su Discord
@@ -395,22 +440,24 @@ function showVoterTooltip(element, nickname) {
     tooltip.textContent = nickname;
     tooltip.style.cssText = `
         position: absolute;
-        background: rgba(0, 0, 0, 0.8);
+        background: rgba(0, 0, 0, 0.9);
         color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
+        padding: 6px 10px;
+        border-radius: 6px;
         font-size: 12px;
+        font-weight: 500;
         white-space: nowrap;
         z-index: 1000;
         pointer-events: none;
         transform: translateX(-50%);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     `;
     
     document.body.appendChild(tooltip);
     
     const rect = element.getBoundingClientRect();
     tooltip.style.left = (rect.left + rect.width / 2) + 'px';
-    tooltip.style.top = (rect.top - tooltip.offsetHeight - 5) + 'px';
+    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
 }
 
 function hideVoterTooltip() {
@@ -448,11 +495,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Avatar error handling
-    const avatarImages = document.querySelectorAll('.voter-avatar-modern img');
-    avatarImages.forEach(img => {
-        img.addEventListener('error', function() {
-            this.src = 'https://via.placeholder.com/32x32/6c757d/ffffff?text=?';
+    // Avatar error handling e tooltip
+    const voterAvatars = document.querySelectorAll('.voter-avatar-modern');
+    voterAvatars.forEach(avatar => {
+        const img = avatar.querySelector('img');
+        const nickname = avatar.getAttribute('data-nickname');
+        
+        // Error handling per immagini
+        if (img) {
+            img.addEventListener('error', function() {
+                this.src = 'https://via.placeholder.com/32x32/6c757d/ffffff?text=?';
+            });
+        }
+        
+        // Tooltip events
+        avatar.addEventListener('mouseenter', function() {
+            showVoterTooltip(this, nickname);
+        });
+        
+        avatar.addEventListener('mouseleave', function() {
+            hideVoterTooltip();
         });
     });
 });

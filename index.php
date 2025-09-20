@@ -28,10 +28,105 @@ try {
 include 'header.php';
 ?>
 
+<style>
+/* FLOATING DROPDOWN - MASSIMA PRIORITÀ */
+.floating-dropdown {
+    position: absolute !important;
+    top: 1.5rem !important;
+    right: 1.5rem !important;
+    z-index: 99999 !important;
+}
+
+.floating-dropdown .nav-item.dropdown {
+    position: relative !important;
+    z-index: 99999 !important;
+}
+
+.floating-dropdown .filters-btn {
+    background: var(--gradient-primary) !important;
+    border: none !important;
+    color: white !important;
+    padding: 0.75rem 1.5rem !important;
+    border-radius: 12px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+.floating-dropdown .filters-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4) !important;
+    color: white !important;
+    text-decoration: none !important;
+}
+
+.floating-dropdown .dropdown-menu {
+    position: absolute !important;
+    z-index: 99999 !important;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+    padding: 0.5rem !important;
+    margin-top: 0.5rem !important;
+    backdrop-filter: blur(20px) !important;
+    min-width: 200px !important;
+}
+
+.floating-dropdown .dropdown-menu.show {
+    z-index: 99999 !important;
+    display: block !important;
+}
+
+.floating-dropdown .dropdown-item {
+    color: var(--text-primary) !important;
+    padding: 0.75rem 1rem !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    font-weight: 500 !important;
+    text-decoration: none !important;
+}
+
+.floating-dropdown .dropdown-item:hover,
+.floating-dropdown .dropdown-item:focus {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+    transform: translateX(4px) !important;
+    text-decoration: none !important;
+}
+</style>
+
 <div class="container" style="margin-top: 2rem;">
     <div class="row">
         <!-- Main Content -->
-        <div class="col-lg-9">
+        <div class="col-lg-9" style="position: relative;">
+            <!-- Dropdown fuori dal header per evitare z-index conflicts -->
+            <div class="floating-dropdown" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 99999;">
+                <div class="nav-item dropdown">
+                    <a class="filters-btn dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-funnel"></i> Filtri
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" data-sort="votes">
+                            <i class="bi bi-trophy"></i> Ordina per Voti
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" data-sort="name">
+                            <i class="bi bi-server"></i> Ordina per Server
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" data-sort="players">
+                            <i class="bi bi-people"></i> Ordina per Players
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+            
             <!-- Server List Header -->
             <div class="server-list-header">
                 <div class="d-flex align-items-center">
@@ -42,9 +137,8 @@ include 'header.php';
                 </div>
                 <div class="search-container">
                     <input type="text" class="search-input" placeholder="Cerca" id="searchInput">
-                    <button class="filters-btn">
-                        <i class="bi bi-funnel"></i> Filtri
-                    </button>
+                    <!-- Spazio per il bottone che ora è floating -->
+                    <div style="width: 120px;"></div>
                 </div>
             </div>
             
@@ -169,9 +263,6 @@ include 'header.php';
                 
                 <div class="filter-group">
                     <h5>Modalità</h5>
-                    <div class="filter-status">
-                        <small class="text-muted">Nessun filtro selezionato</small>
-                    </div>
                     <div class="filter-tags">
                         <span class="filter-tag">Adventure</span>
                         <span class="filter-tag">Survival</span>
@@ -208,18 +299,25 @@ function searchServers() {
             server.style.display = 'none';
         }
     });
+    
+    // Riapplica l'ordinamento corrente
+    const currentSort = sessionStorage.getItem('serverSort') || 'votes';
+    applySorting(currentSort);
 }
 
 // Ricerca in tempo reale
-document.getElementById('searchInput').addEventListener('input', searchServers);
+document.getElementById('searchInput').addEventListener('input', function() {
+    searchServers();
+    updateClearFiltersButton();
+});
 
 // Gestione filtri avanzata
 document.addEventListener('DOMContentLoaded', function() {
     // Inizializza animazioni
     initAnimations();
     
-    // Inizializza status filtri
-    updateFilterStatus();
+    // Inizializza ordinamento salvato
+    loadSavedSort();
     
     // Filter tags
     const filterTags = document.querySelectorAll('.filter-tag');
@@ -227,8 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tag.addEventListener('click', function() {
             this.classList.toggle('active');
             applyFilters();
-            updateFilterCount();
-            updateFilterStatus();
+            updateClearFiltersButton();
         });
     });
     
@@ -239,15 +336,20 @@ document.addEventListener('DOMContentLoaded', function() {
             server.style.display = 'flex';
         });
         document.getElementById('searchInput').value = '';
-        updateFilterCount();
-        updateFilterStatus();
+        updateClearFiltersButton();
+        // Riapplica l'ordinamento corrente
+        const currentSort = sessionStorage.getItem('serverSort') || 'votes';
+        applySorting(currentSort);
     });
     
-    // Filters button toggle
-    document.querySelector('.filters-btn').addEventListener('click', function() {
-        const sidebar = document.querySelector('.col-lg-3');
-        sidebar.classList.toggle('d-none');
-        sidebar.classList.toggle('d-lg-block');
+    // Sort dropdown items
+    document.querySelectorAll('.dropdown-item[data-sort]').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const sortType = this.getAttribute('data-sort');
+            applySorting(sortType);
+            sessionStorage.setItem('serverSort', sortType);
+        });
     });
     
     // Server IP click to copy
@@ -256,6 +358,26 @@ document.addEventListener('DOMContentLoaded', function() {
             copyServerIP(this.textContent);
         });
     });
+    
+    // Inizializza stato bottone clear filters
+    updateClearFiltersButton();
+    
+    // Debug: verifica che gli stili siano caricati
+    console.log('Clear filters button found:', document.querySelector('.clear-filters'));
+    console.log('Filter tags found:', document.querySelectorAll('.filter-tag').length);
+    
+    // Force floating dropdown z-index
+    const dropdownToggle = document.querySelector('.floating-dropdown .dropdown-toggle');
+    if (dropdownToggle) {
+        dropdownToggle.addEventListener('shown.bs.dropdown', function() {
+            const dropdownMenu = document.querySelector('.floating-dropdown .dropdown-menu');
+            if (dropdownMenu) {
+                dropdownMenu.style.zIndex = '99999';
+                dropdownMenu.style.position = 'absolute';
+                console.log('Floating dropdown z-index forced to 99999');
+            }
+        });
+    }
 });
 
 function applyFilters() {
@@ -282,31 +404,89 @@ function applyFilters() {
     
     // Update results count
     updateResultsCount(visibleCount);
+    
+    // Riapplica l'ordinamento corrente sui server visibili
+    const currentSort = sessionStorage.getItem('serverSort') || 'votes';
+    applySorting(currentSort);
 }
 
-function updateFilterCount() {
+function updateClearFiltersButton() {
     const activeCount = document.querySelectorAll('.filter-tag.active').length;
-    const filtersBtn = document.querySelector('.filters-btn');
+    const clearBtn = document.querySelector('.clear-filters');
+    
+    if (!clearBtn) {
+        console.warn('Clear filters button not found');
+        return;
+    }
     
     if (activeCount > 0) {
-        filtersBtn.innerHTML = `<i class="bi bi-funnel-fill"></i> Filtri (${activeCount})`;
+        clearBtn.classList.add('active');
+        // Backup inline style per assicurarsi che funzioni
+        clearBtn.style.backgroundColor = '#ffebee';
+        clearBtn.style.borderColor = '#ffcdd2';
+        clearBtn.style.color = '#c62828';
+        console.log('Clear filters button activated - filters active:', activeCount);
     } else {
-        filtersBtn.innerHTML = `<i class="bi bi-funnel"></i> Filtri`;
+        clearBtn.classList.remove('active');
+        // Rimuovi stili inline
+        clearBtn.style.backgroundColor = '';
+        clearBtn.style.borderColor = '';
+        clearBtn.style.color = '';
+        console.log('Clear filters button deactivated');
     }
 }
 
-function updateFilterStatus() {
-    const activeCount = document.querySelectorAll('.filter-tag.active').length;
-    const filterStatus = document.querySelector('.filter-status small');
+function applySorting(sortType) {
+    const serverList = document.querySelector('.server-list');
+    const servers = Array.from(serverList.querySelectorAll('.server-card'));
     
-    if (activeCount > 0) {
-        const activeFilters = Array.from(document.querySelectorAll('.filter-tag.active')).map(tag => tag.textContent);
-        filterStatus.textContent = `${activeCount} filtro${activeCount > 1 ? 'i' : ''} selezionato${activeCount > 1 ? 'i' : ''}: ${activeFilters.join(', ')}`;
-        filterStatus.className = 'text-primary';
-    } else {
-        filterStatus.textContent = 'Nessun filtro selezionato';
-        filterStatus.className = 'text-muted';
-    }
+    // Ordina solo i server visibili
+    const visibleServers = servers.filter(server => server.style.display !== 'none');
+    const hiddenServers = servers.filter(server => server.style.display === 'none');
+    
+    visibleServers.sort((a, b) => {
+        switch (sortType) {
+            case 'votes':
+                return getVotes(b) - getVotes(a);
+            case 'name':
+                return getServerName(a).localeCompare(getServerName(b));
+            case 'players':
+                return getPlayerCount(b) - getPlayerCount(a);
+            default:
+                return 0;
+        }
+    });
+    
+    // Rimuovi tutti i server dal DOM
+    servers.forEach(server => server.remove());
+    
+    // Aggiungi prima i server visibili ordinati, poi quelli nascosti
+    visibleServers.forEach(server => serverList.appendChild(server));
+    hiddenServers.forEach(server => serverList.appendChild(server));
+}
+
+function getVotes(serverCard) {
+    const rankElement = serverCard.querySelector('.server-rank');
+    if (!rankElement) return 0;
+    const voteText = rankElement.textContent.replace('+', '').trim();
+    return parseInt(voteText) || 0;
+}
+
+function getServerName(serverCard) {
+    return serverCard.getAttribute('data-name') || '';
+}
+
+function getPlayerCount(serverCard) {
+    const playerElement = serverCard.querySelector('.player-count');
+    if (!playerElement) return 0;
+    const playerText = playerElement.textContent.trim();
+    if (playerText === '...' || playerText === 'Offline') return 0;
+    return parseInt(playerText) || 0;
+}
+
+function loadSavedSort() {
+    const savedSort = sessionStorage.getItem('serverSort') || 'votes';
+    applySorting(savedSort);
 }
 
 function updateResultsCount(count) {

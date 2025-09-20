@@ -146,7 +146,7 @@ include 'header.php';
                                                 <?php if ($user_voted_this_server): ?>
                                                     <div class="voted-indicator">
                                                         <i class="bi bi-check-circle-fill text-success"></i>
-                                                        <span class="voted-text">Votato</span>
+                                                        <span class="voted-text">Votato oggi</span>
                                                     </div>
                                                 <?php endif; ?>
                                             </div>
