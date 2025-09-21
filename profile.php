@@ -51,6 +51,22 @@ $user_stats = [
     'join_date' => $user['data_registrazione'] ?? date('Y-m-d H:i:s')
 ];
 
+// Recupera le licenze dei server di proprietà dell'utente
+$server_licenses = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT sl.*, s.nome as server_name, s.ip as server_ip
+        FROM sl_server_licenses sl
+        JOIN sl_servers s ON sl.server_id = s.id
+        WHERE s.owner_id = ? AND sl.is_active = 1
+        ORDER BY s.nome ASC
+    ");
+    $stmt->execute([$user_id]);
+    $server_licenses = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log("Errore nel recupero licenze server: " . $e->getMessage());
+}
+
 try {
     // Voti totali dati dall'utente
     $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM sl_votes WHERE user_id = ?");
@@ -63,22 +79,6 @@ try {
     $user_stats['servers_voted'] = $stmt->fetch()['total'];
 } catch (PDOException $e) {
     error_log("Errore nel recupero statistiche utente: " . $e->getMessage());
-}
-
-// Recupera le licenze dei server dell'utente
-$user_licenses = [];
-try {
-    $stmt = $pdo->prepare("
-        SELECT s.id, s.nome, sl.license_key, sl.is_active, sl.created_at, sl.last_used 
-        FROM sl_servers s 
-        LEFT JOIN sl_server_licenses sl ON s.id = sl.server_id 
-        WHERE s.owner_id = ? AND s.is_active = 1 
-        ORDER BY s.nome ASC
-    ");
-    $stmt->execute([$user_id]);
-    $user_licenses = $stmt->fetchAll();
-} catch (PDOException $e) {
-    error_log("Errore nel recupero licenze utente: " . $e->getMessage());
 }
 
 $page_title = "Profilo - " . htmlspecialchars($user['minecraft_nick'] ?? 'Utente');
@@ -203,6 +203,150 @@ include 'header.php';
                             </div>
                         </div>
                     <?php endif; ?>
+                    
+                    <!-- Server Licenses Section -->
+                    <?php if (!empty($server_licenses)): ?>
+                        <div class="server-licenses-section">
+                            <h3 class="section-title">
+                                <i class="bi bi-key-fill"></i> Licenze dei Server
+                            </h3>
+                            
+                            <div class="licenses-grid">
+                                <?php foreach ($server_licenses as $license): ?>
+                                    <div class="license-card">
+                                        <div class="license-card-header">
+                                            <h4 class="license-server-name">
+                                                <?php echo htmlspecialchars($license['server_name']); ?>
+                                            </h4>
+                                            <span class="license-status <?php echo $license['is_active'] ? 'active' : 'inactive'; ?>">
+                                                <i class="bi bi-<?php echo $license['is_active'] ? 'check-circle-fill' : 'x-circle-fill'; ?>"></i>
+                                                <?php echo $license['is_active'] ? 'Attiva' : 'Inattiva'; ?>
+                                            </span>
+                                        </div>
+                                        
+                                        <div class="license-card-body">
+                                            <div class="license-key-display">
+                                                <span class="license-label">License Key:</span>
+                                                <code class="license-key-value license-hidden">
+                                                    <span class="license-dots">•••••••••••••••••••••••••••••••••</span>
+                                                    <span class="license-text" style="display: none;"><?php echo htmlspecialchars($license['license_key']); ?></span>
+                                                </code>
+                                            </div>
+                                            
+                                            <div class="license-meta">
+                                                <div class="license-meta-item">
+                                                    <i class="bi bi-calendar"></i>
+                                                    <span>Creata: <?php echo date('d/m/Y', strtotime($license['created_at'])); ?></span>
+                                                </div>
+                                                <?php if ($license['last_used']): ?>
+                                                    <div class="license-meta-item">
+                                                        <i class="bi bi-clock-history"></i>
+                                                        <span>Ultimo uso: <?php echo date('d/m/Y H:i', strtotime($license['last_used'])); ?></span>
+                                                    </div>
+                                                <?php endif; ?>
+                                                <div class="license-meta-item">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                    <span>Utilizzi: <?php echo number_format($license['usage_count']); ?></span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="license-actions">
+                                                <button class="view-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
+                                                    <i class="bi bi-eye"></i> Visualizza
+                                                </button>
+                                                <button class="copy-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
+                                                    <i class="bi bi-copy"></i> Copia
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        
+                        <!-- JavaScript per gestione licenze -->
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            // Gestione pulsanti licenze
+            const viewLicenseButtons = document.querySelectorAll('.view-license-btn');
+            const copyLicenseButtons = document.querySelectorAll('.copy-license-btn');
+                            
+                            // Funzione per visualizzare la licenza
+                            viewLicenseButtons.forEach(button => {
+                                button.addEventListener('click', function() {
+                                    const licenseCard = this.closest('.license-card');
+                                    const licenseKeyDisplay = licenseCard.querySelector('.license-key-value');
+                                    const licenseDots = licenseKeyDisplay.querySelector('.license-dots');
+                                    const licenseText = licenseKeyDisplay.querySelector('.license-text');
+                                    const buttonIcon = this.querySelector('i');
+                                    const buttonText = this.querySelector('span');
+                                    
+                                    if (licenseDots.style.display === 'none') {
+                                        // Nascondi il testo e mostra i pallini
+                                        licenseDots.style.display = 'inline';
+                                        licenseText.style.display = 'none';
+                                        buttonIcon.className = 'bi bi-eye';
+                                        buttonText.textContent = ' Visualizza';
+                                    } else {
+                                        // Mostra il testo e nascondi i pallini
+                                        licenseDots.style.display = 'none';
+                                        licenseText.style.display = 'inline';
+                                        buttonIcon.className = 'bi bi-eye-slash';
+                                        buttonText.textContent = ' Nascondi';
+                                    }
+                                });
+                            });
+                            
+                            // Funzione per copiare la licenza
+                            copyLicenseButtons.forEach(button => {
+                                button.addEventListener('click', function() {
+                                    const licenseKey = this.getAttribute('data-license');
+                                    
+                                    navigator.clipboard.writeText(licenseKey).then(function() {
+                                        // Usa la funzione showToast esistente se disponibile
+                                        if (typeof showToast === 'function') {
+                                            showToast('Licenza copiata negli appunti!', 'success');
+                                        } else {
+                                            alert('Licenza copiata negli appunti!');
+                                        }
+                                        
+                                        // Cambia temporaneamente l'icona per feedback visivo
+                                        const icon = button.querySelector('i');
+                                        const originalClass = icon.className;
+                                        icon.className = 'bi bi-check-lg';
+                                        
+                                        setTimeout(() => {
+                                            icon.className = originalClass;
+                                        }, 2000);
+                                        
+                                    }).catch(function() {
+                                        // Fallback per browser più vecchi
+                                        var textArea = document.createElement('textarea');
+                                        textArea.value = licenseKey;
+                                        document.body.appendChild(textArea);
+                                        textArea.select();
+                                        document.execCommand('copy');
+                                        document.body.removeChild(textArea);
+                                        
+                                        if (typeof showToast === 'function') {
+                                            showToast('Licenza copiata negli appunti!', 'success');
+                                        } else {
+                                            alert('Licenza copiata negli appunti!');
+                                        }
+                                    });
+                                });
+                            });
+                        });
+                        </script>
+                    <?php else: ?>
+                        <div class="no-licenses-section">
+                            <div class="no-licenses-content">
+                                <i class="bi bi-key no-licenses-icon"></i>
+                                <h3>Nessuna Licenza</h3>
+                                <p>Non hai ancora licenze attive per i tuoi server. Le licenze vengono generate automaticamente quando un server viene aggiunto.</p>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Sidebar -->
@@ -271,49 +415,6 @@ include 'header.php';
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Server Licenses -->
-                    <?php if (!empty($user_licenses)): ?>
-                        <div class="profile-licenses-card">
-                            <h4><i class="bi bi-key"></i> Licenze Server</h4>
-                            
-                            <div class="licenses-list">
-                                <?php foreach ($user_licenses as $license): ?>
-                                    <div class="license-item">
-                                        <div class="license-server-name">
-                                            <?php echo htmlspecialchars($license['nome']); ?>
-                                        </div>
-                                        <?php if ($license['license_key']): ?>
-                                            <div class="license-key-container">
-                                                <input type="text" class="license-key-input" 
-                                                       value="<?php echo htmlspecialchars($license['license_key']); ?>" 
-                                                       readonly onclick="this.select()" 
-                                                       title="Clicca per selezionare">
-                                                <button type="button" class="btn-copy-license" 
-                                                        onclick="copyLicense('<?php echo htmlspecialchars($license['license_key']); ?>')"
-                                                        title="Copia licenza">
-                                                    <i class="bi bi-clipboard"></i>
-                                                </button>
-                                            </div>
-                                            <div class="license-status <?php echo $license['is_active'] ? 'status-active' : 'status-inactive'; ?>">
-                                                <i class="bi bi-<?php echo $license['is_active'] ? 'check-circle' : 'x-circle'; ?>"></i>
-                                                <?php echo $license['is_active'] ? 'Attiva' : 'Disattivata'; ?>
-                                            </div>
-                                        <?php else: ?>
-                                            <div class="license-missing">
-                                                <i class="bi bi-exclamation-triangle"></i>
-                                                Nessuna licenza generata
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                            
-                            <div class="license-info">
-                                <small><i class="bi bi-info-circle"></i> Usa questa licenza nel tuo plugin Blocksy</small>
-                            </div>
-                        </div>
-                    <?php endif; ?>
                 </div>
             </div>
         <?php else: ?>

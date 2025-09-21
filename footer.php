@@ -233,6 +233,8 @@
                     });
                 });
             }
+            
+            // Gestione pulsanti licenze rimossa dal footer - ora gestita in profile.php
         });
     </script>
     
