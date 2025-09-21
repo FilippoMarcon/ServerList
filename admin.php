@@ -261,6 +261,12 @@ include 'header.php';
                         <a href="admin.php?action=add" class="btn btn-success<?php echo $action === 'add' ? ' active' : ''; ?>">
                             <i class="bi bi-plus-circle"></i> Aggiungi Server
                         </a>
+                        <a href="admin_rewards.php" class="btn btn-info">
+                            <i class="bi bi-gift"></i> Gestione Ricompense
+                        </a>
+                        <a href="admin_reward_logs.php" class="btn btn-secondary">
+                            <i class="bi bi-history"></i> Log Ricompense
+                        </a>
                         <a href="admin.php?action=webhooks" class="btn btn-warning<?php echo $action === 'webhooks' ? ' active' : ''; ?>">
                             <i class="bi bi-webhook"></i> Webhook
                         </a>

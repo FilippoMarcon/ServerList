@@ -1,0 +1,44 @@
+# Configurazione Blocksy Vote Plugin
+# Blocksy Vote Plugin Configuration
+
+# Licenza del server (24 caratteri univoci) - IDENTIFICAZIONE UNICA
+# Server License (24 unique characters) - UNIQUE IDENTIFICATION
+# OBBLIGATORIO: Inserisci la tua licenza qui 
+server-license: "" # ES: AbC123dEF456gHi789jKL012
+
+# URL dell'API del sito web (senza slash finale)
+# Website API URL (without trailing slash)
+api:
+  url: "https://www.islandmc.it/ServerList"  # URL dell'API senza spazi extra
+  key: ""  # Chiave API opzionale per autenticazione
+  timeout: 30  # Timeout in secondi
+  max-retries: 3  # Numero massimo di tentativi in caso di errore
+
+# Impostazioni generali
+# General settings
+debug: false  # Abilita la modalità debug per vedere i log
+show-vote-reminder-on-join: false  # Mostra promemoria voto quando il giocatore entra
+
+# Messaggi personalizzati
+# Custom messages
+messages:
+  vote-command: "§6§l[Blocksy] §eVota per il nostro server e ricevi ricompense!"
+  invalid-code-format: "§cFormato codice non valido. Usa: XXXX-XXXX-XXXX"
+  code-validating: "§7§oValidazione codice in corso..."
+  reward-success: "§a§l[Blocksy] §aRicompensa ricevuta con successo!"
+  reward-error: "§c§l[Blocksy] §cErrore durante il recupero della ricompensa"
+  vote-reminder: "§6§l[Blocksy] §eHai un codice di voto da riscuotere!"
+
+# Comandi per le ricompense automatiche (eseguiti quando un giocatore ha votato)
+# Commands for automatic rewards (executed when a player has voted)
+auto-reward-commands:
+  - "give {player} minecraft:diamond 2"
+  - "give {player} minecraft:emerald 5"
+  - "eco give {player} 100"
+
+# Impostazioni ricompense automatiche
+# Automatic reward settings
+auto-reward:
+  enabled: true  # Abilita le ricompense automatiche
+  check-interval: 20  # Secondi tra un controllo e l'altro (default: 20 secondi)
+  only-online-players: true  # Dai ricompense solo ai giocatori online

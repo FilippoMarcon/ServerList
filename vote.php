@@ -86,6 +86,17 @@ try {
     $stmt = $pdo->prepare("INSERT INTO sl_votes (server_id, user_id, data_voto) VALUES (?, ?, NOW())");
     $stmt->execute([$server_id, $user_id]);
     
+    // Ottieni l'ID del voto appena inserito
+    $vote_id = $pdo->lastInsertId();
+    
+    // Genera un codice univoco per il voto
+    $vote_code = generateUniqueVoteCode($server_id, $user_id);
+    
+    // Inserisci il codice di voto
+    $expires_at = date('Y-m-d H:i:s', strtotime('+7 days')); // Codice valido per 7 giorni
+    $stmt = $pdo->prepare("INSERT INTO sl_vote_codes (vote_id, server_id, user_id, player_name, code, expires_at) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$vote_id, $server_id, $user_id, $_SESSION['minecraft_nick'], $vote_code, $expires_at]);
+    
     // Aggiorna il contatore voti nella vista (opzionale, la vista si aggiorna automaticamente)
     // Ma possiamo anche aggiornare una cache se necessario
     
@@ -100,7 +111,9 @@ try {
         'success' => true,
         'message' => 'Voto registrato con successo!',
         'vote_time' => date('Y-m-d H:i:s'),
-        'user_nick' => $_SESSION['minecraft_nick']
+        'user_nick' => $_SESSION['minecraft_nick'],
+        'vote_code' => $vote_code,
+        'code_expires' => $expires_at
     ];
     
     echo json_encode($response);
@@ -168,6 +181,20 @@ function getUserVoteStatus($user_id, $server_id = null) {
             'error' => 'Errore nel controllo del voto'
         ];
     }
+}
+
+/**
+ * Genera un codice di voto univoco
+ */
+function generateUniqueVoteCode($server_id, $user_id) {
+    // Crea un codice univoco basato su server, utente e timestamp
+    $timestamp = microtime(true);
+    $random_bytes = random_bytes(16);
+    $hash_data = $server_id . $user_id . $timestamp . bin2hex($random_bytes);
+    $code = strtoupper(substr(hash('sha256', $hash_data), 0, 12));
+    
+    // Formatta il codice in gruppi di 4 caratteri per leggibilità
+    return implode('-', str_split($code, 4));
 }
 
 /**

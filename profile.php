@@ -65,6 +65,22 @@ try {
     error_log("Errore nel recupero statistiche utente: " . $e->getMessage());
 }
 
+// Recupera le licenze dei server dell'utente
+$user_licenses = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT s.id, s.nome, sl.license_key, sl.is_active, sl.created_at, sl.last_used 
+        FROM sl_servers s 
+        LEFT JOIN sl_server_licenses sl ON s.id = sl.server_id 
+        WHERE s.owner_id = ? AND s.is_active = 1 
+        ORDER BY s.nome ASC
+    ");
+    $stmt->execute([$user_id]);
+    $user_licenses = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log("Errore nel recupero licenze utente: " . $e->getMessage());
+}
+
 $page_title = "Profilo - " . htmlspecialchars($user['minecraft_nick'] ?? 'Utente');
 include 'header.php';
 ?>
@@ -255,6 +271,49 @@ include 'header.php';
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Server Licenses -->
+                    <?php if (!empty($user_licenses)): ?>
+                        <div class="profile-licenses-card">
+                            <h4><i class="bi bi-key"></i> Licenze Server</h4>
+                            
+                            <div class="licenses-list">
+                                <?php foreach ($user_licenses as $license): ?>
+                                    <div class="license-item">
+                                        <div class="license-server-name">
+                                            <?php echo htmlspecialchars($license['nome']); ?>
+                                        </div>
+                                        <?php if ($license['license_key']): ?>
+                                            <div class="license-key-container">
+                                                <input type="text" class="license-key-input" 
+                                                       value="<?php echo htmlspecialchars($license['license_key']); ?>" 
+                                                       readonly onclick="this.select()" 
+                                                       title="Clicca per selezionare">
+                                                <button type="button" class="btn-copy-license" 
+                                                        onclick="copyLicense('<?php echo htmlspecialchars($license['license_key']); ?>')"
+                                                        title="Copia licenza">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            </div>
+                                            <div class="license-status <?php echo $license['is_active'] ? 'status-active' : 'status-inactive'; ?>">
+                                                <i class="bi bi-<?php echo $license['is_active'] ? 'check-circle' : 'x-circle'; ?>"></i>
+                                                <?php echo $license['is_active'] ? 'Attiva' : 'Disattivata'; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="license-missing">
+                                                <i class="bi bi-exclamation-triangle"></i>
+                                                Nessuna licenza generata
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            
+                            <div class="license-info">
+                                <small><i class="bi bi-info-circle"></i> Usa questa licenza nel tuo plugin Blocksy</small>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php else: ?>

@@ -1,0 +1,30 @@
+name: Blocksy
+version: '1.0-SNAPSHOT'
+main: me.ph1llyon.blocksy.Blocksy
+api-version: '1.21'
+authors: [ Ph1llyOn_ ]
+description: Blocksy Vote Plugin - Gestione voti e ricompense
+
+commands:
+  blocksy:
+    description: Comando principale di amministrazione per Blocksy
+    usage: /blocksy <help|debug|reload|interval>
+    aliases: [bl, blocksyadmin]
+
+permissions:
+  blocksy.debug:
+    description: Permette di vedere informazioni di debug
+    default: op
+  blocksy.reload:
+    description: Permette di ricaricare la configurazione
+    default: op
+  blocksy.interval:
+    description: Permette di modificare l'intervallo di controllo
+    default: op
+  blocksy.admin:
+    description: Permessi completi per Blocksy
+    default: op
+    children:
+      blocksy.debug: true
+      blocksy.reload: true
+      blocksy.interval: true

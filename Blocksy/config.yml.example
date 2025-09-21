@@ -1,0 +1,34 @@
+# Configurazione Plugin Blocksy
+# Licenza server - IDENTIFICAZIONE UNICA (obbligatoria, 24 caratteri)
+# La licenza identifica automaticamente il server e assegna le ricompense al server corretto
+server-license: ""
+
+# Impostazioni API
+api:
+  url: "https://www.islandmc.it/ServerList"
+  debug: true
+  timeout: 10
+
+# Messaggi personalizzati
+messages:
+  prefix: "§a§l[Blocksy] §r"
+  vote-code-prompt: "§7Inserisci il codice ricevuto dal voto:"
+  invalid-code: "§cCodice non valido o già utilizzato!"
+  vote-success: "§aGrazie per aver votato! Ricompensa ricevuta: §e%reward%"
+  vote-error: "§cSi è verificato un errore durante l'elaborazione del voto."
+  vote-already-used: "§cHai già utilizzato questo codice!"
+  vote-expired: "§cQuesto codice è scaduto!"
+
+# Comandi da eseguire quando un giocatore vota con successo
+# Usa %player% per il nome del giocatore
+reward-commands:
+  - "give %player% diamond 5"
+  - "eco give %player% 1000"
+  - "msg %player% §aGrazie per aver votato!"
+
+# Ricompense automatiche (controlla voti pendenti ogni 5 minuti)
+auto-reward:
+  enabled: true
+  interval-minutes: 5
+  check-on-join: true
+  max-pending-votes: 10
