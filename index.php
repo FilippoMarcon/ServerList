@@ -9,13 +9,31 @@ require_once 'config.php';
 // Titolo pagina
 $page_title = "Lista Server Minecraft";
 
-// Query per ottenere i server con conteggio voti
+// Query per ottenere i server sponsorizzati attivi
+try {
+    $stmt = $pdo->query("
+        SELECT s.*, COUNT(v.id) as voti_totali 
+        FROM sl_servers s 
+        LEFT JOIN sl_votes v ON s.id = v.server_id 
+        WHERE s.is_sponsored = 1 
+            AND (s.sponsor_expires_at IS NULL OR s.sponsor_expires_at > NOW())
+            AND s.is_active = 1
+        GROUP BY s.id 
+        ORDER BY s.sponsor_priority DESC, s.data_aggiornamento DESC
+    ");
+    $sponsored_servers = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $sponsored_servers = [];
+}
+
+// Query per ottenere i server normali con conteggio voti
 try {
     $stmt = $pdo->query("
         SELECT s.*, COUNT(v.id) as voti_totali 
         FROM sl_servers s 
         LEFT JOIN sl_votes v ON s.id = v.server_id 
         WHERE s.is_active = 1 
+            AND (s.is_sponsored = 0 OR s.is_sponsored IS NULL OR (s.sponsor_expires_at IS NOT NULL AND s.sponsor_expires_at <= NOW()))
         GROUP BY s.id 
         ORDER BY voti_totali DESC, s.nome ASC
     ");
@@ -64,6 +82,147 @@ include 'header.php';
     text-decoration: none !important;
 }
 
+/* Stili per Server Sponsorizzati */
+.sponsored-servers-section {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: rgba(255, 193, 7, 0.05);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.sponsored-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid rgba(255, 193, 7, 0.3);
+}
+
+.sponsored-header h4 {
+    margin: 0;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.sponsored-servers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.sponsored-card {
+    position: relative;
+    border: 2px solid #ffc107;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(255, 193, 7, 0.1) 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(255, 193, 7, 0.2);
+}
+
+.sponsored-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(255, 193, 7, 0.3);
+    border-color: #ffeb3b;
+}
+
+.sponsor-badge {
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    background: #ffc107;
+    color: #000;
+    padding: 4px 8px;
+    border-radius: 0 12px 0 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.sponsored-card .server-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 2px solid rgba(255, 193, 7, 0.3);
+}
+
+.sponsored-card .server-name {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.sponsored-card .server-name:hover {
+    color: #ffc107;
+}
+
+.sponsored-card .server-ip {
+    font-size: 1rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.sponsored-card .server-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.sponsored-card .server-tag {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid rgba(255, 193, 7, 0.4);
+}
+
+.sponsored-card .server-players {
+    text-align: center;
+    min-width: 120px;
+}
+
+.sponsored-card .player-count {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.sponsored-card .player-status {
+    font-size: 0.9rem;
+    color: var(--accent-green);
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive per server sponsorizzati */
+@media (max-width: 768px) {
+    .sponsored-card {
+        flex-direction: column;
+        text-align: center;
+        padding: 1rem;
+    }
+    
+    .sponsored-card .server-logo {
+        margin: 0 auto 1rem;
+    }
+    
+    .sponsored-card .server-players {
+        margin-top: 1rem;
+        min-width: auto;
+    }
+    
+    .sponsored-servers-section {
+        padding: 0.75rem;
+    }
+}
+</style>
 .floating-dropdown .dropdown-menu {
     position: absolute !important;
     z-index: 99999 !important;
@@ -142,17 +301,95 @@ include 'header.php';
                 </div>
             </div>
             
+            <!-- Sponsored Servers Section -->
+            <?php if (!empty($sponsored_servers)): ?>
+                <div class="sponsored-servers-section" style="margin-bottom: 2rem;">
+                    <div class="sponsored-header" style="display: flex; align-items: center; margin-bottom: 1rem;">
+                        <i class="bi bi-star-fill text-warning" style="font-size: 1.5rem; margin-right: 0.5rem;"></i>
+                        <h4 style="margin: 0; color: var(--text-primary);">Server Sponsorizzati</h4>
+                        <span class="badge bg-warning text-dark ms-2">AD</span>
+                    </div>
+                    <div class="sponsored-servers-list">
+                        <?php foreach ($sponsored_servers as $sponsor_server): ?>
+                            <?php 
+                            // Generate tags for sponsored server
+                            $sponsor_tags = [];
+                            if (stripos($sponsor_server['nome'], 'roleplay') !== false || stripos($sponsor_server['descrizione'], 'roleplay') !== false) {
+                                $sponsor_tags[] = 'RolePlay';
+                            }
+                            if (stripos($sponsor_server['nome'], 'survival') !== false || stripos($sponsor_server['descrizione'], 'survival') !== false) {
+                                $sponsor_tags[] = 'Survival';
+                            }
+                            if (stripos($sponsor_server['nome'], 'pvp') !== false || stripos($sponsor_server['descrizione'], 'pvp') !== false) {
+                                $sponsor_tags[] = 'PvP';
+                            }
+                            if (stripos($sponsor_server['nome'], 'mini') !== false || stripos($sponsor_server['descrizione'], 'mini') !== false) {
+                                $sponsor_tags[] = 'MiniGames';
+                            }
+                            if (empty($sponsor_tags)) {
+                                $sponsor_tags[] = 'Adventure';
+                                $sponsor_tags[] = 'Vanilla';
+                            }
+                            ?>
+                            <div class="server-card sponsored-card" data-name="<?php echo htmlspecialchars(strtolower($sponsor_server['nome'])); ?>" data-server-id="<?php echo $sponsor_server['id']; ?>" data-votes="<?php echo $sponsor_server['voti_totali']; ?>" style="border: 2px solid #ffc107; background: linear-gradient(135deg, var(--card-bg) 0%, rgba(255, 193, 7, 0.1) 100%);">
+                                <div class="sponsor-badge" style="position: absolute; top: -1px; right: -1px; background: #ffc107; color: #000; padding: 4px 8px; border-radius: 0 12px 0 8px; font-size: 0.75rem; font-weight: 600;">
+                                    <i class="bi bi-star-fill"></i> SPONSOR
+                                </div>
+                                
+                                <?php if ($sponsor_server['logo_url']): ?>
+                                    <img src="<?php echo htmlspecialchars($sponsor_server['logo_url']); ?>" 
+                                         alt="Logo" class="server-logo">
+                                <?php else: ?>
+                                    <div class="server-logo d-flex align-items-center justify-content-center" 
+                                         style="background-color: var(--accent-green);">
+                                        <i class="bi bi-server text-white"></i>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="server-info">
+                                    <a href="server.php?id=<?php echo $sponsor_server['id']; ?>" class="server-name">
+                                        <?php echo htmlspecialchars($sponsor_server['nome']); ?> 
+                                        <span style="font-size: 0.9rem; color: var(--text-muted);">
+                                            <?php echo htmlspecialchars($sponsor_server['versione'] ?: '1.20.2'); ?>
+                                        </span>
+                                    </a>
+                                    <div class="server-ip"><?php echo htmlspecialchars($sponsor_server['ip']); ?></div>
+                                    <div class="server-tags">
+                                        <?php foreach ($sponsor_tags as $tag): ?>
+                                            <span class="server-tag" style="background: rgba(255, 193, 7, 0.2); color: #ffc107;"><?php echo $tag; ?></span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="server-players">
+                                    <div class="player-count" data-playercounter-ip="<?php echo htmlspecialchars($sponsor_server['ip']); ?>">
+                                        ...
+                                    </div>
+                                    <div class="player-status">online</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                                        <?php echo htmlspecialchars($sponsor_server['tipo_server'] ?? 'Java & Bedrock'); ?>
+                                    </div>
+                                    <div style="font-size: 0.7rem; color: #ffc107; margin-top: 0.25rem;">
+                                        <i class="bi bi-star-fill"></i> <?php echo $sponsor_server['voti_totali']; ?> voti
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+            
             <!-- Server List -->
             <div class="server-list">
                 <?php if (isset($error)): ?>
                     <div class="alert alert-danger">
                         <i class="bi bi-exclamation-triangle"></i> <?php echo $error; ?>
                     </div>
-                <?php elseif (empty($servers)): ?>
+                <?php elseif (empty($servers) && empty($sponsored_servers)): ?>
                     <div class="alert alert-info text-center">
                         <i class="bi bi-info-circle"></i> Nessun server disponibile al momento.
                     </div>
-                <?php else: ?>
+                <?php elseif (!empty($servers)): ?>
                     <?php 
                     $rank = 1;
                     foreach ($servers as $server): 
@@ -210,7 +447,7 @@ include 'header.php';
                                     <?php endif; ?>
                                 </div>
                                 <?php if ($rank <= 3): ?>
-                                    <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;">
+                                    <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 12px; text-align: center;">
                                         +<?php echo $server['voti_totali']; ?>
                                     </div>
                                 <?php endif; ?>

@@ -88,6 +88,26 @@ include 'header.php';
 <!-- Profile Page Container -->
 <div class="profile-page-container">
     <div class="container" style="margin-top: 2rem;">
+        
+        <!-- Notifiche Toast da sessione -->
+        <?php if (isset($_SESSION['toast_success'])): ?>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    showToast('<?php echo addslashes($_SESSION['toast_success']); ?>', 'success');
+                });
+            </script>
+            <?php unset($_SESSION['toast_success']); ?>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['toast_error'])): ?>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    showToast('<?php echo addslashes($_SESSION['toast_error']); ?>', 'error');
+                });
+            </script>
+            <?php unset($_SESSION['toast_error']); ?>
+        <?php endif; ?>
+        
         <?php if ($user): ?>
             <div class="row">
                 <!-- Main Profile Content -->
@@ -178,11 +198,9 @@ include 'header.php';
                                                 <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server">
                                                     <i class="bi bi-eye"></i> Visualizza
                                                 </a>
-                                                <?php if (isAdmin()): ?>
-                                                    <a href="admin.php?edit=<?php echo $server['id']; ?>" class="btn-edit-server">
-                                                        <i class="bi bi-pencil"></i> Modifica
-                                                    </a>
-                                                <?php endif; ?>
+                                                <a href="edit_server.php?id=<?php echo $server['id']; ?>" class="btn-edit-server">
+                                                    <i class="bi bi-pencil"></i> Modifica
+                                                </a>
                                             </div>
                                         </div>
                                     </div>
