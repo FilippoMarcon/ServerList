@@ -153,7 +153,8 @@
         .search-container {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 2rem;
+            margin-left: 2rem;
         }
         
         .search-input {
@@ -455,21 +456,7 @@
             overflow: hidden;
         }
 
-        .sponsored-servers-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #FFD700, #FFA500, #FFD700);
-            animation: shimmer 2s infinite;
-        }
 
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
 
         .sponsored-header {
             display: flex;
@@ -516,28 +503,38 @@
         .sponsored-server-card {
             background: rgba(255, 255, 255, 0.08);
             border: 2px solid rgba(255, 215, 0, 0.2);
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 12px;
             position: relative;
-            transition: all 0.3s ease;
             overflow: hidden;
+            max-height: 140px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
         }
 
         .sponsored-server-card::before {
             content: '';
             position: absolute;
             top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.05), transparent);
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.15), transparent);
             pointer-events: none;
+            animation: sponsorShine 3s ease-in-out infinite;
         }
 
-        .sponsored-server-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(255, 215, 0, 0.4);
-            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2);
+        @keyframes sponsorShine {
+            0% {
+                left: -100%;
+            }
+            50% {
+                left: 100%;
+            }
+            100% {
+                left: -100%;
+            }
         }
 
         .sponsored-overlay {
@@ -557,49 +554,55 @@
         }
 
         .sponsored-server-card .server-logo {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 16px;
+            width: 48px;
+            height: 48px;
+            margin-bottom: 0;
             border: 2px solid rgba(255, 215, 0, 0.3);
+            flex-shrink: 0;
+        }
+
+        .sponsored-server-card .server-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 48px;
         }
 
         .sponsored-server-card .server-info h4 {
             color: #FFD700;
             font-weight: 700;
-            margin-bottom: 8px;
-            font-size: 18px;
+            margin-bottom: 4px;
+            font-size: 14px;
         }
 
         .sponsored-server-card .server-ip {
             color: rgba(255, 255, 255, 0.8);
             font-family: 'Courier New', monospace;
             background: rgba(0, 0, 0, 0.3);
-            padding: 4px 8px;
-            border-radius: 6px;
+            padding: 2px 6px;
+            border-radius: 4px;
             display: inline-block;
-            margin-bottom: 8px;
-            font-size: 13px;
+            margin-bottom: 6px;
+            font-size: 11px;
+            width: fit-content;
         }
 
-        .sponsored-server-card .server-description {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 14px;
-            line-height: 1.4;
-            margin-bottom: 12px;
-        }
+
 
         .sponsored-server-card .server-stats {
             display: flex;
-            gap: 16px;
-            margin-bottom: 16px;
+            gap: 8px;
+            margin-bottom: 0;
+            flex-wrap: wrap;
         }
 
         .sponsored-server-card .server-stats span {
             color: rgba(255, 255, 255, 0.8);
-            font-size: 13px;
+            font-size: 11px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
         }
 
         .sponsored-server-card .votes-count .bi-heart-fill {
@@ -610,47 +613,7 @@
             color: #70a1ff;
         }
 
-        .sponsored-server-card .server-actions {
-            display: flex;
-            gap: 8px;
-        }
 
-        .btn-view-sponsored,
-        .sponsored-server-card .btn-copy-ip {
-            padding: 8px 16px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 13px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn-view-sponsored {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            color: #000;
-        }
-
-        .btn-view-sponsored:hover {
-            background: linear-gradient(135deg, #FFA500, #FF8C00);
-            transform: translateY(-2px);
-            color: #000;
-        }
-
-        .sponsored-server-card .btn-copy-ip {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .sponsored-server-card .btn-copy-ip:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
-        }
 
         @media (max-width: 768px) {
             .sponsored-servers-grid {
@@ -662,20 +625,17 @@
                 gap: 12px;
                 text-align: center;
             }
-            
-            .sponsored-server-card .server-actions {
-                flex-direction: column;
-            }
         }
         
         .server-logo {
-            width: 80px;
-            height: 80px;
-            border-radius: 16px;
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
             object-fit: cover;
-            border: 3px solid var(--border-color);
+            border: 2px solid var(--border-color);
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: block;
         }
         
         .server-card:hover .server-logo {
@@ -695,6 +655,30 @@
             text-decoration: none;
             transition: all 0.3s ease;
             display: block;
+        }
+        
+        .sponsored-indicator {
+            display: inline-block;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+            box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
+            animation: sparkle 2s infinite;
+        }
+        
+        .sponsored-indicator .bi-star-fill {
+            margin-right: 3px;
+            font-size: 0.6rem;
+        }
+        
+        @keyframes sparkle {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
         }
         
         .server-name:hover {
@@ -2478,13 +2462,14 @@
         }
         
         .server-logo {
-            width: 70px;
-            height: 70px;
-            border-radius: 16px;
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
             object-fit: cover;
             border: 2px solid var(--border-color);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             flex-shrink: 0;
+            display: block;
         }
         
         .server-logo.default-logo {

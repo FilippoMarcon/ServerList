@@ -12,6 +12,24 @@ $page_title = "Lista Server Minecraft";
 // Gestione filtro da URL
 $active_filter = isset($_GET['filter']) ? sanitize($_GET['filter']) : '';
 
+// Crea la tabella sponsored_servers se non esiste
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS sl_sponsored_servers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            server_id INT NOT NULL,
+            priority INT DEFAULT 1,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NULL,
+            FOREIGN KEY (server_id) REFERENCES sl_servers(id) ON DELETE CASCADE,
+            UNIQUE KEY unique_server (server_id)
+        )
+    ");
+} catch (PDOException $e) {
+    // Ignora errori di creazione tabella se già esiste
+}
+
 // Query per ottenere i server sponsorizzati
 $sponsored_servers = [];
 try {
@@ -32,31 +50,18 @@ try {
         $sponsored_servers = $stmt->fetchAll();
     }
 } catch (PDOException $e) {
-    // Tabella non esiste ancora, creiamola
-    try {
-        $pdo->exec("
-            CREATE TABLE IF NOT EXISTS sl_sponsored_servers (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                server_id INT NOT NULL,
-                priority INT DEFAULT 1,
-                is_active TINYINT(1) DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP NULL,
-                FOREIGN KEY (server_id) REFERENCES sl_servers(id) ON DELETE CASCADE,
-                UNIQUE KEY unique_server (server_id)
-            )
-        ");
-    } catch (PDOException $e2) {
-        // Ignora errori di creazione tabella
-    }
+    // Errore nel caricamento server sponsorizzati
+    $sponsored_servers = [];
 }
 
-// Query per ottenere i server con conteggio voti
+// Query per ottenere i server con conteggio voti e informazioni sponsorizzazione
 try {
     $stmt = $pdo->query("
-        SELECT s.*, COUNT(v.id) as voti_totali 
+        SELECT s.*, COUNT(v.id) as voti_totali, 
+               CASE WHEN ss.server_id IS NOT NULL THEN 1 ELSE 0 END as is_sponsored
         FROM sl_servers s 
         LEFT JOIN sl_votes v ON s.id = v.server_id 
+        LEFT JOIN sl_sponsored_servers ss ON s.id = ss.server_id
         WHERE s.is_active = 1 
         GROUP BY s.id 
         ORDER BY voti_totali DESC, s.nome ASC
@@ -73,9 +78,7 @@ include 'header.php';
 <style>
 /* FLOATING DROPDOWN - MASSIMA PRIORITÀ */
 .floating-dropdown {
-    position: absolute !important;
-    top: 1.5rem !important;
-    right: 1.5rem !important;
+    position: relative !important;
     z-index: 99999 !important;
 }
 
@@ -109,13 +112,13 @@ include 'header.php';
 .floating-dropdown .dropdown-menu {
     position: absolute !important;
     z-index: 99999 !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border-color) !important;
+    background: rgba(30, 30, 30, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 12px !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-    padding: 0.5rem !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+    padding: 0.5rem 0 !important;
     margin-top: 0.5rem !important;
-    backdrop-filter: blur(20px) !important;
     min-width: 200px !important;
 }
 
@@ -149,40 +152,6 @@ include 'header.php';
     <div class="row">
         <!-- Main Content -->
         <div class="col-lg-9" style="position: relative;">
-            <!-- Dropdown fuori dal header per evitare z-index conflicts -->
-            <div class="floating-dropdown" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 99999;">
-                <div class="nav-item dropdown">
-                    <a class="filters-btn dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-funnel"></i> Filtri
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#" data-sort="votes">
-                            <i class="bi bi-trophy"></i> Ordina per Voti
-                        </a></li>
-                        <li><a class="dropdown-item" href="#" data-sort="name">
-                            <i class="bi bi-server"></i> Ordina per Server
-                        </a></li>
-                        <li><a class="dropdown-item" href="#" data-sort="players">
-                            <i class="bi bi-people"></i> Ordina per Players
-                        </a></li>
-                    </ul>
-                </div>
-            </div>
-            
-            <!-- Server List Header -->
-            <div class="server-list-header">
-                <div class="d-flex align-items-center">
-                    <h3>Voti</h3>
-                    <span class="ms-2">↑</span>
-                    <h3 class="ms-4">Server</h3>
-                    <span class="ms-2">↑</span>
-                </div>
-                <div class="search-container">
-                    <input type="text" class="search-input" placeholder="Cerca" id="searchInput">
-                    <!-- Spazio per il bottone che ora è floating -->
-                    <div style="width: 120px;"></div>
-                </div>
-            </div>
             
             <!-- Sponsored Servers Section -->
             <?php if (!empty($sponsored_servers)): ?>
@@ -198,24 +167,22 @@ include 'header.php';
                                 <i class="bi bi-star-fill"></i>
                                 <span>SPONSORIZZATO</span>
                             </div>
-                            <div class="server-logo">
-                                <?php if (!empty($sponsored['logo_url'])): ?>
-                                    <img src="<?php echo htmlspecialchars($sponsored['logo_url']); ?>" 
-                                         alt="<?php echo htmlspecialchars($sponsored['nome']); ?>" 
-                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <div class="logo-fallback" style="display: none;">
-                                        <i class="bi bi-server"></i>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="logo-fallback">
-                                        <i class="bi bi-server"></i>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
+                            <?php if (!empty($sponsored['logo_url'])): ?>
+                                <img src="<?php echo htmlspecialchars($sponsored['logo_url']); ?>" 
+                                     alt="<?php echo htmlspecialchars($sponsored['nome']); ?>" 
+                                     class="server-logo"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="server-logo logo-fallback" style="display: none;">
+                                    <i class="bi bi-server"></i>
+                                </div>
+                            <?php else: ?>
+                                <div class="server-logo logo-fallback">
+                                    <i class="bi bi-server"></i>
+                                </div>
+                            <?php endif; ?>
                             <div class="server-info">
-                                <h4><?php echo htmlspecialchars($sponsored['nome']); ?></h4>
+                                <h4><a href="server.php?id=<?php echo $sponsored['id']; ?>" style="text-decoration: none; color: inherit;"><?php echo htmlspecialchars($sponsored['nome']); ?></a></h4>
                                 <p class="server-ip"><?php echo htmlspecialchars($sponsored['ip']); ?></p>
-                                <p class="server-description"><?php echo htmlspecialchars(substr($sponsored['descrizione'], 0, 100)); ?><?php echo strlen($sponsored['descrizione']) > 100 ? '...' : ''; ?></p>
                                 <div class="server-stats">
                                     <span class="votes-count">
                                         <i class="bi bi-heart-fill"></i> <?php echo $sponsored['voti_totali']; ?> voti
@@ -225,19 +192,40 @@ include 'header.php';
                                     </span>
                                 </div>
                             </div>
-                            <div class="server-actions">
-                                <a href="server.php?id=<?php echo $sponsored['id']; ?>" class="btn-view-sponsored">
-                                    <i class="bi bi-eye"></i> Visualizza
-                                </a>
-                                <button class="btn-copy-ip" data-ip="<?php echo htmlspecialchars($sponsored['ip']); ?>">
-                                    <i class="bi bi-clipboard"></i> Copia IP
-                                </button>
-                            </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
             </div>
             <?php endif; ?>
+            
+            <!-- Server List Header -->
+            <div class="server-list-header">
+                <div class="d-flex align-items-center">
+                    <h3>Voti</h3>
+                    <h3 class="ms-5">Server</h3>
+                </div>
+                <div class="search-container">
+                    <input type="text" class="search-input" placeholder="Cerca" id="searchInput">
+                    <div class="floating-dropdown">
+                        <div class="nav-item dropdown">
+                            <a class="filters-btn dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="sortButton">
+                                <i class="bi bi-funnel"></i> Ordina <span id="sortArrow"></span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item sort-option" href="#" data-sort="votes">
+                                    <i class="bi bi-trophy"></i> Ordina per Voti <span class="sort-arrow" id="arrow-votes"></span>
+                                </a></li>
+                                <li><a class="dropdown-item sort-option" href="#" data-sort="name">
+                                    <i class="bi bi-server"></i> Ordina per Server <span class="sort-arrow" id="arrow-name"></span>
+                                </a></li>
+                                <li><a class="dropdown-item sort-option" href="#" data-sort="players">
+                                    <i class="bi bi-people"></i> Ordina per Players <span class="sort-arrow" id="arrow-players"></span>
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Server List -->
             <div class="server-list">
@@ -327,6 +315,11 @@ include 'header.php';
                                 <div class="server-basic-info">
                                     <a href="server.php?id=<?php echo $server['id']; ?>" class="server-name">
                                         <?php echo htmlspecialchars($server['nome']); ?> 
+                                        <?php if ($server['is_sponsored']): ?>
+                                            <span class="sponsored-indicator">
+                                                <i class="bi bi-star-fill"></i> SPONSOR
+                                            </span>
+                                        <?php endif; ?>
                                         <span style="font-size: 0.9rem; color: var(--text-muted);">
                                             <?php echo htmlspecialchars($server['versione'] ?: '1.20.2'); ?>
                                         </span>
@@ -407,7 +400,8 @@ function searchServers() {
     
     // Riapplica l'ordinamento corrente
     const currentSort = sessionStorage.getItem('serverSort') || 'votes';
-    applySorting(currentSort);
+    const currentDirection = sessionStorage.getItem('sortDirection') || 'desc';
+    applySorting(currentSort, currentDirection);
 }
 
 // Ricerca in tempo reale
@@ -449,16 +443,29 @@ document.addEventListener('DOMContentLoaded', function() {
         updateClearFiltersButton();
         // Riapplica l'ordinamento corrente
         const currentSort = sessionStorage.getItem('serverSort') || 'votes';
-        applySorting(currentSort);
+        const currentDirection = sessionStorage.getItem('sortDirection') || 'desc';
+        applySorting(currentSort, currentDirection);
     });
     
     // Sort dropdown items
-    document.querySelectorAll('.dropdown-item[data-sort]').forEach(item => {
+    document.querySelectorAll('.sort-option').forEach(item => {
         item.addEventListener('click', function(e) {
             e.preventDefault();
             const sortType = this.getAttribute('data-sort');
-            applySorting(sortType);
+            
+            // Controlla se è lo stesso tipo di ordinamento per invertire
+            const currentSort = sessionStorage.getItem('serverSort');
+            const currentDirection = sessionStorage.getItem('sortDirection') || 'desc';
+            
+            let newDirection = 'desc';
+            if (currentSort === sortType && currentDirection === 'desc') {
+                newDirection = 'asc';
+            }
+            
+            applySorting(sortType, newDirection);
             sessionStorage.setItem('serverSort', sortType);
+            sessionStorage.setItem('sortDirection', newDirection);
+            updateSortArrows(sortType, newDirection);
         });
     });
     
@@ -527,7 +534,8 @@ function applyFilters() {
     
     // Riapplica l'ordinamento corrente sui server visibili
     const currentSort = sessionStorage.getItem('serverSort') || 'votes';
-    applySorting(currentSort);
+    const currentDirection = sessionStorage.getItem('sortDirection') || 'desc';
+    applySorting(currentSort, currentDirection);
 }
 
 function updateClearFiltersButton() {
@@ -556,25 +564,32 @@ function updateClearFiltersButton() {
     }
 }
 
-function applySorting(sortType) {
+function applySorting(sortType, direction = 'desc') {
     const serverList = document.querySelector('.server-list');
-    const servers = Array.from(serverList.querySelectorAll('.server-card'));
+    const servers = Array.from(serverList.querySelectorAll('.homepage-server-card'));
     
     // Ordina solo i server visibili
     const visibleServers = servers.filter(server => server.style.display !== 'none');
     const hiddenServers = servers.filter(server => server.style.display === 'none');
     
     visibleServers.sort((a, b) => {
+        let result = 0;
         switch (sortType) {
             case 'votes':
-                return getVotes(b) - getVotes(a);
+                result = getVotes(b) - getVotes(a);
+                break;
             case 'name':
-                return getServerName(a).localeCompare(getServerName(b));
+                result = getServerName(a).localeCompare(getServerName(b));
+                break;
             case 'players':
-                return getPlayerCount(b) - getPlayerCount(a);
+                result = getPlayerCount(b) - getPlayerCount(a);
+                break;
             default:
                 return 0;
         }
+        
+        // Inverti il risultato se la direzione è ascendente
+        return direction === 'asc' ? -result : result;
     });
     
     // Rimuovi tutti i server dal DOM
@@ -589,7 +604,7 @@ function applySorting(sortType) {
 }
 
 function updateRankings() {
-    const visibleServers = Array.from(document.querySelectorAll('.server-card')).filter(server => server.style.display !== 'none');
+    const visibleServers = Array.from(document.querySelectorAll('.homepage-server-card')).filter(server => server.style.display !== 'none');
     
     visibleServers.forEach((server, index) => {
         const rank = index + 1;
@@ -627,16 +642,18 @@ function updateRankings() {
             rankElement.classList.add('bronze');
         }
         
-        // Aggiorna l'icona del trofeo
-        const trophyIcon = rankElement.querySelector('.bi-trophy-fill');
+        // Aggiorna l'icona del trofeo e il testo
         if (rank <= 3) {
-            if (!trophyIcon) {
-                const icon = document.createElement('i');
-                icon.className = 'bi bi-trophy-fill';
-                icon.style.marginRight = '6px';
-                rankElement.insertBefore(icon, rankElement.firstChild);
-            }
+            // Per i primi 3 posti, ricostruisci completamente il contenuto
+            rankElement.innerHTML = '';
+            const icon = document.createElement('i');
+            icon.className = 'bi bi-trophy-fill';
+            icon.style.marginRight = '6px';
+            rankElement.appendChild(icon);
+            rankElement.appendChild(document.createTextNode(rank + '°'));
         } else {
+            // Per gli altri posti, rimuovi il trofeo se presente
+            const trophyIcon = rankElement.querySelector('.bi-trophy-fill');
             if (trophyIcon) {
                 trophyIcon.remove();
             }
@@ -670,7 +687,41 @@ function getPlayerCount(serverCard) {
 
 function loadSavedSort() {
     const savedSort = sessionStorage.getItem('serverSort') || 'votes';
-    applySorting(savedSort);
+    const savedDirection = sessionStorage.getItem('sortDirection') || 'desc';
+    applySorting(savedSort, savedDirection);
+    updateSortArrows(savedSort, savedDirection);
+}
+
+function updateSortArrows(activeSort, direction) {
+    // Reset tutte le frecce
+    document.querySelectorAll('.sort-arrow').forEach(arrow => {
+        arrow.textContent = '';
+    });
+    
+    // Aggiorna la freccia del bottone principale
+    const mainArrow = document.getElementById('sortArrow');
+    if (mainArrow) {
+        mainArrow.textContent = direction === 'desc' ? '↓' : '↑';
+    }
+    
+    // Aggiorna la freccia dell'opzione attiva
+    const activeArrow = document.getElementById(`arrow-${activeSort}`);
+    if (activeArrow) {
+        activeArrow.textContent = direction === 'desc' ? '↓' : '↑';
+        activeArrow.style.color = 'var(--primary-color)';
+    }
+    
+    // Aggiorna il testo del bottone principale
+    const sortButton = document.getElementById('sortButton');
+    if (sortButton) {
+        const sortNames = {
+            'votes': 'Voti',
+            'name': 'Server', 
+            'players': 'Players'
+        };
+        const sortName = sortNames[activeSort] || 'Ordina';
+        sortButton.innerHTML = `<i class="bi bi-funnel"></i> ${sortName} <span id="sortArrow">${direction === 'desc' ? '↓' : '↑'}</span>`;
+    }
 }
 
 function updateResultsCount(count) {
