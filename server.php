@@ -225,7 +225,7 @@ include 'header.php';
                     <?php endif; ?>
                     
                     <?php if ($user_has_voted_today): ?>
-                        <div class="vote-info-below" style="margin-top: 1.5rem;">
+                        <div class="vote-info-below">
                             <small>Hai votato: <strong><?php echo htmlspecialchars($voted_server_name); ?></strong></small>
                             <br>
                             <small>Prossimo voto tra: <strong><?php echo $time_until_next_vote; ?></strong></small>

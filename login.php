@@ -70,7 +70,7 @@ $page_title = "Login";
 include 'header.php';
 ?>
 
-<link rel="stylesheet" href="assets/css/auth-improvements.css">
+
 <style>
 /* Force center alignment - Override any conflicting styles */
 .auth-header {

@@ -96,7 +96,7 @@ $page_title = "Registrazione";
 include 'header.php';
 ?>
 
-<link rel="stylesheet" href="assets/css/auth-improvements.css">
+
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 <style>
 /* Force center alignment - Override any conflicting styles */

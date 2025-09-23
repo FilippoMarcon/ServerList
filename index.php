@@ -9,6 +9,48 @@ require_once 'config.php';
 // Titolo pagina
 $page_title = "Lista Server Minecraft";
 
+// Gestione filtro da URL
+$active_filter = isset($_GET['filter']) ? sanitize($_GET['filter']) : '';
+
+// Query per ottenere i server sponsorizzati
+$sponsored_servers = [];
+try {
+    // Prima verifica se la tabella sponsored_servers esiste
+    $stmt = $pdo->query("SHOW TABLES LIKE 'sl_sponsored_servers'");
+    if ($stmt->rowCount() > 0) {
+        $stmt = $pdo->query("
+            SELECT s.*, COUNT(v.id) as voti_totali, ss.priority, ss.expires_at
+            FROM sl_servers s 
+            INNER JOIN sl_sponsored_servers ss ON s.id = ss.server_id
+            LEFT JOIN sl_votes v ON s.id = v.server_id 
+            WHERE s.is_active = 1 AND ss.is_active = 1 
+            AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
+            GROUP BY s.id 
+            ORDER BY ss.priority ASC, voti_totali DESC
+            LIMIT 3
+        ");
+        $sponsored_servers = $stmt->fetchAll();
+    }
+} catch (PDOException $e) {
+    // Tabella non esiste ancora, creiamola
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sl_sponsored_servers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                server_id INT NOT NULL,
+                priority INT DEFAULT 1,
+                is_active TINYINT(1) DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NULL,
+                FOREIGN KEY (server_id) REFERENCES sl_servers(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_server (server_id)
+            )
+        ");
+    } catch (PDOException $e2) {
+        // Ignora errori di creazione tabella
+    }
+}
+
 // Query per ottenere i server con conteggio voti
 try {
     $stmt = $pdo->query("
@@ -142,6 +184,61 @@ include 'header.php';
                 </div>
             </div>
             
+            <!-- Sponsored Servers Section -->
+            <?php if (!empty($sponsored_servers)): ?>
+            <div class="sponsored-servers-section">
+                <div class="sponsored-header">
+                    <h3><i class="bi bi-star-fill"></i> Server Sponsorizzati</h3>
+                    <span class="sponsored-badge">SPONSOR</span>
+                </div>
+                <div class="sponsored-servers-grid">
+                    <?php foreach ($sponsored_servers as $sponsored): ?>
+                        <div class="sponsored-server-card" data-server-id="<?php echo $sponsored['id']; ?>">
+                            <div class="sponsored-overlay">
+                                <i class="bi bi-star-fill"></i>
+                                <span>SPONSORIZZATO</span>
+                            </div>
+                            <div class="server-logo">
+                                <?php if (!empty($sponsored['logo_url'])): ?>
+                                    <img src="<?php echo htmlspecialchars($sponsored['logo_url']); ?>" 
+                                         alt="<?php echo htmlspecialchars($sponsored['nome']); ?>" 
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div class="logo-fallback" style="display: none;">
+                                        <i class="bi bi-server"></i>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="logo-fallback">
+                                        <i class="bi bi-server"></i>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="server-info">
+                                <h4><?php echo htmlspecialchars($sponsored['nome']); ?></h4>
+                                <p class="server-ip"><?php echo htmlspecialchars($sponsored['ip']); ?></p>
+                                <p class="server-description"><?php echo htmlspecialchars(substr($sponsored['descrizione'], 0, 100)); ?><?php echo strlen($sponsored['descrizione']) > 100 ? '...' : ''; ?></p>
+                                <div class="server-stats">
+                                    <span class="votes-count">
+                                        <i class="bi bi-heart-fill"></i> <?php echo $sponsored['voti_totali']; ?> voti
+                                    </span>
+                                    <span class="server-version">
+                                        <i class="bi bi-gear"></i> <?php echo htmlspecialchars($sponsored['versione']); ?>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="server-actions">
+                                <a href="server.php?id=<?php echo $sponsored['id']; ?>" class="btn-view-sponsored">
+                                    <i class="bi bi-eye"></i> Visualizza
+                                </a>
+                                <button class="btn-copy-ip" data-ip="<?php echo htmlspecialchars($sponsored['ip']); ?>">
+                                    <i class="bi bi-clipboard"></i> Copia IP
+                                </button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Server List -->
             <div class="server-list">
                 <?php if (isset($error)): ?>
@@ -197,14 +294,14 @@ include 'header.php';
                             $tags[] = 'Vanilla';
                         }
                     ?>
-                        <div class="server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" data-server-id="<?php echo $server['id']; ?>" data-votes="<?php echo $server['voti_totali']; ?>">
+                        <div class="homepage-server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" data-server-id="<?php echo $server['id']; ?>" data-votes="<?php echo $server['voti_totali']; ?>">
                             <div class="server-rank-container">
                                 <?php if ($rank > 3): ?>
                                     <div class="rank-number-top"><?php echo $rank; ?>°</div>
                                 <?php endif; ?>
                                 <div class="server-rank <?php echo ($rank > 3) ? 'outlined' : $rank_class; ?>">
                                     <?php if ($rank <= 3): ?>
-                                        <?php echo $rank; ?>°
+                                        <i class="bi bi-trophy-fill" style="margin-right: 6px;"></i><?php echo $rank; ?>°
                                     <?php else: ?>
                                         +<?php echo $server['voti_totali']; ?>
                                     <?php endif; ?>
@@ -227,13 +324,15 @@ include 'header.php';
                             <?php endif; ?>
                             
                             <div class="server-info">
-                                <a href="server.php?id=<?php echo $server['id']; ?>" class="server-name">
-                                    <?php echo htmlspecialchars($server['nome']); ?> 
-                                    <span style="font-size: 0.9rem; color: var(--text-muted);">
-                                        <?php echo htmlspecialchars($server['versione'] ?: '1.20.2'); ?>
-                                    </span>
-                                </a>
-                                <div class="server-ip"><?php echo htmlspecialchars($server['ip']); ?></div>
+                                <div class="server-basic-info">
+                                    <a href="server.php?id=<?php echo $server['id']; ?>" class="server-name">
+                                        <?php echo htmlspecialchars($server['nome']); ?> 
+                                        <span style="font-size: 0.9rem; color: var(--text-muted);">
+                                            <?php echo htmlspecialchars($server['versione'] ?: '1.20.2'); ?>
+                                        </span>
+                                    </a>
+                                    <div class="server-ip"><?php echo htmlspecialchars($server['ip']); ?></div>
+                                </div>
                                 <div class="server-tags">
                                     <?php foreach ($tags as $tag): ?>
                                         <span class="server-tag"><?php echo $tag; ?></span>
@@ -295,7 +394,7 @@ include 'header.php';
 // Funzione di ricerca server
 function searchServers() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const servers = document.querySelectorAll('.server-card');
+    const servers = document.querySelectorAll('.homepage-server-card');
     
     servers.forEach(server => {
         const serverName = server.getAttribute('data-name');
@@ -325,6 +424,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inizializza ordinamento salvato
     loadSavedSort();
     
+    // Applica filtro da URL se presente
+    <?php if (!empty($active_filter)): ?>
+    applyFilterFromURL('<?php echo $active_filter; ?>');
+    <?php endif; ?>
+    
     // Filter tags
     const filterTags = document.querySelectorAll('.filter-tag');
     filterTags.forEach(tag => {
@@ -338,7 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Clear filters
     document.querySelector('.clear-filters').addEventListener('click', function() {
         filterTags.forEach(tag => tag.classList.remove('active'));
-        document.querySelectorAll('.server-card').forEach(server => {
+        document.querySelectorAll('.homepage-server-card').forEach(server => {
             server.style.display = 'flex';
         });
         document.getElementById('searchInput').value = '';
@@ -373,7 +477,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Filter tags found:', document.querySelectorAll('.filter-tag').length);
     
     // Debug: verifica server cards
-    const serverCards = document.querySelectorAll('.server-card');
+    const serverCards = document.querySelectorAll('.homepage-server-card');
     console.log('Server cards found:', serverCards.length);
     serverCards.forEach((card, index) => {
         const serverId = card.getAttribute('data-server-id');
@@ -399,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function applyFilters() {
     const activeFilters = Array.from(document.querySelectorAll('.filter-tag.active')).map(tag => tag.textContent.toLowerCase());
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const servers = document.querySelectorAll('.server-card');
+    const servers = document.querySelectorAll('.homepage-server-card');
     
     let visibleCount = 0;
     
@@ -529,6 +633,7 @@ function updateRankings() {
             if (!trophyIcon) {
                 const icon = document.createElement('i');
                 icon.className = 'bi bi-trophy-fill';
+                icon.style.marginRight = '6px';
                 rankElement.insertBefore(icon, rankElement.firstChild);
             }
         } else {
@@ -582,7 +687,7 @@ function updateResultsCount(count) {
 
 function initAnimations() {
     // Staggered animation for server cards
-    const cards = document.querySelectorAll('.server-card');
+    const cards = document.querySelectorAll('.homepage-server-card');
     cards.forEach((card, index) => {
         card.style.opacity = '0';
         card.style.transform = 'translateY(30px)';
@@ -653,6 +758,29 @@ function createToastContainer() {
     container.style.zIndex = '1050';
     document.body.appendChild(container);
     return container;
+}
+
+// Applica filtro da URL
+function applyFilterFromURL(filterName) {
+    const filterTags = document.querySelectorAll('.filter-tag');
+    let filterFound = false;
+    
+    filterTags.forEach(tag => {
+        const tagText = tag.textContent.toLowerCase();
+        if (tagText === filterName.toLowerCase() || 
+            (filterName === 'minigames' && tagText === 'minigames') ||
+            (filterName === 'roleplay' && tagText === 'roleplay') ||
+            (filterName === 'skyblock' && tagText === 'skyblock')) {
+            tag.classList.add('active');
+            filterFound = true;
+        }
+    });
+    
+    if (filterFound) {
+        applyFilters();
+        updateClearFiltersButton();
+        showToast(`Filtro "${filterName}" applicato!`, 'success');
+    }
 }
 </script>
 

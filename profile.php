@@ -1,7 +1,7 @@
 <?php
 /**
- * Pagina Profilo Utente
- * User Profile Page
+ * Pagina Profilo Utente Riprogettata
+ * User Profile Page Redesigned
  */
 
 require_once 'config.php';
@@ -12,6 +12,84 @@ if (!isLoggedIn()) {
 }
 
 $user_id = $_SESSION['user_id'];
+$message = '';
+$error = '';
+
+// Gestione form di richiesta nuovo server
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_server'])) {
+    $nome = sanitize($_POST['nome'] ?? '');
+    $ip = sanitize($_POST['ip'] ?? '');
+    $versione = sanitize($_POST['versione'] ?? '');
+    $tipo_server = sanitize($_POST['tipo_server'] ?? 'Java & Bedrock');
+    $descrizione = sanitize($_POST['descrizione'] ?? '');
+    $banner_url = sanitize($_POST['banner_url'] ?? '');
+    $logo_url = sanitize($_POST['logo_url'] ?? '');
+    
+    if (empty($nome) || empty($ip) || empty($versione)) {
+        $error = 'Nome, IP e Versione sono campi obbligatori.';
+    } else {
+        // Salva la richiesta in una tabella temporanea o invia email agli admin
+        // Per ora salviamo come server inattivo che richiede approvazione
+        try {
+            $stmt = $pdo->prepare("INSERT INTO sl_servers (nome, ip, versione, tipo_server, descrizione, banner_url, logo_url, owner_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())");
+            $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $user_id]);
+            $message = 'Richiesta inviata con successo! Il tuo server sarà revisionato dagli amministratori.';
+        } catch (PDOException $e) {
+            $error = 'Errore durante l\'invio della richiesta.';
+        }
+    }
+}
+
+// Gestione modifica server
+$edit_server_id = isset($_GET['edit_server']) ? (int)$_GET['edit_server'] : 0;
+$server_to_edit = null;
+
+if ($edit_server_id > 0) {
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM sl_servers WHERE id = ? AND owner_id = ?");
+        $stmt->execute([$edit_server_id, $user_id]);
+        $server_to_edit = $stmt->fetch();
+        
+        if (!$server_to_edit) {
+            $error = 'Server non trovato o non hai i permessi per modificarlo.';
+        }
+    } catch (PDOException $e) {
+        $error = 'Errore nel caricamento del server.';
+    }
+}
+
+// Gestione form di modifica server
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
+    $server_id = (int)($_POST['server_id'] ?? 0);
+    $nome = sanitize($_POST['nome'] ?? '');
+    $ip = sanitize($_POST['ip'] ?? '');
+    $versione = sanitize($_POST['versione'] ?? '');
+    $tipo_server = sanitize($_POST['tipo_server'] ?? 'Java & Bedrock');
+    $descrizione = sanitize($_POST['descrizione'] ?? '');
+    $banner_url = sanitize($_POST['banner_url'] ?? '');
+    $logo_url = sanitize($_POST['logo_url'] ?? '');
+    
+    if ($server_id === 0 || empty($nome) || empty($ip) || empty($versione)) {
+        $error = 'Nome, IP e Versione sono campi obbligatori.';
+    } else {
+        try {
+            $stmt = $pdo->prepare("SELECT id FROM sl_servers WHERE id = ? AND owner_id = ?");
+            $stmt->execute([$server_id, $user_id]);
+            
+            if ($stmt->fetch()) {
+                $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ? WHERE id = ? AND owner_id = ?");
+                $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $server_id, $user_id]);
+                $message = 'Server modificato con successo!';
+                $server_to_edit = null;
+                $edit_server_id = 0;
+            } else {
+                $error = 'Non hai i permessi per modificare questo server.';
+            }
+        } catch (PDOException $e) {
+            $error = 'Errore durante la modifica del server.';
+        }
+    }
+}
 
 // Recupera i dati dell'utente dal database
 try {
@@ -25,6 +103,52 @@ try {
 } catch (PDOException $e) {
     error_log("Errore nel recupero dati utente: " . $e->getMessage());
     $user = null;
+}
+
+// Recupera le statistiche dell'utente
+$user_stats = [
+    'total_votes' => 0,
+    'servers_voted' => 0,
+    'join_date' => $user['data_registrazione'] ?? date('Y-m-d H:i:s')
+];
+
+try {
+    // Voti totali dati dall'utente
+    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM sl_votes WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $user_stats['total_votes'] = $stmt->fetch()['total'];
+    
+    // Server diversi votati
+    $stmt = $pdo->prepare("SELECT COUNT(DISTINCT server_id) as total FROM sl_votes WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $user_stats['servers_voted'] = $stmt->fetch()['total'];
+} catch (PDOException $e) {
+    error_log("Errore nel recupero statistiche utente: " . $e->getMessage());
+}
+
+// Recupera il voto giornaliero dell'utente
+$daily_vote = null;
+try {
+    $daily_vote = getUserDailyVoteInfo($user_id, $pdo);
+} catch (PDOException $e) {
+    error_log("Errore nel recupero voto giornaliero: " . $e->getMessage());
+}
+
+// Recupera tutti i voti dell'utente per la sezione "Elenco Voti"
+$user_votes = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT v.*, s.nome as server_name, s.ip as server_ip, s.logo_url as server_logo
+        FROM sl_votes v
+        JOIN sl_servers s ON v.server_id = s.id
+        WHERE v.user_id = ?
+        ORDER BY v.data_voto DESC
+        LIMIT 100
+    ");
+    $stmt->execute([$user_id]);
+    $user_votes = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log("Errore nel recupero voti utente: " . $e->getMessage());
 }
 
 // Recupera i server di proprietà dell'utente
@@ -44,13 +168,6 @@ try {
     error_log("Errore nel recupero server utente: " . $e->getMessage());
 }
 
-// Recupera le statistiche dell'utente
-$user_stats = [
-    'total_votes' => 0,
-    'servers_voted' => 0,
-    'join_date' => $user['data_registrazione'] ?? date('Y-m-d H:i:s')
-];
-
 // Recupera le licenze dei server di proprietà dell'utente
 $server_licenses = [];
 try {
@@ -67,363 +184,548 @@ try {
     error_log("Errore nel recupero licenze server: " . $e->getMessage());
 }
 
-try {
-    // Voti totali dati dall'utente
-    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM sl_votes WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $user_stats['total_votes'] = $stmt->fetch()['total'];
-    
-    // Server diversi votati
-    $stmt = $pdo->prepare("SELECT COUNT(DISTINCT server_id) as total FROM sl_votes WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $user_stats['servers_voted'] = $stmt->fetch()['total'];
-} catch (PDOException $e) {
-    error_log("Errore nel recupero statistiche utente: " . $e->getMessage());
-}
-
 $page_title = "Profilo - " . htmlspecialchars($user['minecraft_nick'] ?? 'Utente');
 include 'header.php';
 ?>
 
-<!-- Profile Page Container -->
-<div class="profile-page-container">
-    <div class="container" style="margin-top: 2rem;">
-        <?php if ($user): ?>
-            <div class="row">
-                <!-- Main Profile Content -->
-                <div class="col-lg-8">
-                    <!-- Profile Header -->
-                    <div class="profile-header-card">
-                        <div class="profile-avatar-section">
-                            <img src="<?php echo getMinecraftAvatar($user['minecraft_nick'] ?: 'MHF_Steve'); ?>" 
-                                 alt="Avatar" class="profile-avatar">
-                            <div class="profile-info">
-                                <h1 class="profile-name"><?php echo htmlspecialchars($user['minecraft_nick'] ?: 'Utente'); ?></h1>
-                                <p class="profile-join-date">
-                                    <i class="bi bi-calendar"></i> 
-                                    Membro dal <?php echo date('d/m/Y', strtotime($user_stats['join_date'])); ?>
-                                </p>
-                                <?php if ($user['is_admin']): ?>
-                                    <span class="admin-badge">
-                                        <i class="bi bi-shield-check"></i> Amministratore
-                                    </span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- User's Servers -->
-                    <?php if (!empty($owned_servers)): ?>
-                        <div class="user-servers-section">
-                            <h3 class="section-title">
-                                <i class="bi bi-server"></i> I Miei Server
-                            </h3>
-                            
-                            <div class="servers-grid">
-                                <?php foreach ($owned_servers as $server): ?>
-                                    <div class="server-card-profile">
-                                        <div class="server-card-header">
-                                            <?php if ($server['logo_url']): ?>
-                                                <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" 
-                                                     alt="Logo" class="server-logo-small">
-                                            <?php else: ?>
-                                                <div class="server-logo-small default-logo">
-                                                    <i class="bi bi-server"></i>
-                                                </div>
-                                            <?php endif; ?>
-                                            
-                                            <div class="server-info-small">
-                                                <h4 class="server-name-small">
-                                                    <a href="server.php?id=<?php echo $server['id']; ?>">
-                                                        <?php echo htmlspecialchars($server['nome']); ?>
-                                                    </a>
-                                                </h4>
-                                                <p class="server-ip-small"><?php echo htmlspecialchars($server['ip']); ?></p>
-                                            </div>
-                                            
-                                            <div class="server-stats-small">
-                                                <div class="stat-item-small">
-                                                    <span class="stat-number-small"><?php echo number_format($server['vote_count']); ?></span>
-                                                    <span class="stat-label-small">Voti</span>
-                                                </div>
-                                                <?php
-                                                // Controlla se l'utente ha votato questo server oggi
-                                                $user_voted_this_server = false;
-                                                if (isLoggedIn()) {
-                                                    try {
-                                                        $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM sl_votes WHERE user_id = ? AND server_id = ? AND DATE(data_voto) = CURDATE()");
-                                                        $stmt->execute([$user_id, $server['id']]);
-                                                        $user_voted_this_server = $stmt->fetch()['count'] > 0;
-                                                    } catch (PDOException $e) {
-                                                        $user_voted_this_server = false;
-                                                    }
-                                                }
-                                                ?>
-                                                <?php if ($user_voted_this_server): ?>
-                                                    <div class="voted-indicator">
-                                                        <i class="bi bi-check-circle-fill text-success"></i>
-                                                        <span class="voted-text">Votato oggi</span>
-                                                    </div>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="server-card-body">
-                                            <p class="server-description-small">
-                                                <?php echo htmlspecialchars(substr($server['descrizione'] ?: 'Nessuna descrizione disponibile.', 0, 100)); ?>
-                                                <?php if (strlen($server['descrizione'] ?: '') > 100): ?>...<?php endif; ?>
-                                            </p>
-                                            
-                                            <div class="server-actions">
-                                                <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server">
-                                                    <i class="bi bi-eye"></i> Visualizza
-                                                </a>
-                                                <?php if (isAdmin()): ?>
-                                                    <a href="admin.php?edit=<?php echo $server['id']; ?>" class="btn-edit-server">
-                                                        <i class="bi bi-pencil"></i> Modifica
-                                                    </a>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <div class="no-servers-section">
-                            <div class="no-servers-content">
-                                <i class="bi bi-server no-servers-icon"></i>
-                                <h3>Nessun Server</h3>
-                                <p>Non possiedi ancora nessun server. Contatta un amministratore per aggiungere il tuo server alla lista!</p>
-                                <?php if (isAdmin()): ?>
-                                    <a href="admin.php" class="btn-add-server">
-                                        <i class="bi bi-plus-circle"></i> Aggiungi Server
-                                    </a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <!-- Server Licenses Section -->
-                    <?php if (!empty($server_licenses)): ?>
-                        <div class="server-licenses-section">
-                            <h3 class="section-title">
-                                <i class="bi bi-key-fill"></i> Licenze dei Server
-                            </h3>
-                            
-                            <div class="licenses-grid">
-                                <?php foreach ($server_licenses as $license): ?>
-                                    <div class="license-card">
-                                        <div class="license-card-header">
-                                            <h4 class="license-server-name">
-                                                <?php echo htmlspecialchars($license['server_name']); ?>
-                                            </h4>
-                                            <span class="license-status <?php echo $license['is_active'] ? 'active' : 'inactive'; ?>">
-                                                <i class="bi bi-<?php echo $license['is_active'] ? 'check-circle-fill' : 'x-circle-fill'; ?>"></i>
-                                                <?php echo $license['is_active'] ? 'Attiva' : 'Inattiva'; ?>
-                                            </span>
-                                        </div>
-                                        
-                                        <div class="license-card-body">
-                                            <div class="license-key-display">
-                                                <span class="license-label">License Key:</span>
-                                                <code class="license-key-value license-hidden">
-                                                    <span class="license-dots">•••••••••••••••••••••••••••••••••</span>
-                                                    <span class="license-text" style="display: none;"><?php echo htmlspecialchars($license['license_key']); ?></span>
-                                                </code>
-                                            </div>
-                                            
-                                            <div class="license-meta">
-                                                <div class="license-meta-item">
-                                                    <i class="bi bi-calendar"></i>
-                                                    <span>Creata: <?php echo date('d/m/Y', strtotime($license['created_at'])); ?></span>
-                                                </div>
-                                                <?php if ($license['last_used']): ?>
-                                                    <div class="license-meta-item">
-                                                        <i class="bi bi-clock-history"></i>
-                                                        <span>Ultimo uso: <?php echo date('d/m/Y H:i', strtotime($license['last_used'])); ?></span>
-                                                    </div>
-                                                <?php endif; ?>
-                                                <div class="license-meta-item">
-                                                    <i class="bi bi-arrow-repeat"></i>
-                                                    <span>Utilizzi: <?php echo number_format($license['usage_count']); ?></span>
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="license-actions">
-                                                <button class="view-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
-                                                    <i class="bi bi-eye"></i> Visualizza
-                                                </button>
-                                                <button class="copy-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
-                                                    <i class="bi bi-copy"></i> Copia
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                        
-                        <!-- JavaScript per gestione licenze -->
-                        <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            // Gestione pulsanti licenze
-            const viewLicenseButtons = document.querySelectorAll('.view-license-btn');
-            const copyLicenseButtons = document.querySelectorAll('.copy-license-btn');
-                            
-                            // Funzione per visualizzare la licenza
-                            viewLicenseButtons.forEach(button => {
-                                button.addEventListener('click', function() {
-                                    const licenseCard = this.closest('.license-card');
-                                    const licenseKeyDisplay = licenseCard.querySelector('.license-key-value');
-                                    const licenseDots = licenseKeyDisplay.querySelector('.license-dots');
-                                    const licenseText = licenseKeyDisplay.querySelector('.license-text');
-                                    const buttonIcon = this.querySelector('i');
-                                    const buttonText = this.querySelector('span');
-                                    
-                                    if (licenseDots.style.display === 'none') {
-                                        // Nascondi il testo e mostra i pallini
-                                        licenseDots.style.display = 'inline';
-                                        licenseText.style.display = 'none';
-                                        buttonIcon.className = 'bi bi-eye';
-                                        buttonText.textContent = ' Visualizza';
-                                    } else {
-                                        // Mostra il testo e nascondi i pallini
-                                        licenseDots.style.display = 'none';
-                                        licenseText.style.display = 'inline';
-                                        buttonIcon.className = 'bi bi-eye-slash';
-                                        buttonText.textContent = ' Nascondi';
-                                    }
-                                });
-                            });
-                            
-                            // Funzione per copiare la licenza
-                            copyLicenseButtons.forEach(button => {
-                                button.addEventListener('click', function() {
-                                    const licenseKey = this.getAttribute('data-license');
-                                    
-                                    navigator.clipboard.writeText(licenseKey).then(function() {
-                                        // Usa la funzione showToast esistente se disponibile
-                                        if (typeof showToast === 'function') {
-                                            showToast('Licenza copiata negli appunti!', 'success');
-                                        } else {
-                                            alert('Licenza copiata negli appunti!');
-                                        }
-                                        
-                                        // Cambia temporaneamente l'icona per feedback visivo
-                                        const icon = button.querySelector('i');
-                                        const originalClass = icon.className;
-                                        icon.className = 'bi bi-check-lg';
-                                        
-                                        setTimeout(() => {
-                                            icon.className = originalClass;
-                                        }, 2000);
-                                        
-                                    }).catch(function() {
-                                        // Fallback per browser più vecchi
-                                        var textArea = document.createElement('textarea');
-                                        textArea.value = licenseKey;
-                                        document.body.appendChild(textArea);
-                                        textArea.select();
-                                        document.execCommand('copy');
-                                        document.body.removeChild(textArea);
-                                        
-                                        if (typeof showToast === 'function') {
-                                            showToast('Licenza copiata negli appunti!', 'success');
-                                        } else {
-                                            alert('Licenza copiata negli appunti!');
-                                        }
-                                    });
-                                });
-                            });
-                        });
-                        </script>
-                    <?php else: ?>
-                        <div class="no-licenses-section">
-                            <div class="no-licenses-content">
-                                <i class="bi bi-key no-licenses-icon"></i>
-                                <h3>Nessuna Licenza</h3>
-                                <p>Non hai ancora licenze attive per i tuoi server. Le licenze vengono generate automaticamente quando un server viene aggiunto.</p>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
-                
-                <!-- Sidebar -->
-                <div class="col-lg-4">
-                    <!-- User Stats -->
-                    <div class="profile-stats-card">
-                        <h4><i class="bi bi-graph-up"></i> Statistiche</h4>
-                        
-                        <div class="stats-list">
-                            <div class="stat-item-profile">
-                                <div class="stat-icon">
-                                    <i class="bi bi-hand-thumbs-up"></i>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-number"><?php echo number_format($user_stats['total_votes']); ?></span>
-                                    <span class="stat-label">Voti Dati</span>
-                                </div>
-                            </div>
-                            
-                            <div class="stat-item-profile">
-                                <div class="stat-icon">
-                                    <i class="bi bi-server"></i>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-number"><?php echo number_format($user_stats['servers_voted']); ?></span>
-                                    <span class="stat-label">Server Votati</span>
-                                </div>
-                            </div>
-                            
-                            <div class="stat-item-profile">
-                                <div class="stat-icon">
-                                    <i class="bi bi-collection"></i>
-                                </div>
-                                <div class="stat-content">
-                                    <span class="stat-number"><?php echo count($owned_servers); ?></span>
-                                    <span class="stat-label">Server Posseduti</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Account Info -->
-                    <div class="profile-info-card">
-                        <h4><i class="bi bi-person-circle"></i> Informazioni Account</h4>
-                        
-                        <div class="info-list">
-                            <div class="info-item">
-                                <span class="info-label">Nickname Minecraft:</span>
-                                <span class="info-value">
-                                    <?php echo htmlspecialchars($user['minecraft_nick'] ?: 'Non impostato'); ?>
-                                </span>
-                            </div>
-                            
-                            <div class="info-item">
-                                <span class="info-label">Data Registrazione:</span>
-                                <span class="info-value">
-                                    <?php echo date('d/m/Y H:i', strtotime($user_stats['join_date'])); ?>
-                                </span>
-                            </div>
-                            
-                            <div class="info-item">
-                                <span class="info-label">Stato Account:</span>
-                                <span class="info-value status-active">
-                                    <i class="bi bi-check-circle"></i> Attivo
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<div class="profile-container">
+    <div class="container">
+        <!-- Header del Profilo -->
+        <div class="profile-header">
+            <div class="profile-avatar">
+                <img src="<?php echo getMinecraftAvatar($user['minecraft_nick'] ?: 'MHF_Steve'); ?>" 
+                     alt="Avatar" class="avatar-img">
             </div>
-        <?php else: ?>
-            <div class="alert alert-danger">
-                <i class="bi bi-exclamation-triangle"></i> 
-                Impossibile caricare i dati del profilo. Si prega di riprovare più tardi.
+            <div class="profile-info">
+                <h1 class="profile-nickname"><?php echo htmlspecialchars($user['minecraft_nick'] ?: 'Utente'); ?></h1>
+                <p class="profile-join-date">
+                    <i class="bi bi-calendar"></i> 
+                    Membro dal <?php echo date('d/m/Y', strtotime($user_stats['join_date'])); ?>
+                </p>
+                <?php if ($user['is_admin']): ?>
+                    <span class="admin-badge">
+                        <i class="bi bi-shield-check"></i> Amministratore
+                    </span>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Messaggi di successo/errore -->
+        <?php if ($message): ?>
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle"></i> <?php echo $message; ?>
             </div>
         <?php endif; ?>
+        
+        <?php if ($error): ?>
+            <div class="alert alert-error">
+                <i class="bi bi-exclamation-triangle"></i> <?php echo $error; ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Navigazione Principale -->
+        <div class="profile-navigation">
+            <button class="nav-btn active" data-section="profile">
+                <i class="bi bi-person-circle"></i> Il tuo profilo
+            </button>
+            <button class="nav-btn" data-section="votes">
+                <i class="bi bi-hand-thumbs-up"></i> Elenco Voti
+            </button>
+            <button class="nav-btn" data-section="new-server">
+                <i class="bi bi-plus-circle"></i> Nuovo server
+            </button>
+            <button class="nav-btn" data-section="server-management">
+                <i class="bi bi-server"></i> Gestione Server
+            </button>
+        </div>
+
+        <!-- Contenuto delle Sezioni -->
+        <div class="profile-content">
+            
+            <!-- Sezione: Il mio profilo -->
+            <div class="content-section active" id="profile-section">
+                <div class="section-header">
+                    <h2><i class="bi bi-person-circle"></i> Il mio profilo</h2>
+                </div>
+                
+                <div class="profile-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="bi bi-hand-thumbs-up"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-number"><?php echo number_format($user_stats['total_votes']); ?></span>
+                            <span class="stat-label">Voti Totali</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="bi bi-server"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-number"><?php echo number_format($user_stats['servers_voted']); ?></span>
+                            <span class="stat-label">Server Votati</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="bi bi-collection"></i>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-number"><?php echo count($owned_servers); ?></span>
+                            <span class="stat-label">Server Posseduti</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Voto Giornaliero -->
+                <div class="daily-vote-section">
+                    <h3><i class="bi bi-calendar-check"></i> Voto Giornaliero</h3>
+                    <?php if ($daily_vote): ?>
+                        <div class="daily-vote-card voted">
+                            <div class="vote-info">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>Hai già votato oggi per:</span>
+                                <strong><?php echo htmlspecialchars($daily_vote['nome']); ?></strong>
+                            </div>
+                            <div class="vote-time">
+                                <?php 
+                                $vote_datetime = new DateTime($daily_vote['data_voto'], new DateTimeZone('UTC'));
+                                $vote_datetime->setTimezone(new DateTimeZone('Europe/Rome'));
+                                echo $vote_datetime->format('H:i'); 
+                                ?>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="daily-vote-card not-voted">
+                            <div class="vote-info">
+                                <i class="bi bi-clock"></i>
+                                <span>Non hai ancora votato oggi</span>
+                            </div>
+                            <a href="index.php" class="vote-btn">
+                                <i class="bi bi-hand-thumbs-up"></i> Vota ora
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Sezione: Elenco Voti -->
+            <div class="content-section" id="votes-section">
+                <div class="section-header">
+                    <h2><i class="bi bi-hand-thumbs-up"></i> Elenco Voti</h2>
+                    <p>Tutti i voti che hai dato ai server</p>
+                </div>
+                
+                <?php if (!empty($user_votes)): ?>
+                    <div class="votes-list">
+                        <?php foreach ($user_votes as $vote): ?>
+                            <div class="vote-item">
+                                <div class="vote-server-info">
+                                    <?php if ($vote['server_logo']): ?>
+                                        <img src="<?php echo htmlspecialchars($vote['server_logo']); ?>" 
+                                             alt="Logo" class="server-logo-small">
+                                    <?php else: ?>
+                                        <div class="server-logo-small default-logo">
+                                            <i class="bi bi-server"></i>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <div class="server-details">
+                                        <h4 class="server-name">
+                                            <a href="server.php?id=<?php echo $vote['server_id']; ?>">
+                                                <?php echo htmlspecialchars($vote['server_name']); ?>
+                                            </a>
+                                        </h4>
+                                        <p class="server-ip"><?php echo htmlspecialchars($vote['server_ip']); ?></p>
+                                    </div>
+                                </div>
+                                
+                                <div class="vote-date">
+                                    <i class="bi bi-calendar"></i>
+                                    <?php 
+                                    $vote_datetime = new DateTime($vote['data_voto'], new DateTimeZone('UTC'));
+                                    $vote_datetime->setTimezone(new DateTimeZone('Europe/Rome'));
+                                    echo $vote_datetime->format('d/m/Y H:i'); 
+                                    ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="no-votes-section">
+                        <i class="bi bi-hand-thumbs-up no-votes-icon"></i>
+                        <h3>Nessun Voto</h3>
+                        <p>Non hai ancora votato nessun server. Inizia a votare per supportare i tuoi server preferiti!</p>
+                        <a href="index.php" class="btn-primary">
+                            <i class="bi bi-hand-thumbs-up"></i> Vota ora
+                        </a>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Sezione: Nuovo Server -->
+            <div class="content-section" id="new-server-section">
+                <div class="section-header">
+                    <h2><i class="bi bi-plus-circle"></i> Richiedi Nuovo Server</h2>
+                    <p>Compila il form per richiedere l'aggiunta del tuo server alla lista</p>
+                </div>
+                
+                <form method="POST" class="server-request-form">
+                    <input type="hidden" name="request_server" value="1">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nome">Nome Server *</label>
+                            <input type="text" id="nome" name="nome" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="ip">IP Server *</label>
+                            <input type="text" id="ip" name="ip" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="versione">Versione *</label>
+                            <input type="text" id="versione" name="versione" placeholder="es. 1.20.1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="tipo_server">Tipo Server</label>
+                            <select id="tipo_server" name="tipo_server">
+                                <option value="Java & Bedrock">Java & Bedrock</option>
+                                <option value="Java">Solo Java</option>
+                                <option value="Bedrock">Solo Bedrock</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="descrizione">Descrizione (facoltativo)</label>
+                        <textarea id="descrizione" name="descrizione" rows="4" placeholder="Descrivi il tuo server..."></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="logo_url">URL Logo (facoltativo)</label>
+                            <input type="url" id="logo_url" name="logo_url" placeholder="https://...">
+                        </div>
+                        <div class="form-group">
+                            <label for="banner_url">URL Banner (facoltativo)</label>
+                            <input type="url" id="banner_url" name="banner_url" placeholder="https://...">
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class="bi bi-send"></i> Invia Richiesta
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Sezione: Gestione Server -->
+            <div class="content-section" id="server-management-section">
+                <div class="section-header">
+                    <h2><i class="bi bi-server"></i> Gestione Server</h2>
+                    <p>Gestisci i tuoi server e visualizza le licenze</p>
+                </div>
+
+                <!-- Form Modifica Server -->
+                <?php if ($server_to_edit): ?>
+                <div class="edit-server-form">
+                    <h3><i class="bi bi-pencil"></i> Modifica Server</h3>
+                    <form method="POST">
+                        <input type="hidden" name="edit_server" value="1">
+                        <input type="hidden" name="server_id" value="<?php echo $server_to_edit['id']; ?>">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="nome">Nome Server *</label>
+                                <input type="text" id="nome" name="nome" value="<?php echo htmlspecialchars($server_to_edit['nome']); ?>" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="ip">IP Server *</label>
+                                <input type="text" id="ip" name="ip" value="<?php echo htmlspecialchars($server_to_edit['ip']); ?>" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="versione">Versione *</label>
+                                <input type="text" id="versione" name="versione" value="<?php echo htmlspecialchars($server_to_edit['versione']); ?>" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="tipo_server">Tipo Server</label>
+                                <select id="tipo_server" name="tipo_server">
+                                    <option value="Java & Bedrock" <?php echo ($server_to_edit['tipo_server'] === 'Java & Bedrock') ? 'selected' : ''; ?>>Java & Bedrock</option>
+                                    <option value="Java" <?php echo ($server_to_edit['tipo_server'] === 'Java') ? 'selected' : ''; ?>>Solo Java</option>
+                                    <option value="Bedrock" <?php echo ($server_to_edit['tipo_server'] === 'Bedrock') ? 'selected' : ''; ?>>Solo Bedrock</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="descrizione">Descrizione</label>
+                            <textarea id="descrizione" name="descrizione" rows="4"><?php echo htmlspecialchars($server_to_edit['descrizione']); ?></textarea>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="logo_url">URL Logo</label>
+                                <input type="url" id="logo_url" name="logo_url" value="<?php echo htmlspecialchars($server_to_edit['logo_url']); ?>">
+                            </div>
+                            <div class="form-group">
+                                <label for="banner_url">URL Banner</label>
+                                <input type="url" id="banner_url" name="banner_url" value="<?php echo htmlspecialchars($server_to_edit['banner_url']); ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">
+                                <i class="bi bi-check"></i> Salva Modifiche
+                            </button>
+                            <a href="profile.php" class="btn-secondary">
+                                <i class="bi bi-x"></i> Annulla
+                            </a>
+                        </div>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+                <!-- Lista Server -->
+                <?php if (!empty($owned_servers)): ?>
+                    <div class="servers-section">
+                        <h3><i class="bi bi-server"></i> I Miei Server</h3>
+                        
+                        <div class="profile-servers-grid">
+                            <?php foreach ($owned_servers as $server): ?>
+                                <div class="server-card">
+                                    <div class="server-card-header">
+                                        <?php if ($server['logo_url']): ?>
+                                            <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" 
+                                                 alt="Logo" class="server-logo">
+                                        <?php else: ?>
+                                            <div class="server-logo default-logo">
+                                                <i class="bi bi-server"></i>
+                                            </div>
+                                        <?php endif; ?>
+                                        
+                                        <div class="server-info">
+                                            <h4 class="server-name">
+                                                <a href="server.php?id=<?php echo $server['id']; ?>">
+                                                    <?php echo htmlspecialchars($server['nome']); ?>
+                                                </a>
+                                            </h4>
+                                            <p class="server-ip"><?php echo htmlspecialchars($server['ip']); ?></p>
+                                        </div>
+                                        
+                                        <div class="server-stats">
+                                            <div class="stat-item">
+                                                <span class="stat-number"><?php echo number_format($server['vote_count']); ?></span>
+                                                <span class="stat-label">Voti</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="server-card-body">
+                                        <div class="server-actions">
+                                            <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server">
+                                                <i class="bi bi-eye"></i> Visualizza
+                                            </a>
+                                            <a href="profile.php?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
+                                                <i class="bi bi-pencil"></i> Modifica
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="no-servers-section">
+                        <i class="bi bi-server no-servers-icon"></i>
+                        <h3>Nessun Server</h3>
+                        <p>Non possiedi ancora nessun server attivo. Usa la sezione "Nuovo server" per richiedere l'aggiunta del tuo server!</p>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Licenze Server -->
+                <?php if (!empty($server_licenses)): ?>
+                    <div class="licenses-section">
+                        <h3><i class="bi bi-key-fill"></i> Licenze dei Server</h3>
+                        
+                        <div class="licenses-grid">
+                            <?php foreach ($server_licenses as $license): ?>
+                                <div class="license-card">
+                                    <div class="license-card-header">
+                                        <h4 class="license-server-name">
+                                            <?php echo htmlspecialchars($license['server_name']); ?>
+                                        </h4>
+                                        <span class="license-status <?php echo $license['is_active'] ? 'active' : 'inactive'; ?>">
+                                            <i class="bi bi-<?php echo $license['is_active'] ? 'check-circle-fill' : 'x-circle-fill'; ?>"></i>
+                                            <?php echo $license['is_active'] ? 'Attiva' : 'Inattiva'; ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="license-card-body">
+                                        <div class="license-key-display">
+                                            <span class="license-label">License Key:</span>
+                                            <code class="license-key-value license-hidden">
+                                                <span class="license-dots">•••••••••••••••••••••••••••••••••</span>
+                                                <span class="license-text" style="display: none;"><?php echo htmlspecialchars($license['license_key']); ?></span>
+                                            </code>
+                                        </div>
+                                        
+                                        <div class="license-meta">
+                                            <div class="license-meta-item">
+                                                <i class="bi bi-calendar"></i>
+                                                <span>Creata: <?php echo date('d/m/Y', strtotime($license['created_at'])); ?></span>
+                                            </div>
+                                            <?php if ($license['last_used']): ?>
+                                                <div class="license-meta-item">
+                                                    <i class="bi bi-clock-history"></i>
+                                                    <span>Ultimo uso: <?php echo date('d/m/Y H:i', strtotime($license['last_used'])); ?></span>
+                                                </div>
+                                            <?php endif; ?>
+                                            <div class="license-meta-item">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                                <span>Utilizzi: <?php echo number_format($license['usage_count']); ?></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="license-actions">
+                                            <button class="view-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
+                                                <i class="bi bi-eye"></i> Visualizza
+                                            </button>
+                                            <button class="copy-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
+                                                <i class="bi bi-copy"></i> Copia
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="no-licenses-section">
+                        <i class="bi bi-key no-licenses-icon"></i>
+                        <h3>Nessuna Licenza</h3>
+                        <p>Non hai ancora licenze attive per i tuoi server. Le licenze vengono generate automaticamente quando un server viene aggiunto.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestione navigazione tab
+    const navButtons = document.querySelectorAll('.nav-btn');
+    const contentSections = document.querySelectorAll('.content-section');
+    
+    navButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetSection = this.getAttribute('data-section');
+            
+            // Rimuovi classe active da tutti i bottoni e sezioni
+            navButtons.forEach(btn => btn.classList.remove('active'));
+            contentSections.forEach(section => section.classList.remove('active'));
+            
+            // Aggiungi classe active al bottone cliccato e alla sezione corrispondente
+            this.classList.add('active');
+            document.getElementById(targetSection + '-section').classList.add('active');
+        });
+    });
+    
+    // Gestione pulsanti licenze
+    const viewLicenseButtons = document.querySelectorAll('.view-license-btn');
+    const copyLicenseButtons = document.querySelectorAll('.copy-license-btn');
+    
+    // Funzione per visualizzare la licenza
+    viewLicenseButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const licenseCard = this.closest('.license-card');
+            const licenseKeyDisplay = licenseCard.querySelector('.license-key-value');
+            const licenseDots = licenseKeyDisplay.querySelector('.license-dots');
+            const licenseText = licenseKeyDisplay.querySelector('.license-text');
+            const buttonIcon = this.querySelector('i');
+            
+            if (licenseDots.style.display === 'none') {
+                // Nascondi il testo e mostra i pallini
+                licenseDots.style.display = 'inline';
+                licenseText.style.display = 'none';
+                buttonIcon.className = 'bi bi-eye';
+                this.innerHTML = '<i class="bi bi-eye"></i> Visualizza';
+            } else {
+                // Mostra il testo e nascondi i pallini
+                licenseDots.style.display = 'none';
+                licenseText.style.display = 'inline';
+                buttonIcon.className = 'bi bi-eye-slash';
+                this.innerHTML = '<i class="bi bi-eye-slash"></i> Nascondi';
+            }
+        });
+    });
+    
+    // Funzione per copiare la licenza
+    copyLicenseButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const licenseKey = this.getAttribute('data-license');
+            
+            navigator.clipboard.writeText(licenseKey).then(function() {
+                // Usa la funzione showToast esistente se disponibile
+                if (typeof showToast === 'function') {
+                    showToast('Licenza copiata negli appunti!', 'success');
+                } else {
+                    alert('Licenza copiata negli appunti!');
+                }
+                
+                // Cambia temporaneamente l'icona per feedback visivo
+                const icon = button.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'bi bi-check-lg';
+                
+                setTimeout(() => {
+                    icon.className = originalClass;
+                }, 2000);
+                
+            }).catch(function() {
+                // Fallback per browser più vecchi
+                var textArea = document.createElement('textarea');
+                textArea.value = licenseKey;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (typeof showToast === 'function') {
+                    showToast('Licenza copiata negli appunti!', 'success');
+                } else {
+                    alert('Licenza copiata negli appunti!');
+                }
+            });
+        });
+    });
+    
+    // Gestione automatica della sezione attiva in base ai parametri URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('edit_server')) {
+        // Se c'è il parametro edit_server, attiva la sezione Gestione Server
+        navButtons.forEach(btn => btn.classList.remove('active'));
+        contentSections.forEach(section => section.classList.remove('active'));
+        
+        const serverManagementBtn = document.querySelector('[data-section="server-management"]');
+        const serverManagementSection = document.getElementById('server-management-section');
+        
+        if (serverManagementBtn && serverManagementSection) {
+            serverManagementBtn.classList.add('active');
+            serverManagementSection.classList.add('active');
+        }
+    }
+});
+</script>
 
 <?php include 'footer.php'; ?>
