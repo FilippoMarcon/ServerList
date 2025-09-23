@@ -235,30 +235,6 @@
             }
             
             // Gestione pulsanti licenze rimossa dal footer - ora gestita in profile.php
-        
-        // Gestione filtri da URL parametri GET
-        const urlParams = new URLSearchParams(window.location.search);
-        const filterParam = urlParams.get('filter');
-        
-        if (filterParam && window.location.pathname.includes('index.php')) {
-            // Attendi che il DOM sia completamente caricato
-            setTimeout(() => {
-                const filterTags = document.querySelectorAll('.filter-tag');
-                const targetFilter = filterParam.toLowerCase();
-                
-                filterTags.forEach(tag => {
-                    if (tag.textContent.toLowerCase() === targetFilter) {
-                        tag.classList.add('active');
-                        console.log('Filtro attivato da URL:', targetFilter);
-                    }
-                });
-                
-                // Applica i filtri se ne abbiamo trovati
-                if (typeof applyFilters === 'function') {
-                    applyFilters();
-                }
-            }, 500); // Delay per assicurarci che tutto sia caricato
-        }
         });
     </script>
     
