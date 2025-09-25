@@ -110,8 +110,8 @@ include 'header.php';
 }
 
 .floating-dropdown .dropdown-menu {
-    position: absolute !important;
-    z-index: 99999 !important;
+    position: fixed !important;
+    z-index: 999999 !important;
     background: rgba(30, 30, 30, 0.95) !important;
     backdrop-filter: blur(10px) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -120,11 +120,13 @@ include 'header.php';
     padding: 0.5rem 0 !important;
     margin-top: 0.5rem !important;
     min-width: 200px !important;
+    transform: none !important;
 }
 
 .floating-dropdown .dropdown-menu.show {
-    z-index: 99999 !important;
+    z-index: 999999 !important;
     display: block !important;
+    position: fixed !important;
 }
 
 .floating-dropdown .dropdown-item {
@@ -263,23 +265,16 @@ include 'header.php';
                         elseif ($rank == 2) $rank_class = 'silver';
                         elseif ($rank == 3) $rank_class = 'bronze';
                         
-                        // Generate some sample tags based on server name/description
+                        // Ottieni i tag/modalità dal database
                         $tags = [];
-                        if (stripos($server['nome'], 'roleplay') !== false || stripos($server['descrizione'], 'roleplay') !== false) {
-                            $tags[] = 'RolePlay';
-                        }
-                        if (stripos($server['nome'], 'survival') !== false || stripos($server['descrizione'], 'survival') !== false) {
-                            $tags[] = 'Survival';
-                        }
-                        if (stripos($server['nome'], 'pvp') !== false || stripos($server['descrizione'], 'pvp') !== false) {
-                            $tags[] = 'PvP';
-                        }
-                        if (stripos($server['nome'], 'mini') !== false || stripos($server['descrizione'], 'mini') !== false) {
-                            $tags[] = 'MiniGames';
+                        if (!empty($server['modalita'])) {
+                            $modalita_array = json_decode($server['modalita'], true);
+                            if (is_array($modalita_array)) {
+                                $tags = $modalita_array;
+                            }
                         }
                         if (empty($tags)) {
-                            $tags[] = 'Adventure';
-                            $tags[] = 'Vanilla';
+                            $tags[] = 'Generale';
                         }
                     ?>
                         <div class="homepage-server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" data-server-id="<?php echo $server['id']; ?>" data-votes="<?php echo $server['voti_totali']; ?>">

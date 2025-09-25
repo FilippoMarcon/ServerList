@@ -11,6 +11,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($page_title) ? $page_title . ' - ' : ''; ?><?php echo SITE_NAME; ?></title>
     
+    <!-- Favicon -->
+    <link rel="icon" href="logo.png" type="image/png">
+    
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -359,6 +362,47 @@
         .form-group textarea {
             resize: vertical;
             min-height: 100px;
+        }
+
+        /* Stili per la selezione modalità */
+        .modalita-selection {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .modalita-checkbox {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .modalita-checkbox input[type="checkbox"] {
+            display: none;
+        }
+
+        .modalita-tag {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #fff;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .modalita-checkbox input[type="checkbox"]:checked + .modalita-tag {
+            background: #4CAF50;
+            border-color: #4CAF50;
+            color: #fff;
+        }
+
+        .modalita-tag:hover {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: #4CAF50;
         }
 
         .form-actions {
@@ -3378,6 +3422,31 @@
             overflow: visible;
         }
         
+        .voters-grid.scrollable {
+            max-height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-color) transparent;
+        }
+        
+        .voters-grid.scrollable::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .voters-grid.scrollable::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .voters-grid.scrollable::-webkit-scrollbar-thumb {
+            background: var(--accent-color);
+            border-radius: 3px;
+        }
+        
+        .voters-grid.scrollable::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-hover);
+        }
+        
         .voter-avatar-modern {
             width: 32px;
             height: 32px;
@@ -4650,6 +4719,58 @@
               max-width: 400px;
               line-height: 1.5;
               margin: 0;
+          }
+
+          /* License Key Container with Copy Button */
+          .license-key-container {
+              display: flex;
+              align-items: center;
+              gap: 0.75rem;
+              background: var(--primary-bg);
+              border: 1px solid var(--border-color);
+              border-radius: 8px;
+              padding: 0.75rem;
+              transition: all 0.3s ease;
+          }
+
+          .license-key-container:hover {
+              border-color: var(--accent-purple);
+              background: rgba(102, 126, 234, 0.05);
+          }
+
+          .license-key-container .copy-license-btn {
+              margin: 0;
+              padding: 0.5rem;
+              min-width: auto;
+              border-radius: 6px;
+              background: var(--accent-green);
+              border: none;
+              color: white;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+          }
+
+          .license-key-container .copy-license-btn:hover {
+              background: #059669;
+              transform: scale(1.05);
+          }
+
+          .license-key-container .copy-license-btn i {
+              font-size: 0.9rem;
+          }
+
+          .license-key-container .license-key-value {
+              flex: 1;
+              background: transparent;
+              border: none;
+              padding: 0;
+              margin: 0;
+              font-family: 'Courier New', monospace;
+              font-size: 0.9rem;
+              color: var(--text-primary);
           }
     </style>
 </head>

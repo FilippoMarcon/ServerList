@@ -74,13 +74,12 @@ try {
     elseif ($server_rank == 2) $rank_class = 'silver';
     elseif ($server_rank == 3) $rank_class = 'bronze';
     
-    // Recupera gli utenti che hanno votato per questo server (ultimi 20 voti)
+    // Recupera TUTTI gli utenti che hanno votato per questo server OGGI (voti giornalieri)
     $stmt = $pdo->prepare("SELECT u.minecraft_nick, v.data_voto 
                           FROM sl_votes v 
                           JOIN sl_users u ON v.user_id = u.id 
-                          WHERE v.server_id = ? 
-                          ORDER BY v.data_voto DESC 
-                          LIMIT 20");
+                          WHERE v.server_id = ? AND DATE(v.data_voto) = CURDATE()
+                          ORDER BY v.data_voto DESC");
     $stmt->execute([$server_id]);
     $voters = $stmt->fetchAll();
     
@@ -258,29 +257,20 @@ include 'header.php';
                                      alt="Banner" class="content-banner-img">
                                 <div class="banner-text-overlay">
                                     <h2><?php echo htmlspecialchars($server['nome']); ?></h2>
-                                    <p><?php echo htmlspecialchars($server['descrizione'] ?: 'Il Roleplay Realistico Italiano'); ?></p>
                                 </div>
                             </div>
                         <?php endif; ?>
                         
                         <div class="server-description">
-                            <p class="description-text">
-                                <?php echo nl2br(htmlspecialchars($server['descrizione'] ?: 'Hai mai sognato di giocare a minecraft simulando al 100% la vita reale? Nella città di NeoTecno questo è possibile!')); ?>
-                            </p>
-                            
-                            <div class="description-highlight">
-                                <p>Su <?php echo htmlspecialchars($server['nome']); ?> tutto il gameplay è gestito dagli utenti.</p>
-                            </div>
-                            
-                            <p class="description-detail">
-                                Come nella vita reale, ogni cittadino contribuisce all'esperienza degli altri: il governo stabilisce le leggi della nazione, 
-                                gli insegnanti ti istruiranno a scuola, i dottori ti cureranno in ospedale, le forze armate ti proteggeranno dalle 
-                                associazioni criminali, e tanti lavoratori di decine altre aziende ti aiuteranno nel tuo gameplay!
-                            </p>
-                            
-                            <div class="gameplay-highlight">
-                                <p><em>Qual è il bello?</em> <strong>Che puoi diventare uno di loro.</strong></p>
-                            </div>
+                            <?php if (!empty($server['descrizione'])): ?>
+                                <div class="description-text">
+                                    <?php echo $server['descrizione']; ?>
+                                </div>
+                            <?php else: ?>
+                                <p class="description-text">
+                                    Questo server non ha ancora una descrizione personalizzata.
+                                </p>
+                            <?php endif; ?>
                         </div>
                     </div>
                     
@@ -336,7 +326,22 @@ include 'header.php';
                     </div>
                     
                     <div class="server-tags-section">
-                        <span class="server-tag-modern">RolePlay</span>
+                        <?php 
+                        $modalita_array = [];
+                        if (!empty($server['modalita'])) {
+                            $modalita_array = json_decode($server['modalita'], true);
+                            if (!is_array($modalita_array)) {
+                                $modalita_array = [];
+                            }
+                        }
+                        
+                        if (!empty($modalita_array)): 
+                            foreach ($modalita_array as $modalita): ?>
+                                <span class="server-tag-modern"><?php echo htmlspecialchars($modalita); ?></span>
+                            <?php endforeach;
+                        else: ?>
+                            <span class="server-tag-modern">Generale</span>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
@@ -369,16 +374,17 @@ include 'header.php';
                 
                 <!-- Recent Voters -->
                 <div class="recent-voters-card">
-                    <h4><i class="bi bi-people"></i> Ultimi Voti</h4>
+                    <h4><i class="bi bi-people"></i> Ultimi Voti (<?php echo count($voters); ?>)</h4>
                     
-                    <div class="voters-grid">
+                    <div class="voters-grid <?php echo count($voters) > 40 ? 'scrollable' : ''; ?>">
                         <?php 
-                        $recent_voters_display = array_slice($voters, 0, 16);
-                        foreach ($recent_voters_display as $voter): 
+                        // Mostra TUTTI i voti giornalieri
+                        foreach ($voters as $voter): 
                         ?>
                             <div class="voter-avatar-modern" 
                                  title="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
-                                 data-nickname="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>">
+                                 data-nickname="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
+                                 data-vote-time="<?php echo $voter['data_voto']; ?>">
                                 <img src="https://mc-heads.net/avatar/<?php echo urlencode($voter['minecraft_nick']); ?>" 
                                      alt="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
                                      onerror="this.src='https://via.placeholder.com/32x32/6c757d/ffffff?text=?';">
@@ -513,13 +519,32 @@ function handleAvatarError(img) {
 }
 
 // Funzioni per i tooltip dei votanti
-function showVoterTooltip(element, nickname) {
+function showVoterTooltip(element, nickname, voteTime) {
     // Rimuovi tooltip esistenti
     hideVoterTooltip();
     
+    // Calcola il tempo trascorso
+    const now = new Date();
+    const voteDate = new Date(voteTime);
+    const diffMs = now - voteDate;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    let timeAgo;
+    if (diffMins < 1) {
+        timeAgo = "ora";
+    } else if (diffMins < 60) {
+        timeAgo = diffMins + (diffMins === 1 ? " minuto fa" : " minuti fa");
+    } else if (diffHours < 24) {
+        timeAgo = diffHours + (diffHours === 1 ? " ora fa" : " ore fa");
+    } else {
+        timeAgo = diffDays + (diffDays === 1 ? " giorno fa" : " giorni fa");
+    }
+    
     const tooltip = document.createElement('div');
     tooltip.className = 'voter-tooltip';
-    tooltip.textContent = nickname;
+    tooltip.textContent = nickname + ' - ' + timeAgo;
     tooltip.style.cssText = `
         position: absolute;
         background: rgba(0, 0, 0, 0.9);
@@ -539,7 +564,7 @@ function showVoterTooltip(element, nickname) {
     
     const rect = element.getBoundingClientRect();
     tooltip.style.left = (rect.left + rect.width / 2) + 'px';
-    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+    tooltip.style.top = (rect.top + window.scrollY - tooltip.offsetHeight - 8) + 'px';
 }
 
 function hideVoterTooltip() {
@@ -592,7 +617,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Tooltip events
         avatar.addEventListener('mouseenter', function() {
-            showVoterTooltip(this, nickname);
+            const voteTime = this.getAttribute('data-vote-time');
+            showVoterTooltip(this, nickname, voteTime);
         });
         
         avatar.addEventListener('mouseleave', function() {

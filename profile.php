@@ -52,6 +52,15 @@ if ($edit_server_id > 0) {
         
         if (!$server_to_edit) {
             $error = 'Server non trovato o non hai i permessi per modificarlo.';
+        } else {
+            // Decodifica le modalità esistenti
+            $server_to_edit['modalita_array'] = [];
+            if (!empty($server_to_edit['modalita'])) {
+                $decoded_modalita = json_decode($server_to_edit['modalita'], true);
+                if (is_array($decoded_modalita)) {
+                    $server_to_edit['modalita_array'] = $decoded_modalita;
+                }
+            }
         }
     } catch (PDOException $e) {
         $error = 'Errore nel caricamento del server.';
@@ -68,6 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
     $descrizione = sanitize($_POST['descrizione'] ?? '');
     $banner_url = sanitize($_POST['banner_url'] ?? '');
     $logo_url = sanitize($_POST['logo_url'] ?? '');
+    $modalita = isset($_POST['modalita']) ? $_POST['modalita'] : [];
+    
+    // Converti le modalità in JSON
+    $modalita_json = json_encode(array_values($modalita));
     
     if ($server_id === 0 || empty($nome) || empty($ip) || empty($versione)) {
         $error = 'Nome, IP e Versione sono campi obbligatori.';
@@ -77,8 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
             $stmt->execute([$server_id, $user_id]);
             
             if ($stmt->fetch()) {
-                $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ? WHERE id = ? AND owner_id = ?");
-                $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $server_id, $user_id]);
+                $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ? WHERE id = ? AND owner_id = ?");
+                $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $server_id, $user_id]);
                 $message = 'Server modificato con successo!';
                 $server_to_edit = null;
                 $edit_server_id = 0;
@@ -185,6 +198,7 @@ try {
 }
 
 $page_title = "Profilo - " . htmlspecialchars($user['minecraft_nick'] ?? 'Utente');
+$include_rich_editor = true; // Abilita Quill.js per l'editor rich text
 include 'header.php';
 ?>
 
@@ -292,8 +306,7 @@ include 'header.php';
                             </div>
                             <div class="vote-time">
                                 <?php 
-                                $vote_datetime = new DateTime($daily_vote['data_voto'], new DateTimeZone('UTC'));
-                                $vote_datetime->setTimezone(new DateTimeZone('Europe/Rome'));
+                                $vote_datetime = new DateTime($daily_vote['data_voto']);
                                 echo $vote_datetime->format('H:i'); 
                                 ?>
                             </div>
@@ -346,8 +359,7 @@ include 'header.php';
                                 <div class="vote-date">
                                     <i class="bi bi-calendar"></i>
                                     <?php 
-                                    $vote_datetime = new DateTime($vote['data_voto'], new DateTimeZone('UTC'));
-                                    $vote_datetime->setTimezone(new DateTimeZone('Europe/Rome'));
+                                    $vote_datetime = new DateTime($vote['data_voto']);
                                     echo $vote_datetime->format('d/m/Y H:i'); 
                                     ?>
                                 </div>
@@ -468,6 +480,28 @@ include 'header.php';
                         </div>
                         
                         <div class="form-group">
+                            <label>Modalità di Gioco</label>
+                            <div class="modalita-selection">
+                                <?php 
+                                $modalita_disponibili = [
+                                    'Adventure', 'Survival', 'Vanilla', 'Factions', 'Skyblock', 
+                                    'RolePlay', 'MiniGames', 'BedWars', 'KitPvP', 'SkyPvP', 
+                                    'Survival Games', 'Hunger Games', 'Pixelmon', 'Prison'
+                                ];
+                                
+                                foreach ($modalita_disponibili as $modalita): 
+                                    $is_selected = in_array($modalita, $server_to_edit['modalita_array']);
+                                ?>
+                                    <label class="modalita-checkbox">
+                                        <input type="checkbox" name="modalita[]" value="<?php echo htmlspecialchars($modalita); ?>" 
+                                               <?php echo $is_selected ? 'checked' : ''; ?>>
+                                        <span class="modalita-tag"><?php echo htmlspecialchars($modalita); ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="descrizione">Descrizione</label>
                             <textarea id="descrizione" name="descrizione" rows="4"><?php echo htmlspecialchars($server_to_edit['descrizione']); ?></textarea>
                         </div>
@@ -573,10 +607,15 @@ include 'header.php';
                                     <div class="license-card-body">
                                         <div class="license-key-display">
                                             <span class="license-label">License Key:</span>
-                                            <code class="license-key-value license-hidden">
-                                                <span class="license-dots">•••••••••••••••••••••••••••••••••</span>
-                                                <span class="license-text" style="display: none;"><?php echo htmlspecialchars($license['license_key']); ?></span>
-                                            </code>
+                                            <div class="license-key-container">
+                                                <button class="copy-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>" title="Copia license key">
+                                                    <i class="bi bi-copy"></i>
+                                                </button>
+                                                <code class="license-key-value license-hidden">
+                                                    <span class="license-dots">•••••••••••••••••••••</span>
+                                                    <span class="license-text" style="display: none;"><?php echo htmlspecialchars($license['license_key']); ?></span>
+                                                </code>
+                                            </div>
                                         </div>
                                         
                                         <div class="license-meta">

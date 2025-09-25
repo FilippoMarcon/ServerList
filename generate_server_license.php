@@ -6,6 +6,14 @@
 
 require_once 'config.php';
 
+// Verifica che l'utente sia admin per l'interfaccia web
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    if (!isLoggedIn() || !isAdmin()) {
+        header("Location: login.php");
+        exit();
+    }
+}
+
 /**
  * Genera una licenza server univoca di 24 caratteri
  */

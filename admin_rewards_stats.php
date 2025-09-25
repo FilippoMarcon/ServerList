@@ -1,4 +1,14 @@
-<?php include 'header.php'; ?>
+<?php 
+require_once 'config.php';
+
+// Verifica che l'utente sia admin
+if (!isLoggedIn() || !isAdmin()) {
+    header("Location: login.php");
+    exit();
+}
+
+include 'header.php'; 
+?>
 
 <div class="container mt-4">
     <div class="row">

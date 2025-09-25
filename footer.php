@@ -144,6 +144,62 @@
     <!-- MC Player Counter Script -->
     <script src="https://cdn.jsdelivr.net/gh/leonardosnt/mc-player-counter/dist/mc-player-counter.min.js"></script>
     
+    <!-- Quill.js Editor (solo per pagine che lo richiedono) -->
+    <?php if (isset($include_rich_editor) && $include_rich_editor): ?>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Nascondi il textarea originale
+            const textarea = document.getElementById('descrizione');
+            if (textarea) {
+                textarea.style.display = 'none';
+                
+                // Crea il container per Quill
+                const editorContainer = document.createElement('div');
+                editorContainer.id = 'quill-editor';
+                editorContainer.style.height = '300px';
+                editorContainer.style.backgroundColor = 'white';
+                textarea.parentNode.insertBefore(editorContainer, textarea);
+                
+                // Inizializza Quill
+                const quill = new Quill('#quill-editor', {
+                    theme: 'snow',
+                    modules: {
+                        toolbar: [
+                            [{ 'header': [1, 2, 3, false] }],
+                            ['bold', 'italic', 'underline'],
+                            [{ 'color': [] }, { 'background': [] }],
+                            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                            [{ 'align': [] }],
+                            ['link', 'image'],
+                            ['clean']
+                        ]
+                    }
+                });
+                
+                // Carica il contenuto esistente
+                if (textarea.value) {
+                    quill.root.innerHTML = textarea.value;
+                }
+                
+                // Sincronizza con il textarea quando il form viene inviato
+                const form = textarea.closest('form');
+                if (form) {
+                    form.addEventListener('submit', function() {
+                        textarea.value = quill.root.innerHTML;
+                    });
+                }
+                
+                // Sincronizza in tempo reale
+                quill.on('text-change', function() {
+                    textarea.value = quill.root.innerHTML;
+                });
+            }
+        });
+    </script>
+    <?php endif; ?>
+    
     <!-- Custom JavaScript -->
     <script>
         // Funzione per copiare l'IP del server
