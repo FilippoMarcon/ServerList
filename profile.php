@@ -185,7 +185,7 @@ try {
 $server_licenses = [];
 try {
     $stmt = $pdo->prepare("
-        SELECT sl.*, s.nome as server_name, s.ip as server_ip
+        SELECT sl.*, s.nome as server_name, s.ip as server_ip, s.logo_url as server_logo
         FROM sl_server_licenses sl
         JOIN sl_servers s ON sl.server_id = s.id
         WHERE s.owner_id = ? AND sl.is_active = 1
@@ -602,9 +602,19 @@ include 'header.php';
                             <?php foreach ($server_licenses as $license): ?>
                                 <div class="license-card">
                                     <div class="license-card-header">
-                                        <h4 class="license-server-name">
-                                            <?php echo htmlspecialchars($license['server_name']); ?>
-                                        </h4>
+                                        <div class="license-server-info">
+                                            <?php if ($license['server_logo']): ?>
+                                                <img src="<?php echo htmlspecialchars($license['server_logo']); ?>" 
+                                                     alt="Logo" class="server-logo-small">
+                                            <?php else: ?>
+                                                <div class="server-logo-small default-logo">
+                                                    <i class="bi bi-server"></i>
+                                                </div>
+                                            <?php endif; ?>
+                                            <h4 class="license-server-name">
+                                                <?php echo htmlspecialchars($license['server_name']); ?>
+                                            </h4>
+                                        </div>
                                         <span class="license-status <?php echo $license['is_active'] ? 'active' : 'inactive'; ?>">
                                             <i class="bi bi-<?php echo $license['is_active'] ? 'check-circle-fill' : 'x-circle-fill'; ?>"></i>
                                             <?php echo $license['is_active'] ? 'Attiva' : 'Inattiva'; ?>

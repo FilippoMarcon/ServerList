@@ -2728,6 +2728,12 @@
             justify-content: space-between;
         }
         
+        .license-server-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
         .license-server-name {
             margin: 0;
             font-size: 1.2rem;
@@ -4552,8 +4558,8 @@
 
           .licenses-grid {
               display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-              gap: 1.5rem;
+              grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+              gap: 2rem;
           }
 
           .license-card {
@@ -4577,6 +4583,12 @@
               justify-content: space-between;
               align-items: flex-start;
               margin-bottom: 1.5rem;
+              gap: 1rem;
+          }
+
+          .license-server-info {
+              display: flex;
+              align-items: center;
               gap: 1rem;
           }
 
