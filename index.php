@@ -40,7 +40,7 @@ try {
             SELECT s.*, COUNT(v.id) as voti_totali, ss.priority, ss.expires_at
             FROM sl_servers s 
             INNER JOIN sl_sponsored_servers ss ON s.id = ss.server_id
-            LEFT JOIN sl_votes v ON s.id = v.server_id 
+            LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
             WHERE s.is_active = 1 AND ss.is_active = 1 
             AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
             GROUP BY s.id 
@@ -60,7 +60,7 @@ try {
         SELECT s.*, COUNT(v.id) as voti_totali, 
                CASE WHEN ss.server_id IS NOT NULL THEN 1 ELSE 0 END as is_sponsored
         FROM sl_servers s 
-        LEFT JOIN sl_votes v ON s.id = v.server_id 
+        LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
         LEFT JOIN sl_sponsored_servers ss ON s.id = ss.server_id
         WHERE s.is_active = 1 
         GROUP BY s.id 

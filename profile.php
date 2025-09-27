@@ -170,7 +170,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT s.*, COUNT(v.id) as vote_count 
         FROM sl_servers s 
-        LEFT JOIN sl_votes v ON s.id = v.server_id 
+        LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
         WHERE s.owner_id = ? AND s.is_active = 1 
         GROUP BY s.id 
         ORDER BY vote_count DESC
@@ -414,19 +414,10 @@ include 'header.php';
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="descrizione">Descrizione (facoltativo)</label>
-                        <textarea id="descrizione" name="descrizione" rows="4" placeholder="Descrivi il tuo server..."></textarea>
-                    </div>
-                    
                     <div class="form-row">
                         <div class="form-group">
                             <label for="logo_url">URL Logo (facoltativo)</label>
                             <input type="url" id="logo_url" name="logo_url" placeholder="https://...">
-                        </div>
-                        <div class="form-group">
-                            <label for="banner_url">URL Banner (facoltativo)</label>
-                            <input type="url" id="banner_url" name="banner_url" placeholder="https://...">
                         </div>
                     </div>
                     
@@ -503,7 +494,7 @@ include 'header.php';
                         
                         <div class="form-group">
                             <label for="descrizione">Descrizione</label>
-                            <textarea id="descrizione" name="descrizione" rows="4"><?php echo htmlspecialchars($server_to_edit['descrizione']); ?></textarea>
+                            <textarea id="descrizione" name="descrizione" rows="4" style="background-color: #16213e; color: white;"><?php echo htmlspecialchars($server_to_edit['descrizione']); ?></textarea>
                         </div>
                         
                         <div class="form-row">
@@ -608,9 +599,6 @@ include 'header.php';
                                         <div class="license-key-display">
                                             <span class="license-label">License Key:</span>
                                             <div class="license-key-container">
-                                                <button class="copy-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>" title="Copia license key">
-                                                    <i class="bi bi-copy"></i>
-                                                </button>
                                                 <code class="license-key-value license-hidden">
                                                     <span class="license-dots">•••••••••••••••••••••</span>
                                                     <span class="license-text" style="display: none;"><?php echo htmlspecialchars($license['license_key']); ?></span>
@@ -629,18 +617,11 @@ include 'header.php';
                                                     <span>Ultimo uso: <?php echo date('d/m/Y H:i', strtotime($license['last_used'])); ?></span>
                                                 </div>
                                             <?php endif; ?>
-                                            <div class="license-meta-item">
-                                                <i class="bi bi-arrow-repeat"></i>
-                                                <span>Utilizzi: <?php echo number_format($license['usage_count']); ?></span>
-                                            </div>
                                         </div>
                                         
                                         <div class="license-actions">
                                             <button class="view-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
                                                 <i class="bi bi-eye"></i> Visualizza
-                                            </button>
-                                            <button class="copy-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
-                                                <i class="bi bi-copy"></i> Copia
                                             </button>
                                         </div>
                                     </div>
@@ -682,7 +663,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Gestione pulsanti licenze
     const viewLicenseButtons = document.querySelectorAll('.view-license-btn');
-    const copyLicenseButtons = document.querySelectorAll('.copy-license-btn');
     
     // Funzione per visualizzare la licenza
     viewLicenseButtons.forEach(button => {
@@ -708,46 +688,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-    
-    // Funzione per copiare la licenza
-    copyLicenseButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const licenseKey = this.getAttribute('data-license');
-            
-            navigator.clipboard.writeText(licenseKey).then(function() {
-                // Usa la funzione showToast esistente se disponibile
-                if (typeof showToast === 'function') {
-                    showToast('Licenza copiata negli appunti!', 'success');
-                } else {
-                    alert('Licenza copiata negli appunti!');
-                }
-                
-                // Cambia temporaneamente l'icona per feedback visivo
-                const icon = button.querySelector('i');
-                const originalClass = icon.className;
-                icon.className = 'bi bi-check-lg';
-                
-                setTimeout(() => {
-                    icon.className = originalClass;
-                }, 2000);
-                
-            }).catch(function() {
-                // Fallback per browser più vecchi
-                var textArea = document.createElement('textarea');
-                textArea.value = licenseKey;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                
-                if (typeof showToast === 'function') {
-                    showToast('Licenza copiata negli appunti!', 'success');
-                } else {
-                    alert('Licenza copiata negli appunti!');
-                }
-            });
-        });
-    });
+
     
     // Gestione automatica della sezione attiva in base ai parametri URL
     const urlParams = new URLSearchParams(window.location.search);

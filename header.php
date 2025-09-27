@@ -298,9 +298,7 @@
 
         .server-rank.outlined {
             background: transparent !important;
-            border: 2px solid transparent !important;
-            background-image: linear-gradient(var(--card-bg), var(--card-bg)), 
-                              linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+            border: 2px solid #f093fb !important;
             background-origin: border-box !important;
             background-clip: content-box, border-box !important;
             color: var(--text-primary) !important;

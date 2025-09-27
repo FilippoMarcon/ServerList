@@ -16,7 +16,7 @@ if ($server_id === 0) {
 try {
     // Recupera le informazioni del server con conteggio voti
     $stmt = $pdo->prepare("SELECT s.*, 
-                          (SELECT COUNT(*) FROM sl_votes WHERE server_id = s.id) as vote_count 
+                          (SELECT COUNT(*) FROM sl_votes WHERE server_id = s.id AND MONTH(data_voto) = MONTH(CURRENT_DATE()) AND YEAR(data_voto) = YEAR(CURRENT_DATE())) as vote_count 
                           FROM sl_servers s 
                           WHERE s.id = ? AND s.is_active = 1");
     $stmt->execute([$server_id]);
@@ -27,14 +27,14 @@ try {
     }
     
     // Calcola il ranking del server usando la stessa query dell'index.php
-    $stmt = $pdo->query("
-        SELECT s.id, COUNT(v.id) as voti_totali 
-        FROM sl_servers s 
-        LEFT JOIN sl_votes v ON s.id = v.server_id 
-        WHERE s.is_active = 1 
-        GROUP BY s.id 
-        ORDER BY voti_totali DESC, s.nome ASC
-    ");
+    $stmt = $pdo->prepare("
+            SELECT s.id, s.name, COUNT(v.id) as voti_totali 
+            FROM sl_servers s 
+            LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
+            WHERE s.is_active = 1 
+            GROUP BY s.id 
+            ORDER BY voti_totali DESC
+        ");
     $all_servers = $stmt->fetchAll();
     
     // Trova la posizione del server corrente nella classifica
@@ -52,7 +52,7 @@ try {
         $debug_stmt = $pdo->query("
             SELECT s.nome, s.id, COUNT(v.id) as voti_totali 
             FROM sl_servers s 
-            LEFT JOIN sl_votes v ON s.id = v.server_id 
+            LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.vote_date) = MONTH(CURRENT_DATE()) AND YEAR(v.vote_date) = YEAR(CURRENT_DATE())
             WHERE s.is_active = 1 
             GROUP BY s.id 
             ORDER BY voti_totali DESC, s.nome ASC

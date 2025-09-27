@@ -159,7 +159,8 @@
                 const editorContainer = document.createElement('div');
                 editorContainer.id = 'quill-editor';
                 editorContainer.style.height = '300px';
-                editorContainer.style.backgroundColor = 'white';
+                editorContainer.style.backgroundColor = '#16213e';
+                editorContainer.style.color = 'white';
                 textarea.parentNode.insertBefore(editorContainer, textarea);
                 
                 // Inizializza Quill
