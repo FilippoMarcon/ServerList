@@ -1,0 +1,7 @@
+RewriteEngine On
+
+# Redirect /ServerList to index.php
+RewriteRule ^ServerList/?$ index.php [L]
+
+# Non rimuovere l'estensione .php per evitare conflitti
+# Le regole di rewrite sono disabilitate temporaneamente

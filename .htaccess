@@ -3,7 +3,8 @@ RewriteEngine On
 # Redirect /ServerList to index.php
 RewriteRule ^ServerList/?$ index.php [L]
 
-# Optional: Remove .php extension from URLs
+# Optional: Remove .php extension from URLs (but not for files with query parameters)
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{QUERY_STRING} ^$
 RewriteRule ^([^\.]+)$ $1.php [NC,L]
