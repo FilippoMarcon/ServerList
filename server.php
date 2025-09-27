@@ -151,22 +151,35 @@ include 'header.php';
 }
 
 /* Quill editor content styling for server description */
-.server-description .description-text {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 2rem;
-    margin: 1.5rem 0;
-    line-height: 1.6;
-    font-size: 1.1rem;
-    color: var(--text-primary);
-    white-space: normal;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
-    hyphens: auto;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
-}
+        .server-description .description-text {
+            /* Stili base per la descrizione */
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 12px !important;
+            padding: 2rem !important;
+            margin: 1.5rem 0 !important;
+            outline: none !important;
+            
+            /* Stili di base che possono essere sovrascritti dagli stili inline */
+            color: #e0e6ed;
+            text-align: left;
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.6;
+            word-break: break-word;
+            hyphens: auto;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+            font-size: 1.1rem;
+            font-weight: normal;
+            text-decoration: none;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+        
+        /* Gli stili inline hanno precedenza naturale sui CSS esterni */
+
+
 
 /* Quill content styling */
 .server-description .description-text h1,
@@ -231,12 +244,10 @@ include 'header.php';
 }
 
 .server-description .description-text strong {
-    color: var(--accent-purple);
     font-weight: 700;
 }
 
 .server-description .description-text em {
-    color: var(--accent-green);
     font-style: italic;
 }
 
@@ -345,73 +356,114 @@ include 'header.php';
 .server-description .description-text br {
             display: block;
             margin: 0.8rem 0;
+            padding: 0;
             height: 0.8rem;
+            background-color: transparent;
+            border: none;
+            color: transparent;
         }
 
-/* Stili per elementi HTML di Quill */
-.server-description .description-text strong,
-.server-description .description-text b {
-    font-weight: bold;
-    color: #ffffff;
-}
-
-.server-description .description-text em,
-.server-description .description-text i {
-    font-style: italic;
-}
-
-.server-description .description-text u {
-    text-decoration: underline;
-}
-
-.server-description .description-text h1,
-.server-description .description-text h2,
-.server-description .description-text h3,
-.server-description .description-text h4,
-.server-description .description-text h5,
-.server-description .description-text h6 {
-    color: #ffffff;
-    margin: 0.5rem 0;
-    font-weight: bold;
-}
-
-.server-description .description-text h1 { font-size: 1.8rem; }
-.server-description .description-text h2 { font-size: 1.6rem; }
-.server-description .description-text h3 { font-size: 1.4rem; }
-.server-description .description-text h4 { font-size: 1.2rem; }
-.server-description .description-text h5 { font-size: 1.1rem; }
-.server-description .description-text h6 { font-size: 1rem; }
-
-.server-description .description-text ul,
-.server-description .description-text ol {
-    margin: 0.5rem 0;
-    padding-left: 1.5rem;
-}
-
-.server-description .description-text li {
-    margin: 0.2rem 0;
-}
-
-.server-description .description-text blockquote {
-    border-left: 3px solid #007bff;
-    padding-left: 1rem;
-    margin: 0.5rem 0;
-    font-style: italic;
-    background-color: rgba(0, 123, 255, 0.1);
-}
-
-.server-description .description-text a {
-    color: #007bff;
-    text-decoration: none;
-}
-
-.server-description .description-text a:hover {
+/* Stili isolati per elementi HTML di Quill */
+        .server-description .description-text strong,
+        .server-description .description-text b {
+            font-weight: bold;
+            background-color: transparent;
+            text-decoration: none;
+            border: none;
+        }
+        
+        .server-description .description-text em,
+        .server-description .description-text i {
+            font-style: italic;
+            background-color: transparent;
+            text-decoration: none;
+            border: none;
+        }
+        
+        .server-description .description-text u {
             text-decoration: underline;
+            background-color: transparent;
+            border: none;
+        }
+        
+        .server-description .description-text h1,
+        .server-description .description-text h2,
+        .server-description .description-text h3,
+        .server-description .description-text h4,
+        .server-description .description-text h5,
+        .server-description .description-text h6 {
+            margin: 0.5rem 0;
+            padding: 0;
+            font-weight: bold;
+            background-color: transparent;
+            text-decoration: none;
+            border: none;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+        
+        .server-description .description-text h1 { font-size: 1.8rem !important; }
+        .server-description .description-text h2 { font-size: 1.6rem !important; }
+        .server-description .description-text h3 { font-size: 1.4rem !important; }
+        .server-description .description-text h4 { font-size: 1.2rem !important; }
+        .server-description .description-text h5 { font-size: 1.1rem !important; }
+        .server-description .description-text h6 { font-size: 1rem !important; }
+        
+        .server-description .description-text ul,
+        .server-description .description-text ol {
+            margin: 0.5rem 0;
+            padding: 0 0 0 1.5rem;
+            color: #e0e6ed;
+            background-color: transparent;
+            border: none;
+            list-style-position: outside;
+        }
+        
+        .server-description .description-text li {
+            margin: 0.2rem 0;
+            padding: 0;
+            color: #e0e6ed;
+            background-color: transparent;
+            border: none;
+        }
+        
+        .server-description .description-text blockquote {
+            border-left: 3px solid #007bff;
+            padding: 0 0 0 1rem;
+            margin: 0.5rem 0;
+            font-style: italic;
+            background-color: rgba(0, 123, 255, 0.1);
+            color: #e0e6ed;
+            border-top: none;
+            border-right: none;
+            border-bottom: none;
+        }
+        
+        .server-description .description-text a {
+            color: #007bff;
+            text-decoration: none;
+            background-color: transparent;
+            border: none;
+            font-weight: normal;
+        }
+        
+        .server-description .description-text a:hover {
+            text-decoration: underline;
+            color: #0056b3;
         }
         
         .server-description .description-text p {
             margin: 0.5rem 0;
+            padding: 0;
             line-height: 1.6;
+            color: #e0e6ed;
+            background-color: transparent;
+            border: none;
+            font-size: inherit;
+            font-weight: normal;
+            text-decoration: none;
+            text-transform: none;
+            letter-spacing: normal;
         }
         
         .server-description .description-text p:first-child {
@@ -420,6 +472,26 @@ include 'header.php';
         
         .server-description .description-text p:last-child {
             margin-bottom: 0;
+        }
+        
+        /* Supporto per span e div con stili inline di Quill */
+        .server-description .description-text span {
+            background-color: transparent;
+            border: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .server-description .description-text div {
+            background-color: transparent;
+            border: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Permette agli stili inline di Quill di funzionare */
+        .server-description .description-text * {
+            /* Gli stili inline hanno automaticamente precedenza */
         }
 </style>
 

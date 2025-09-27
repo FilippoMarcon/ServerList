@@ -56,7 +56,7 @@ function sanitize($data) {
  */
 function sanitizeQuillContent($data) {
     // Lista di tag HTML sicuri permessi da Quill
-    $allowed_tags = '<p><br><strong><b><em><i><u><ol><ul><li><h1><h2><h3><h4><h5><h6><blockquote><a>';
+    $allowed_tags = '<p><br><strong><b><em><i><u><ol><ul><li><h1><h2><h3><h4><h5><h6><blockquote><a><span><div>';
     
     // Rimuove tag non sicuri ma preserva quelli di formattazione
     $cleaned = strip_tags(trim($data), $allowed_tags);
@@ -64,8 +64,40 @@ function sanitizeQuillContent($data) {
     // Sanitizza gli attributi dei link per sicurezza
     $cleaned = preg_replace('/<a\s+[^>]*href\s*=\s*["\']([^"\']*)["\'][^>]*>/i', '<a href="$1" target="_blank" rel="noopener noreferrer">', $cleaned);
     
-    // Rimuove attributi pericolosi
-    $cleaned = preg_replace('/<(\w+)\s+[^>]*?(on\w+|javascript:|data:|style=)[^>]*?>/i', '<$1>', $cleaned);
+    // Rimuove solo attributi pericolosi ma preserva style e class per Quill
+    $cleaned = preg_replace('/<(\w+)\s+[^>]*?(on\w+|javascript:|data:)[^>]*?>/i', '<$1>', $cleaned);
+    
+    // Sanitizza gli attributi style per permettere solo proprietà CSS sicure
+    $cleaned = preg_replace_callback('/style\s*=\s*["\']([^"\']*)["\']/', function($matches) {
+        $style = $matches[1];
+        // Permette solo proprietà CSS sicure di Quill
+        $safe_properties = [
+            'color', 'background-color', 'font-size', 'font-weight', 'font-style', 
+            'text-decoration', 'text-align', 'line-height', 'margin', 'padding',
+            'border', 'border-color', 'border-width', 'border-style'
+        ];
+        
+        $safe_style = '';
+        $declarations = explode(';', $style);
+        foreach ($declarations as $declaration) {
+            $parts = explode(':', $declaration, 2);
+            if (count($parts) === 2) {
+                $property = trim($parts[0]);
+                $value = trim($parts[1]);
+                
+                // Verifica se la proprietà è sicura
+                if (in_array($property, $safe_properties)) {
+                    // Rimuove caratteri pericolosi dal valore
+                    $value = preg_replace('/[<>"\']/', '', $value);
+                    if (!empty($value)) {
+                        $safe_style .= $property . ': ' . $value . '; ';
+                    }
+                }
+            }
+        }
+        
+        return !empty($safe_style) ? 'style="' . trim($safe_style) . '"' : '';
+    }, $cleaned);
     
     return $cleaned;
 }
