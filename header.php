@@ -1949,6 +1949,19 @@
             font-weight: 600;
         }
         
+        /* Colori specifici per i diversi ruoli */
+        .admin-badge.user-role {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        
+        .admin-badge.owner-role {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+        
+        .admin-badge.admin-role {
+            background: var(--gradient-primary);
+        }
+        
         /* Navigazione principale */
         .profile-navigation {
             display: flex;

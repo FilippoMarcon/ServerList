@@ -216,9 +216,25 @@ include 'header.php';
                     <i class="bi bi-calendar"></i> 
                     Membro dal <?php echo date('d/m/Y', strtotime($user_stats['join_date'])); ?>
                 </p>
-                <?php if ($user['is_admin']): ?>
-                    <span class="admin-badge">
+                <?php 
+                // Determina il ruolo dell'utente e il badge da mostrare
+                if ($user['is_admin']): ?>
+                    <span class="admin-badge admin-role">
                         <i class="bi bi-shield-check"></i> Amministratore
+                    </span>
+                <?php elseif (!empty($owned_servers)): 
+                    // Crea la lista dei nomi dei server posseduti
+                    $server_names = array_map(function($server) {
+                        return htmlspecialchars($server['nome']);
+                    }, $owned_servers);
+                    $server_list = implode(' / ', $server_names);
+                ?>
+                    <span class="admin-badge owner-role">
+                        <i class="bi bi-server"></i> Owner di <?php echo $server_list; ?>
+                    </span>
+                <?php else: ?>
+                    <span class="admin-badge user-role">
+                        <i class="bi bi-person"></i> Utente
                     </span>
                 <?php endif; ?>
             </div>

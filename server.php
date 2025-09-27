@@ -4,44 +4,37 @@
  * Single Server Page
  */
 
-// Ottieni l'ID del server dall'URL con pulizia migliorata PRIMA di caricare config.php
-$raw_id = $_GET['id'] ?? '';
-// Rimuovi caratteri non numerici e spazi
-$clean_id = preg_replace('/[^0-9]/', '', trim($raw_id));
-$server_id = !empty($clean_id) ? (int)$clean_id : 0;
-
-// Se l'ID è 0, redirect immediatamente PRIMA di caricare config.php
-if ($server_id === 0) {
-    header('Location: index.php');
-    exit;
-}
-
 require_once 'config.php';
+
+// Ottieni l'ID del server dall'URL
+$server_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+if ($server_id === 0) {
+    redirect('index.php');
+}
 
 try {
     // Recupera le informazioni del server con conteggio voti
     $stmt = $pdo->prepare("SELECT s.*, 
-                          (SELECT COUNT(*) FROM sl_votes WHERE server_id = s.id AND MONTH(data_voto) = MONTH(CURRENT_DATE()) AND YEAR(data_voto) = YEAR(CURRENT_DATE())) as voti
+                          (SELECT COUNT(*) FROM sl_votes WHERE server_id = s.id) as vote_count 
                           FROM sl_servers s 
                           WHERE s.id = ? AND s.is_active = 1");
     $stmt->execute([$server_id]);
     $server = $stmt->fetch();
     
     if (!$server) {
-        header('Location: index.php');
-        exit;
+        redirect('index.php');
     }
     
     // Calcola il ranking del server usando la stessa query dell'index.php
-    $stmt = $pdo->prepare("
-            SELECT s.id, s.nome, COUNT(v.id) as voti_totali 
-            FROM sl_servers s 
-            LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
-            WHERE s.is_active = 1 
-            GROUP BY s.id 
-            ORDER BY voti_totali DESC, s.nome ASC
-        ");
-    $stmt->execute(); // FIX: Aggiunto execute() mancante
+    $stmt = $pdo->query("
+        SELECT s.id, COUNT(v.id) as voti_totali 
+        FROM sl_servers s 
+        LEFT JOIN sl_votes v ON s.id = v.server_id 
+        WHERE s.is_active = 1 
+        GROUP BY s.id 
+        ORDER BY voti_totali DESC, s.nome ASC
+    ");
     $all_servers = $stmt->fetchAll();
     
     // Trova la posizione del server corrente nella classifica
@@ -51,6 +44,28 @@ try {
             $server_rank = $index + 1;
             break;
         }
+    }
+    
+    // Debug: verifica il calcolo del ranking
+    // Ottieni la classifica completa per debug
+    if (isset($_GET['debug'])) {
+        $debug_stmt = $pdo->query("
+            SELECT s.nome, s.id, COUNT(v.id) as voti_totali 
+            FROM sl_servers s 
+            LEFT JOIN sl_votes v ON s.id = v.server_id 
+            WHERE s.is_active = 1 
+            GROUP BY s.id 
+            ORDER BY voti_totali DESC, s.nome ASC
+        ");
+        $debug_servers = $debug_stmt->fetchAll();
+        
+        echo "<!-- DEBUG CLASSIFICA:\n";
+        foreach ($debug_servers as $i => $debug_server) {
+            $pos = $i + 1;
+            $current = ($debug_server['id'] == $server_id) ? " <-- QUESTO SERVER" : "";
+            echo "Pos {$pos}: {$debug_server['nome']} ({$debug_server['voti_totali']} voti){$current}\n";
+        }
+        echo "-->";
     }
     
     // Determina la classe CSS per il ranking
@@ -98,64 +113,187 @@ try {
     }
     
 } catch (PDOException $e) {
-    header('Location: index.php');
-    exit;
+    redirect('index.php');
 }
 
 $page_title = htmlspecialchars($server['nome']);
 include 'header.php';
 ?>
 
-<!-- Pagina Server utilizzando le classi di header.php -->
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <!-- Header del Server -->
-            <div class="server-card-modern mb-4">
-                <div class="server-header-modern">
-                    <?php if (!empty($server['banner_url'])): ?>
-                        <img src="<?php echo htmlspecialchars($server['banner_url']); ?>" alt="Banner" class="server-banner">
+<style>
+/* Server rank badge styling */
+.server-rank-badge {
+    background: var(--gradient-secondary);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.server-rank-badge.gold {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    color: #1a1a2e;
+}
+
+.server-rank-badge.silver {
+    background: linear-gradient(135deg, #c0c0c0 0%, #e5e5e5 100%);
+    color: #1a1a2e;
+}
+
+.server-rank-badge.bronze {
+    background: linear-gradient(135deg, #cd7f32 0%, #daa520 100%);
+    color: white;
+}
+</style>
+
+<!-- Server Page Container -->
+<div class="server-page-container">
+    <!-- Server Header with Banner -->
+    <div class="server-header">
+        <?php if ($server['banner_url']): ?>
+            <div class="server-banner-bg" style="background-image: url('<?php echo htmlspecialchars($server['banner_url']); ?>');">
+                <div class="server-banner-overlay"></div>
+            </div>
+        <?php else: ?>
+            <div class="server-banner-bg default-banner">
+                <div class="server-banner-overlay"></div>
+            </div>
+        <?php endif; ?>
+        
+        <div class="container" style="display: flex !important; align-items: center !important; justify-content: center !important; height: 100% !important; min-height: 400px !important;">
+            <div class="server-header-content" style="display: flex !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; max-width: 1200px !important;">
+                <div class="server-main-info">
+                    <div class="server-logo-section">
+                        <?php if ($server['logo_url']): ?>
+                            <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" 
+                                 alt="Logo" class="server-logo-large">
+                        <?php else: ?>
+                            <div class="server-logo-large default-logo">
+                                <i class="bi bi-server"></i>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="server-title-section">
+                        <h1 class="server-title"><?php echo htmlspecialchars($server['nome']); ?></h1>
+                        <div class="server-details-row">
+                            <div class="server-rank-badge <?php echo $rank_class; ?>">
+                                <?php if ($server_rank <= 3): ?>
+                                    <i class="bi bi-trophy-fill"></i>
+                                <?php endif; ?>
+                                <?php echo $server_rank; ?>°
+                            </div>
+                            <div class="server-ip-display" title="Clicca per copiare">
+                                <?php echo htmlspecialchars($server['ip']); ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="server-vote-section">
+                    <div class="vote-button-container">
+                        <?php if ($can_vote): ?>
+                            <button class="vote-button" onclick="voteServer(<?php echo $server_id; ?>)">
+                                <i class="bi bi-hand-thumbs-up"></i> Vota il server
+                            </button>
+                        <?php else: ?>
+                            <button class="vote-button vote-disabled" disabled>
+                                <i class="bi bi-check-circle"></i> 
+                                <?php if ($user_has_voted_today): ?>
+                                    Hai già votato oggi
+                                <?php else: ?>
+                                    Accedi per votare
+                                <?php endif; ?>
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="vote-count">
+                        <?php echo number_format($server['vote_count']); ?> voti
+                    </div>
+                    <?php if ($can_vote): ?>
+                        <div class="vote-action">
+                            <button class="vote-increment" onclick="voteServer(<?php echo $server_id; ?>)">
+                                +1
+                            </button>
+                        </div>
                     <?php endif; ?>
                     
-                    <div class="server-info-overlay">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center">
-                                <?php if (!empty($server['logo_url'])): ?>
-                                    <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" alt="Logo" class="server-logo-large me-3">
-                                <?php endif; ?>
-                                <div>
-                                    <h1 class="server-name-large mb-2"><?php echo htmlspecialchars($server['nome']); ?></h1>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="server-ip-modern" onclick="copyToClipboard('<?php echo htmlspecialchars($server['ip']); ?>')">
-                                            <i class="bi bi-server"></i> <?php echo htmlspecialchars($server['ip']); ?>
-                                        </span>
-                                        <?php if ($server['posizione'] <= 3): ?>
-                                            <span class="rank-badge rank-<?php echo $server['posizione']; ?>">
-                                                <i class="bi bi-trophy-fill"></i> #<?php echo $server['posizione']; ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="rank-badge">
-                                                #<?php echo $server['posizione']; ?>
-                                            </span>
-                                        <?php endif; ?>
-                                    </div>
+                    <?php if ($user_has_voted_today): ?>
+                        <div class="vote-info-below">
+                            <small>Hai votato: <strong><?php echo htmlspecialchars($voted_server_name); ?></strong></small>
+                            <br>
+                            <small>Prossimo voto tra: <strong><?php echo $time_until_next_vote; ?></strong></small>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Server Content -->
+    <div class="container server-content">
+        <div class="row">
+            <!-- Main Content -->
+            <div class="col-lg-8">
+                <!-- Navigation Tabs -->
+                <div class="server-nav-tabs">
+                    <button class="tab-btn active" data-tab="description">DESCRIZIONE</button>
+                    <button class="tab-btn" data-tab="staff">STAFF</button>
+                    <button class="tab-btn" data-tab="stats">STATISTICHE</button>
+                </div>
+                
+                <!-- Tab Content -->
+                <div class="tab-content-container">
+                    <!-- Description Tab -->
+                    <div class="tab-content active" id="description">
+                        <?php if ($server['banner_url']): ?>
+                            <div class="content-banner">
+                                <img src="<?php echo htmlspecialchars($server['banner_url']); ?>" 
+                                     alt="Banner" class="content-banner-img">
+                                <div class="banner-text-overlay">
+                                    <h2><?php echo htmlspecialchars($server['nome']); ?></h2>
                                 </div>
                             </div>
-                            
-                            <div class="text-end">
-                                <button class="vote-btn-modern" onclick="voteServer(<?php echo $server['id']; ?>)">
-                                    <i class="bi bi-heart-fill"></i>
-                                    <span>Vota Server</span>
-                                </button>
-                                <div class="server-stats-modern mt-2">
-                                    <span class="stat-item">
-                                        <i class="bi bi-people-fill"></i>
-                                        <?php echo $server['giocatori_online']; ?>/<?php echo $server['giocatori_max']; ?>
-                                    </span>
-                                    <span class="stat-item">
-                                        <i class="bi bi-heart-fill"></i>
-                                        <?php echo $server['voti']; ?> voti
-                                    </span>
+                        <?php endif; ?>
+                        
+                        <div class="server-description">
+                            <?php if (!empty($server['descrizione'])): ?>
+                                <div class="description-text">
+                                    <?php echo $server['descrizione']; ?>
+                                </div>
+                            <?php else: ?>
+                                <p class="description-text">
+                                    Questo server non ha ancora una descrizione personalizzata.
+                                </p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- Staff Tab -->
+                    <div class="tab-content" id="staff">
+                        <div class="staff-section">
+                            <h3>Team del Server</h3>
+                            <p>Informazioni sullo staff non disponibili al momento.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats Tab -->
+                    <div class="tab-content" id="stats">
+                        <div class="stats-section">
+                            <h3>Statistiche Server</h3>
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-number"><?php echo number_format($server['vote_count']); ?></div>
+                                    <div class="stat-label">Voti Totali</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number"><?php echo count($voters); ?></div>
+                                    <div class="stat-label">Votanti Recenti</div>
                                 </div>
                             </div>
                         </div>
@@ -163,125 +301,96 @@ include 'header.php';
                 </div>
             </div>
             
-            <!-- Contenuto del Server -->
-            <div class="row">
-                <div class="col-lg-8">
-                    <!-- Descrizione -->
-                    <div class="content-card-modern mb-4">
-                        <h3 class="section-title-modern">
-                            <i class="bi bi-info-circle-fill"></i>
-                            Descrizione
-                        </h3>
-                        <div class="server-description">
-                            <?php echo nl2br(htmlspecialchars($server['descrizione'])); ?>
-                        </div>
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Server Info Card -->
+                <div class="server-info-card">
+                    <h4><i class="bi bi-info-circle"></i> Info Server</h4>
+                    
+                    <div class="info-item">
+                        <span class="info-label">Edizione:</span>
+                        <span class="info-value"><?php echo htmlspecialchars($server['tipo_server'] ?? 'Java & Bedrock'); ?></span>
                     </div>
                     
-                    <!-- Statistiche Dettagliate -->
-                    <div class="content-card-modern mb-4">
-                        <h3 class="section-title-modern">
-                            <i class="bi bi-graph-up"></i>
-                            Statistiche
-                        </h3>
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="bi bi-trophy"></i>
-                                </div>
-                                <div class="stat-info">
-                                    <div class="stat-value">#<?php echo $server['posizione']; ?></div>
-                                    <div class="stat-label">Posizione</div>
-                                </div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="bi bi-heart-fill"></i>
-                                </div>
-                                <div class="stat-info">
-                                    <div class="stat-value"><?php echo $server['voti']; ?></div>
-                                    <div class="stat-label">Voti Totali</div>
-                                </div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="bi bi-people"></i>
-                                </div>
-                                <div class="stat-info">
-                                    <div class="stat-value"><?php echo $server['giocatori_online']; ?>/<?php echo $server['giocatori_max']; ?></div>
-                                    <div class="stat-label">Giocatori</div>
-                                </div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="bi bi-calendar"></i>
-                                </div>
-                                <div class="stat-info">
-                                    <div class="stat-value"><?php echo date('d/m/Y', strtotime($server['data_aggiunta'])); ?></div>
-                                    <div class="stat-label">Aggiunto</div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="info-item">
+                        <span class="info-label">Versione:</span>
+                        <span class="info-value"><?php echo htmlspecialchars($server['versione'] ?: '1.16.5 - 1.20.2'); ?></span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-label">Utenti Online:</span>
+                        <span class="info-value">
+                            <i class="bi bi-person-fill"></i> 
+                            <span data-playercounter-ip="<?php echo htmlspecialchars($server['ip']); ?>">...</span>
+                        </span>
+                    </div>
+                    
+                    <div class="server-tags-section">
+                        <?php 
+                        $modalita_array = [];
+                        if (!empty($server['modalita'])) {
+                            $modalita_array = json_decode($server['modalita'], true);
+                            if (!is_array($modalita_array)) {
+                                $modalita_array = [];
+                            }
+                        }
+                        
+                        if (!empty($modalita_array)): 
+                            foreach ($modalita_array as $modalita): ?>
+                                <span class="server-tag-modern"><?php echo htmlspecialchars($modalita); ?></span>
+                            <?php endforeach;
+                        else: ?>
+                            <span class="server-tag-modern">Generale</span>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
-                <div class="col-lg-4">
-                    <!-- Informazioni Server -->
-                    <div class="sidebar-card-modern mb-4">
-                        <h4 class="sidebar-title">
-                            <i class="bi bi-info-circle"></i>
-                            Informazioni Server
-                        </h4>
-                        <div class="server-info-list">
-                            <div class="info-item">
-                                <span class="info-label">IP Server:</span>
-                                <span class="info-value server-ip-copy" onclick="copyToClipboard('<?php echo htmlspecialchars($server['ip']); ?>')">
-                                    <?php echo htmlspecialchars($server['ip']); ?>
-                                    <i class="bi bi-clipboard"></i>
-                                </span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Versione:</span>
-                                <span class="info-value"><?php echo htmlspecialchars($server['versione']); ?></span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Modalità:</span>
-                                <span class="info-value"><?php echo htmlspecialchars($server['modalita']); ?></span>
-                            </div>
-                            <?php if (!empty($server['sito_web'])): ?>
-                            <div class="info-item">
-                                <span class="info-label">Sito Web:</span>
-                                <span class="info-value">
-                                    <a href="<?php echo htmlspecialchars($server['sito_web']); ?>" target="_blank" class="server-link">
-                                        Visita <i class="bi bi-box-arrow-up-right"></i>
-                                    </a>
-                                </span>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+                <!-- Social Links -->
+                <div class="server-social-card">
+                    <h4><i class="bi bi-share"></i> Social</h4>
                     
-                    <!-- Ultimi Votanti -->
-                    <?php if (!empty($daily_voters)): ?>
-                    <div class="sidebar-card-modern">
-                        <h4 class="sidebar-title">
-                            <i class="bi bi-people"></i>
-                            Ultimi Votanti (Oggi)
-                        </h4>
-                        <div class="voters-grid">
-                            <?php foreach ($daily_voters as $voter): ?>
-                                <div class="voter-avatar-modern" title="<?php echo htmlspecialchars($voter['username']); ?>">
-                                    <?php if (!empty($voter['avatar_url'])): ?>
-                                        <img src="<?php echo htmlspecialchars($voter['avatar_url']); ?>" alt="<?php echo htmlspecialchars($voter['username']); ?>">
-                                    <?php else: ?>
-                                        <div class="avatar-placeholder">
-                                            <?php echo strtoupper(substr($voter['username'], 0, 1)); ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                    <div class="social-links-modern">
+                        <a href="#" class="social-link-modern website">
+                            <i class="bi bi-globe"></i> Website
+                            <span class="social-url">https://forum.<?php echo strtolower($server['nome']); ?>...</span>
+                        </a>
+                        
+                        <a href="#" class="social-link-modern shop">
+                            <i class="bi bi-shop"></i> Shop
+                            <span class="social-url">https://store.<?php echo strtolower($server['nome']); ?>.c...</span>
+                        </a>
+                        
+                        <a href="#" class="social-link-modern discord">
+                            <i class="bi bi-discord"></i> Discord
+                            <span class="social-url">https://discord.gg/<?php echo strtolower($server['nome']); ?>...</span>
+                        </a>
+                        
+                        <a href="#" class="social-link-modern telegram">
+                            <i class="bi bi-telegram"></i> Telegram
+                            <span class="social-url">https://telegram.me/<?php echo strtolower($server['nome']); ?>...</span>
+                        </a>
                     </div>
-                    <?php endif; ?>
+                </div>
+                
+                <!-- Recent Voters -->
+                <div class="recent-voters-card">
+                    <h4><i class="bi bi-people"></i> Ultimi Voti (<?php echo count($voters); ?>)</h4>
+                    
+                    <div class="voters-grid <?php echo count($voters) > 40 ? 'scrollable' : ''; ?>">
+                        <?php 
+                        // Mostra TUTTI i voti giornalieri
+                        foreach ($voters as $voter): 
+                        ?>
+                            <div class="voter-avatar-modern" 
+                                 title="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
+                                 data-nickname="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
+                                 data-vote-time="<?php echo $voter['data_voto']; ?>">
+                                <img src="https://mc-heads.net/avatar/<?php echo urlencode($voter['minecraft_nick']); ?>" 
+                                     alt="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
+                                     onerror="this.src='https://via.placeholder.com/32x32/6c757d/ffffff?text=?';">
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -379,58 +488,35 @@ function showCustomToast(message, type = 'success') {
     }, 3000);
 }
 
-// Tab functionality
-document.addEventListener('DOMContentLoaded', function() {
-    // Tab switching
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
+// Funzione per condividere su Discord
+function shareOnDiscord() {
+    const serverName = '<?php echo addslashes($server['nome']); ?>';
+    const serverIP = '<?php echo addslashes($server['ip']); ?>';
+    const serverVersion = '<?php echo addslashes($server['versione']); ?>';
+    const currentUrl = window.location.href;
     
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const targetTab = this.getAttribute('data-tab');
-            
-            // Remove active class from all tabs and contents
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            
-            // Add active class to clicked tab and corresponding content
-            this.classList.add('active');
-            document.getElementById(targetTab).classList.add('active');
-        });
+    const message = `🎮 **${serverName}**\n` +
+                   `📍 IP: \`${serverIP}\`\n` +
+                   `🔧 Versione: ${serverVersion}\n` +
+                   `🔗 Vota qui: ${currentUrl}`;
+    
+    // Copia il messaggio negli appunti
+    navigator.clipboard.writeText(message).then(function() {
+        showToast('Messaggio copiato! Incollalo su Discord.', 'success');
     });
-    
-    // Server IP click to copy
-    const serverIP = document.querySelector('.server-ip-display');
-    if (serverIP) {
-        serverIP.addEventListener('click', function() {
-            copyToClipboard(this.textContent);
-        });
-    }
-    
-    // Avatar error handling e tooltip
-    const voterAvatars = document.querySelectorAll('.voter-avatar-modern');
-    voterAvatars.forEach(avatar => {
-        const img = avatar.querySelector('img');
-        const nickname = avatar.getAttribute('data-nickname');
-        
-        // Error handling per immagini
-        if (img) {
-            img.addEventListener('error', function() {
-                this.src = 'https://via.placeholder.com/32x32/6c757d/ffffff?text=?';
-            });
-        }
-        
-        // Tooltip events
-        avatar.addEventListener('mouseenter', function() {
-            const voteTime = this.getAttribute('data-vote-time');
-            showVoterTooltip(this, nickname, voteTime);
-        });
-        
-        avatar.addEventListener('mouseleave', function() {
-            hideVoterTooltip();
-        });
-    });
-});
+}
+
+// Funzione per copiare il link di condivisione
+function copyShareLink() {
+    const currentUrl = window.location.href;
+    copyToClipboard(currentUrl);
+}
+
+// Gestione degli avatar con fallback
+function handleAvatarError(img) {
+    img.src = 'https://via.placeholder.com/64x64/6c757d/ffffff?text=?';
+    img.onerror = null;
+}
 
 // Funzioni per i tooltip dei votanti
 function showVoterTooltip(element, nickname, voteTime) {
@@ -487,53 +573,61 @@ function hideVoterTooltip() {
         existingTooltip.remove();
     }
 }
-</script>
 
-<script>
-// Funzione per votare il server
-function voteServer(serverId) {
-    if (!confirm('Sei sicuro di voler votare questo server? Puoi votare solo una volta ogni 24 ore.')) {
-        return;
+// Tab functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab switching
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tab');
+            
+            // Remove active class from all tabs and contents
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked tab and corresponding content
+            this.classList.add('active');
+            document.getElementById(targetTab).classList.add('active');
+        });
+    });
+    
+    // Server IP click to copy
+    const serverIP = document.querySelector('.server-ip-display');
+    if (serverIP) {
+        serverIP.addEventListener('click', function() {
+            copyToClipboard(this.textContent);
+        });
     }
     
-    fetch('vote.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'server_id=' + serverId + '&action=vote'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showCustomToast('Voto registrato con successo!', 'success');
-            setTimeout(() => {
-                location.reload();
-            }, 1500);
-        } else {
-            showCustomToast(data.message || 'Errore durante la votazione.', 'error');
+    // Avatar error handling e tooltip
+    const voterAvatars = document.querySelectorAll('.voter-avatar-modern');
+    voterAvatars.forEach(avatar => {
+        const img = avatar.querySelector('img');
+        const nickname = avatar.getAttribute('data-nickname');
+        
+        // Error handling per immagini
+        if (img) {
+            img.addEventListener('error', function() {
+                this.src = 'https://via.placeholder.com/32x32/6c757d/ffffff?text=?';
+            });
         }
-    })
-    .catch(error => {
-        showCustomToast('Errore di connessione. Riprova.', 'error');
+        
+        // Tooltip events
+        avatar.addEventListener('mouseenter', function() {
+            const voteTime = this.getAttribute('data-vote-time');
+            showVoterTooltip(this, nickname, voteTime);
+        });
+        
+        avatar.addEventListener('mouseleave', function() {
+            hideVoterTooltip();
+        });
     });
-}
-
-// Funzione per copiare l'IP del server
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(function() {
-        showCustomToast('IP copiato negli appunti!', 'success');
-    }).catch(function() {
-        // Fallback per browser più vecchi
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        showCustomToast('IP copiato negli appunti!', 'success');
-    });
-}
+});
 </script>
+
+
 
 <?php include 'footer.php'; ?>
