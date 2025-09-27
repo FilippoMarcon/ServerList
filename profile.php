@@ -20,10 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_server'])) {
     $nome = sanitize($_POST['nome'] ?? '');
     $ip = sanitize($_POST['ip'] ?? '');
     $versione = sanitize($_POST['versione'] ?? '');
-    $tipo_server = sanitize($_POST['tipo_server'] ?? 'Java & Bedrock');
-    $descrizione = sanitize($_POST['descrizione'] ?? '');
+    $tipo_server = $_POST['tipo_server'] ?? 'Java & Bedrock';
+    // Validazione tipo_server
+    $allowed_types = ['Java', 'Bedrock', 'Java & Bedrock'];
+    if (!in_array($tipo_server, $allowed_types)) {
+        $tipo_server = 'Java & Bedrock';
+    }
+    $descrizione = sanitizeQuillContent($_POST['descrizione'] ?? '');
     $banner_url = sanitize($_POST['banner_url'] ?? '');
     $logo_url = sanitize($_POST['logo_url'] ?? '');
+    $modalita = isset($_POST['modalita']) ? $_POST['modalita'] : [];
+    $modalita_json = json_encode(array_values($modalita));
     
     if (empty($nome) || empty($ip) || empty($versione)) {
         $error = 'Nome, IP e Versione sono campi obbligatori.';
@@ -31,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_server'])) {
         // Salva la richiesta in una tabella temporanea o invia email agli admin
         // Per ora salviamo come server inattivo che richiede approvazione
         try {
-            $stmt = $pdo->prepare("INSERT INTO sl_servers (nome, ip, versione, tipo_server, descrizione, banner_url, logo_url, owner_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())");
-            $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $user_id]);
+            $stmt = $pdo->prepare("INSERT INTO sl_servers (nome, ip, versione, tipo_server, descrizione, banner_url, logo_url, modalita, owner_id, is_active, data_inserimento) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 2, NOW())");
+            $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $user_id]);
             $message = 'Richiesta inviata con successo! Il tuo server sarà revisionato dagli amministratori.';
         } catch (PDOException $e) {
             $error = 'Errore durante l\'invio della richiesta.';
@@ -74,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
     $ip = sanitize($_POST['ip'] ?? '');
     $versione = sanitize($_POST['versione'] ?? '');
     $tipo_server = sanitize($_POST['tipo_server'] ?? 'Java & Bedrock');
-    $descrizione = sanitize($_POST['descrizione'] ?? '');
+    $descrizione = sanitizeQuillContent($_POST['descrizione'] ?? '');
     $banner_url = sanitize($_POST['banner_url'] ?? '');
     $logo_url = sanitize($_POST['logo_url'] ?? '');
     $modalita = isset($_POST['modalita']) ? $_POST['modalita'] : [];
@@ -164,16 +171,16 @@ try {
     error_log("Errore nel recupero voti utente: " . $e->getMessage());
 }
 
-// Recupera i server di proprietà dell'utente
+// Recupera i server di proprietà dell'utente (attivi e in attesa di approvazione)
 $owned_servers = [];
 try {
     $stmt = $pdo->prepare("
         SELECT s.*, COUNT(v.id) as vote_count 
         FROM sl_servers s 
         LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
-        WHERE s.owner_id = ? AND s.is_active = 1 
+        WHERE s.owner_id = ? AND s.is_active IN (0, 1, 2)
         GROUP BY s.id 
-        ORDER BY vote_count DESC
+        ORDER BY s.is_active DESC, vote_count DESC
     ");
     $stmt->execute([$user_id]);
     $owned_servers = $stmt->fetchAll();
@@ -543,7 +550,10 @@ include 'header.php';
                         
                         <div class="profile-servers-grid">
                             <?php foreach ($owned_servers as $server): ?>
-                                <div class="server-card">
+                                <div class="server-card <?php 
+                                    if ($server['is_active'] == 2) echo 'pending-server';
+                                    elseif ($server['is_active'] == 0) echo 'disabled-server';
+                                ?>">
                                     <div class="server-card-header">
                                         <?php if ($server['logo_url']): ?>
                                             <img src="<?php echo htmlspecialchars($server['logo_url']); ?>" 
@@ -556,30 +566,62 @@ include 'header.php';
                                         
                                         <div class="server-info">
                                             <h4 class="server-name">
-                                                <a href="server.php?id=<?php echo $server['id']; ?>">
+                                                <?php if ($server['is_active'] == 1): ?>
+                                                    <a href="server.php?id=<?php echo $server['id']; ?>">
+                                                        <?php echo htmlspecialchars($server['nome']); ?>
+                                                    </a>
+                                                <?php else: ?>
                                                     <?php echo htmlspecialchars($server['nome']); ?>
-                                                </a>
+                                                <?php endif; ?>
                                             </h4>
                                             <p class="server-ip"><?php echo htmlspecialchars($server['ip']); ?></p>
+                                            
+                                            <?php if ($server['is_active'] == 2): ?>
+                                                <span class="pending-status">
+                                                    <i class="bi bi-clock-history"></i>
+                                                    In Approvazione
+                                                </span>
+                                            <?php endif; ?>
                                         </div>
                                         
-                                        <div class="server-stats">
-                                            <div class="stat-item">
-                                                <span class="stat-number"><?php echo number_format($server['vote_count']); ?></span>
-                                                <span class="stat-label">Voti</span>
+                                        <?php if ($server['is_active'] == 1): ?>
+                                            <div class="server-stats">
+                                                <div class="stat-item">
+                                                    <span class="stat-number"><?php echo number_format($server['vote_count']); ?></span>
+                                                    <span class="stat-label">Voti</span>
+                                                </div>
                                             </div>
-                                        </div>
+                                        <?php endif; ?>
                                     </div>
                                     
                                     <div class="server-card-body">
-                                        <div class="server-actions">
-                                            <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server">
-                                                <i class="bi bi-eye"></i> Visualizza
-                                            </a>
-                                            <a href="profile.php?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
-                                                <i class="bi bi-pencil"></i> Modifica
-                                            </a>
-                                        </div>
+                                        <?php if ($server['is_active'] == 1): ?>
+                            <div class="server-actions">
+                                <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server">
+                                    <i class="bi bi-eye"></i> Visualizza
+                                </a>
+                                <a href="profile.php?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
+                                    <i class="bi bi-pencil"></i> Modifica
+                                </a>
+                            </div>
+                        <?php elseif ($server['is_active'] == 2): ?>
+                            <div class="pending-server-info">
+                                <p class="pending-message">
+                                    <i class="bi bi-info-circle"></i>
+                                    Il server è in attesa di approvazione da parte degli amministratori.
+                                </p>
+                            </div>
+                        <?php elseif ($server['is_active'] == 0): ?>
+                            <div class="disabled-server-info">
+                                <p class="disabled-message">
+                                    <i class="bi bi-x-circle"></i>
+                                    Il server è stato disabilitato da un amministratore, se vuoi fare ricorso apri un ticket su <a href="https://discord.blocksy.it" target="_blank">discord.blocksy.it</a>.
+                                </p>
+                                <p class="disabled-date">
+                                    Server disabilitato il <?php echo date('d/m/Y', strtotime($server['data_aggiornamento'])); ?>
+                                </p>
+                            </div>
+                        <?php endif; ?>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -649,6 +691,9 @@ include 'header.php';
                                             <button class="view-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
                                                 <i class="bi bi-eye"></i> Visualizza
                                             </button>
+                                            <button class="copy-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>" title="Copia licenza">
+                                                <i class="bi bi-clipboard"></i> Copia
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -712,6 +757,56 @@ document.addEventListener('DOMContentLoaded', function() {
                 buttonIcon.className = 'bi bi-eye-slash';
                 this.innerHTML = '<i class="bi bi-eye-slash"></i> Nascondi';
             }
+        });
+    });
+
+    // Gestione pulsanti copia licenza
+    const copyLicenseButtons = document.querySelectorAll('.copy-license-btn');
+    
+    copyLicenseButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const licenseKey = this.getAttribute('data-license');
+            
+            // Copia la licenza negli appunti
+            navigator.clipboard.writeText(licenseKey).then(() => {
+                // Cambia temporaneamente il testo del bottone per confermare la copia
+                const originalHTML = this.innerHTML;
+                this.innerHTML = '<i class="bi bi-check"></i> Copiato!';
+                this.style.background = '#28a745';
+                this.style.borderColor = '#28a745';
+                this.style.color = 'white';
+                
+                // Ripristina il testo originale dopo 2 secondi
+                setTimeout(() => {
+                    this.innerHTML = originalHTML;
+                    this.style.background = '';
+                    this.style.borderColor = '';
+                    this.style.color = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('Errore durante la copia: ', err);
+                // Fallback per browser che non supportano clipboard API
+                const textArea = document.createElement('textarea');
+                textArea.value = licenseKey;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                // Mostra conferma anche per il fallback
+                const originalHTML = this.innerHTML;
+                this.innerHTML = '<i class="bi bi-check"></i> Copiato!';
+                this.style.background = '#28a745';
+                this.style.borderColor = '#28a745';
+                this.style.color = 'white';
+                
+                setTimeout(() => {
+                    this.innerHTML = originalHTML;
+                    this.style.background = '';
+                    this.style.borderColor = '';
+                    this.style.color = '';
+                }, 2000);
+            });
         });
     });
 

@@ -52,6 +52,25 @@ function sanitize($data) {
 }
 
 /**
+ * Sanitizza il contenuto HTML di Quill preservando la formattazione sicura
+ */
+function sanitizeQuillContent($data) {
+    // Lista di tag HTML sicuri permessi da Quill
+    $allowed_tags = '<p><br><strong><b><em><i><u><ol><ul><li><h1><h2><h3><h4><h5><h6><blockquote><a>';
+    
+    // Rimuove tag non sicuri ma preserva quelli di formattazione
+    $cleaned = strip_tags(trim($data), $allowed_tags);
+    
+    // Sanitizza gli attributi dei link per sicurezza
+    $cleaned = preg_replace('/<a\s+[^>]*href\s*=\s*["\']([^"\']*)["\'][^>]*>/i', '<a href="$1" target="_blank" rel="noopener noreferrer">', $cleaned);
+    
+    // Rimuove attributi pericolosi
+    $cleaned = preg_replace('/<(\w+)\s+[^>]*?(on\w+|javascript:|data:|style=)[^>]*?>/i', '<$1>', $cleaned);
+    
+    return $cleaned;
+}
+
+/**
  * Verifica se l'utente è loggato
  */
 function isLoggedIn() {

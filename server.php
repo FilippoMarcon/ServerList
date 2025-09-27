@@ -149,6 +149,278 @@ include 'header.php';
     background: linear-gradient(135deg, #cd7f32 0%, #daa520 100%);
     color: white;
 }
+
+/* Quill editor content styling for server description */
+.server-description .description-text {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    line-height: 1.6;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+}
+
+/* Quill content styling */
+.server-description .description-text h1,
+.server-description .description-text h2,
+.server-description .description-text h3 {
+    color: var(--text-primary);
+    font-weight: 700;
+    margin: 1.5rem 0 1rem 0;
+    line-height: 1.3;
+}
+
+.server-description .description-text h1 {
+    font-size: 2rem;
+    border-bottom: 2px solid var(--accent-purple);
+    padding-bottom: 0.5rem;
+}
+
+.server-description .description-text h2 {
+    font-size: 1.6rem;
+    color: var(--accent-purple);
+}
+
+.server-description .description-text h3 {
+    font-size: 1.3rem;
+    color: var(--accent-green);
+}
+
+.server-description .description-text p {
+    margin: 0.5rem 0;
+    line-height: 1.6;
+}
+
+.server-description .description-text br {
+    display: block;
+    margin: 0;
+    content: "";
+    line-height: 0.8;
+}
+
+.server-description .description-text div {
+    margin: 0;
+}
+
+/* Gestione specifica per il contenuto Quill */
+.server-description .description-text .ql-editor {
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.server-description .description-text .ql-editor p {
+    margin: 0.3rem 0;
+    line-height: 1.6;
+}
+
+.server-description .description-text .ql-editor p:first-child {
+    margin-top: 0;
+}
+
+.server-description .description-text .ql-editor p:last-child {
+    margin-bottom: 0;
+}
+
+.server-description .description-text strong {
+    color: var(--accent-purple);
+    font-weight: 700;
+}
+
+.server-description .description-text em {
+    color: var(--accent-green);
+    font-style: italic;
+}
+
+.server-description .description-text u {
+    text-decoration: underline;
+    text-decoration-color: var(--accent-purple);
+}
+
+.server-description .description-text ol,
+.server-description .description-text ul {
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+.server-description .description-text li {
+    margin: 0.5rem 0;
+    line-height: 1.6;
+}
+
+.server-description .description-text ol li {
+    list-style-type: decimal;
+}
+
+.server-description .description-text ul li {
+    list-style-type: disc;
+}
+
+.server-description .description-text a {
+    color: var(--accent-purple);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.server-description .description-text a:hover {
+    border-bottom-color: var(--accent-purple);
+    color: var(--accent-green);
+}
+
+.server-description .description-text img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 1rem 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.server-description .description-text blockquote {
+    border-left: 4px solid var(--accent-purple);
+    margin: 1.5rem 0;
+    padding: 1rem 1.5rem;
+    background: var(--secondary-bg);
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+}
+
+/* Text alignment classes */
+.server-description .description-text .ql-align-center {
+    text-align: center;
+}
+
+.server-description .description-text .ql-align-right {
+    text-align: right;
+}
+
+.server-description .description-text .ql-align-justify {
+    text-align: justify;
+}
+
+/* Color styling for Quill editor colors */
+.server-description .description-text .ql-color-red {
+    color: #e74c3c;
+}
+
+.server-description .description-text .ql-color-green {
+    color: var(--accent-green);
+}
+
+.server-description .description-text .ql-color-blue {
+    color: #3498db;
+}
+
+.server-description .description-text .ql-color-purple {
+    color: var(--accent-purple);
+}
+
+.server-description .description-text .ql-bg-yellow {
+    background-color: #f1c40f;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+
+.server-description .description-text .ql-bg-green {
+    background-color: rgba(46, 204, 113, 0.2);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+
+.server-description .description-text .ql-bg-blue {
+    background-color: rgba(52, 152, 219, 0.2);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+
+/* Migliore gestione delle interruzioni di riga */
+.server-description .description-text br {
+            display: block;
+            margin: 0.8rem 0;
+            height: 0.8rem;
+        }
+
+/* Stili per elementi HTML di Quill */
+.server-description .description-text strong,
+.server-description .description-text b {
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.server-description .description-text em,
+.server-description .description-text i {
+    font-style: italic;
+}
+
+.server-description .description-text u {
+    text-decoration: underline;
+}
+
+.server-description .description-text h1,
+.server-description .description-text h2,
+.server-description .description-text h3,
+.server-description .description-text h4,
+.server-description .description-text h5,
+.server-description .description-text h6 {
+    color: #ffffff;
+    margin: 0.5rem 0;
+    font-weight: bold;
+}
+
+.server-description .description-text h1 { font-size: 1.8rem; }
+.server-description .description-text h2 { font-size: 1.6rem; }
+.server-description .description-text h3 { font-size: 1.4rem; }
+.server-description .description-text h4 { font-size: 1.2rem; }
+.server-description .description-text h5 { font-size: 1.1rem; }
+.server-description .description-text h6 { font-size: 1rem; }
+
+.server-description .description-text ul,
+.server-description .description-text ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+
+.server-description .description-text li {
+    margin: 0.2rem 0;
+}
+
+.server-description .description-text blockquote {
+    border-left: 3px solid #007bff;
+    padding-left: 1rem;
+    margin: 0.5rem 0;
+    font-style: italic;
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.server-description .description-text a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.server-description .description-text a:hover {
+            text-decoration: underline;
+        }
+        
+        .server-description .description-text p {
+            margin: 0.5rem 0;
+            line-height: 1.6;
+        }
+        
+        .server-description .description-text p:first-child {
+            margin-top: 0;
+        }
+        
+        .server-description .description-text p:last-child {
+            margin-bottom: 0;
+        }
 </style>
 
 <!-- Server Page Container -->
@@ -264,7 +536,10 @@ include 'header.php';
                         <div class="server-description">
                             <?php if (!empty($server['descrizione'])): ?>
                                 <div class="description-text">
-                                    <?php echo $server['descrizione']; ?>
+                                    <?php 
+                                    // Il contenuto è già sanitizzato con HTML sicuro preservato
+                                    echo $server['descrizione'];
+                                    ?>
                                 </div>
                             <?php else: ?>
                                 <p class="description-text">

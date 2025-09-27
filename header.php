@@ -2675,6 +2675,99 @@
             color: white;
         }
         
+        /* Stili per server in attesa di approvazione */
+        .pending-server {
+            opacity: 0.8;
+            border: 2px solid #f39c12;
+            background: linear-gradient(135deg, rgba(243, 156, 18, 0.05), rgba(243, 156, 18, 0.02));
+        }
+        
+        .pending-server .server-name {
+            color: var(--text-secondary);
+            cursor: default;
+        }
+        
+        .pending-status {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.5rem;
+            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.3);
+        }
+        
+        .pending-server-info {
+            padding: 1rem;
+            background: rgba(243, 156, 18, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #f39c12;
+        }
+        
+        .pending-message {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        /* Stili per server disabilitati */
+        .disabled-server {
+            opacity: 0.7;
+            border: 2px solid #e74c3c;
+            background: linear-gradient(135deg, rgba(231, 76, 60, 0.05), rgba(231, 76, 60, 0.02));
+        }
+        
+        .disabled-server .server-name {
+            color: var(--text-secondary);
+            cursor: default;
+        }
+        
+        .disabled-server-info {
+            padding: 1rem;
+            background: rgba(231, 76, 60, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #e74c3c;
+        }
+        
+        .disabled-message {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .disabled-message a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .disabled-message a:hover {
+            text-decoration: underline;
+        }
+        
+        .disabled-date {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-style: italic;
+        }
+        
+        .pending-message i {
+            color: #f39c12;
+            font-size: 1rem;
+        }
+        
         .no-servers-section,
         .no-licenses-section {
             text-align: center;
@@ -2833,7 +2926,6 @@
         .copy-license-btn:hover {
             background: var(--secondary-bg);
             border-color: var(--accent-purple);
-            transform: translateY(-2px);
         }
         
         /* Responsive */

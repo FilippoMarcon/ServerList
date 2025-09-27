@@ -315,18 +315,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nome = sanitize($_POST['nome'] ?? '');
             $ip = sanitize($_POST['ip'] ?? '');
             $versione = sanitize($_POST['versione'] ?? '');
-            $tipo_server = sanitize($_POST['tipo_server'] ?? 'Java & Bedrock');
-            $descrizione = sanitize($_POST['descrizione'] ?? '');
+            $tipo_server = $_POST['tipo_server'] ?? 'Java & Bedrock';
+            // Validazione tipo_server
+            $allowed_types = ['Java', 'Bedrock', 'Java & Bedrock'];
+            if (!in_array($tipo_server, $allowed_types)) {
+                $tipo_server = 'Java & Bedrock';
+            }
+            $descrizione = sanitizeQuillContent($_POST['descrizione'] ?? '');
             $banner_url = sanitize($_POST['banner_url'] ?? '');
             $logo_url = sanitize($_POST['logo_url'] ?? '');
+            $modalita = isset($_POST['modalita']) ? $_POST['modalita'] : [];
+            $modalita_json = json_encode(array_values($modalita));
             
             if (empty($nome) || empty($ip) || empty($versione)) {
                 $error = 'Nome, IP e Versione sono campi obbligatori.';
             } else {
                 try {
-                    $stmt = $pdo->prepare("INSERT INTO sl_servers (nome, ip, versione, tipo_server, descrizione, banner_url, logo_url, data_inserimento) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url]);
-                    $message = 'Server aggiunto con successo!';
+                    $stmt = $pdo->prepare("INSERT INTO sl_servers (nome, ip, versione, tipo_server, descrizione, banner_url, logo_url, modalita, is_active, data_inserimento) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2, NOW())");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json]);
+                    $message = 'Server aggiunto con successo! Il server è in attesa di approvazione.';
                 } catch (PDOException $e) {
                     $error = 'Errore durante l\'aggiunta del server.';
                 }
