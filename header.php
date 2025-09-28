@@ -4982,7 +4982,7 @@
               font-size: 2.5rem;
               font-weight: 700;
               color: var(--text-primary);
-              margin-bottom: 0.5rem;
+              margin-bottom: 0;
           }
 
           .stat-label {
@@ -4994,16 +4994,22 @@
           .stat-icon {
               width: 60px;
               height: 60px;
+              min-width: 60px;
+              min-height: 60px;
+              max-width: 60px;
+              max-height: 60px;
               font-size: 1.8rem;
-              margin: 0 auto 1rem auto;
+              margin: 0 auto;
               opacity: 0.8;
               background: rgba(255, 255, 255, 0.1);
               border-radius: 12px;
-              display: flex;
+              display: inline-flex;
               align-items: center;
               justify-content: center;
               backdrop-filter: blur(10px);
               border: 1px solid rgba(255, 255, 255, 0.2);
+              flex-shrink: 0;
+              box-sizing: border-box;
           }
 
           .dashboard-section {

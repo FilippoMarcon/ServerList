@@ -196,6 +196,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Interfaccia web per admin
+// Ottieni lista server attivi per il dropdown
+$servers = [];
+try {
+    $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE is_active = 1 ORDER BY nome ASC");
+    $stmt->execute();
+    $servers = $stmt->fetchAll();
+} catch (PDOException $e) {
+    // In caso di errore, array vuoto
+}
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -221,11 +230,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="container">
         <h1>Gestione Licenze Server</h1>
         
+        <?php if (empty($servers)): ?>
+            <div class="result error">
+                <strong>⚠️ Attenzione:</strong> Non ci sono server attivi nel sistema. 
+                <br>Aggiungi prima dei server dalla sezione amministrazione.
+            </div>
+        <?php else: ?>
+        
         <h2>Genera Nuova Licenza</h2>
         <form id="generateForm">
             <div class="form-group">
-                <label>Server ID:</label>
-                <input type="number" name="server_id" required>
+                <label>Seleziona Server:</label>
+                <select name="server_id" required style="width: 300px;">
+                    <option value="">-- Seleziona un server --</option>
+                    <?php foreach ($servers as $server): ?>
+                        <option value="<?= htmlspecialchars($server['id']) ?>">
+                            <?= htmlspecialchars($server['nome']) ?> (ID: <?= $server['id'] ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <button type="submit">Genera Licenza</button>
             </div>
         </form>
@@ -233,8 +256,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h2>Ottieni Licenza Esistente</h2>
         <form id="getForm">
             <div class="form-group">
-                <label>Server ID:</label>
-                <input type="number" name="server_id" required>
+                <label>Seleziona Server:</label>
+                <select name="server_id" required style="width: 300px;">
+                    <option value="">-- Seleziona un server --</option>
+                    <?php foreach ($servers as $server): ?>
+                        <option value="<?= htmlspecialchars($server['id']) ?>">
+                            <?= htmlspecialchars($server['nome']) ?> (ID: <?= $server['id'] ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <button type="submit">Ottieni Licenza</button>
             </div>
         </form>
@@ -249,14 +279,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
         
         <div id="result"></div>
+        
+        <?php endif; ?>
     </div>
 
     <script>
         function handleForm(formId, action) {
             document.getElementById(formId).addEventListener('submit', function(e) {
                 e.preventDefault();
+                
+                // Validazione specifica per server_id
+                if (action === 'generate' || action === 'get') {
+                    const serverSelect = this.querySelector('select[name="server_id"]');
+                    if (!serverSelect.value) {
+                        document.getElementById('result').innerHTML = 
+                            '<div class="result error"><strong>Errore:</strong> Seleziona un server</div>';
+                        return;
+                    }
+                }
+                
                 const formData = new FormData(this);
                 formData.append('action', action);
+                
+                // Mostra loading
+                document.getElementById('result').innerHTML = 
+                    '<div class="result" style="background: #e3f2fd; border: 1px solid #90caf9; color: #1565c0;">Elaborazione in corso...</div>';
                 
                 fetch('', {
                     method: 'POST',
@@ -268,27 +315,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (data.success) {
                         let html = '<div class="result success">';
                         if (data.license_key) {
-                            html += '<h3>Licenza Generata!</h3>';
+                            html += '<h3>✅ Licenza Generata con Successo!</h3>';
                             html += '<p><strong>Server:</strong> ' + data.server_name + ' (ID: ' + data.server_id + ')</p>';
                             html += '<p><strong>License Key:</strong></p>';
                             html += '<div class="license-display">' + data.license_key + '</div>';
+                            html += '<p><small>La licenza è stata creata o aggiornata nel database.</small></p>';
                         } else if (data.license) {
-                            html += '<h3>Licenza Trovata</h3>';
+                            html += '<h3>📋 Licenza Trovata</h3>';
                             html += '<p><strong>Server:</strong> ' + data.license.server_name + '</p>';
                             html += '<p><strong>License Key:</strong></p>';
                             html += '<div class="license-display">' + data.license.license_key + '</div>';
                             html += '<p><strong>Attiva:</strong> ' + (data.license.is_active ? 'Sì' : 'No') + '</p>';
                             html += '<p><strong>Utilizzi:</strong> ' + data.license.usage_count + '</p>';
+                            if (data.license.last_used) {
+                                html += '<p><strong>Ultimo utilizzo:</strong> ' + data.license.last_used + '</p>';
+                            }
                         }
                         html += '</div>';
                     } else {
-                        html = '<div class="result error"><strong>Errore:</strong> ' + data.error + '</div>';
+                        html = '<div class="result error"><strong>❌ Errore:</strong> ' + data.error + '</div>';
                     }
                     resultDiv.innerHTML = html;
                 })
                 .catch(error => {
                     document.getElementById('result').innerHTML = 
-                        '<div class="result error"><strong>Errore:</strong> ' + error.message + '</div>';
+                        '<div class="result error"><strong>❌ Errore di connessione:</strong> ' + error.message + '</div>';
                 });
             });
         }
