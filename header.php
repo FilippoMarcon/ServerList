@@ -3021,9 +3021,6 @@
                 font-size: 2rem;
             }
             
-            .profile-avatar {
-                /* Dimensioni gestite da .avatar-img */
-            }
         }
         
         @media (max-width: 992px) {
