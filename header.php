@@ -4887,6 +4887,519 @@
               font-size: 0.9rem;
               color: var(--text-primary);
           }
+
+          /* Admin Dashboard Styles */
+          .admin-dashboard {
+              background: var(--primary-bg);
+              min-height: 100vh;
+              padding: 2rem 0;
+          }
+
+          .admin-sidebar {
+              background: var(--card-bg);
+              border-radius: 16px;
+              padding: 1.5rem;
+              height: fit-content;
+              position: sticky;
+              top: 2rem;
+              border: 1px solid var(--border-color);
+              box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+          }
+
+          .admin-content {
+              background: var(--card-bg);
+              border-radius: 16px;
+              padding: 2rem;
+              border: 1px solid var(--border-color);
+              box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+              min-height: 600px;
+          }
+
+          .admin-nav-item {
+              display: flex;
+              align-items: center;
+              padding: 0.75rem 1rem;
+              margin: 0.25rem 0;
+              border-radius: 10px;
+              color: var(--text-secondary);
+              text-decoration: none;
+              transition: all 0.3s ease;
+              border: 1px solid transparent;
+          }
+
+          .admin-nav-item:hover {
+              background: var(--hover-bg);
+              color: var(--text-primary);
+              transform: translateX(4px);
+          }
+
+          .admin-nav-item.active {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              border-color: var(--accent-purple);
+          }
+
+          .admin-nav-item i {
+              width: 20px;
+              margin-right: 0.75rem;
+              text-align: center;
+          }
+
+          .stats-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+              gap: 1.5rem;
+              margin-bottom: 2rem;
+          }
+
+          .stat-card {
+              background: var(--card-bg);
+              border: 1px solid var(--border-color);
+              border-radius: 12px;
+              padding: 1.5rem;
+              text-align: center;
+              transition: transform 0.2s ease, box-shadow 0.2s ease;
+              position: relative;
+              overflow: hidden;
+          }
+
+          .stat-card:hover {
+              transform: translateY(-4px);
+              box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+          }
+
+          .stat-card::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 4px;
+              background: var(--gradient-primary);
+          }
+
+          .stat-number {
+              font-size: 2.5rem;
+              font-weight: 700;
+              color: var(--text-primary);
+              margin-bottom: 0.5rem;
+          }
+
+          .stat-label {
+              color: var(--text-secondary);
+              font-size: 0.875rem;
+              font-weight: 500;
+          }
+
+          .stat-icon {
+              width: 60px;
+              height: 60px;
+              font-size: 1.8rem;
+              margin: 0 auto 1rem auto;
+              opacity: 0.8;
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 12px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              backdrop-filter: blur(10px);
+              border: 1px solid rgba(255, 255, 255, 0.2);
+          }
+
+          .dashboard-section {
+              background: var(--secondary-bg);
+              border: 1px solid var(--border-color);
+              border-radius: 12px;
+              padding: 1.5rem;
+              margin-bottom: 1.5rem;
+          }
+
+          .section-header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 1.5rem;
+              padding-bottom: 1rem;
+              border-bottom: 1px solid var(--border-color);
+          }
+
+          .section-title {
+              color: var(--text-primary);
+              font-size: 1.25rem;
+              font-weight: 600;
+              margin: 0;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+          }
+
+          .activity-item {
+              display: flex;
+              align-items: center;
+              padding: 0.75rem;
+              margin: 0.5rem 0;
+              background: var(--card-bg);
+              border: 1px solid var(--border-color);
+              border-radius: 8px;
+              transition: all 0.2s ease;
+          }
+
+          .activity-item:hover {
+              background: var(--hover-bg);
+              transform: translateX(4px);
+          }
+
+          .activity-icon {
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-right: 1rem;
+              font-size: 1.1rem;
+          }
+
+          .activity-vote {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+          }
+
+          .activity-user {
+              background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+              color: white;
+          }
+
+          .quick-actions {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 1rem;
+              margin-top: 1.5rem;
+          }
+
+          .quick-action-btn {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 1rem;
+              background: var(--card-bg);
+              border: 2px solid var(--border-color);
+              border-radius: 10px;
+              color: var(--text-primary);
+              text-decoration: none;
+              transition: all 0.3s ease;
+              font-weight: 500;
+          }
+
+          .quick-action-btn:hover {
+              background: var(--hover-bg);
+              border-color: var(--accent-purple);
+              transform: translateY(-2px);
+              color: var(--text-primary);
+          }
+
+          .quick-action-btn i {
+              margin-right: 0.5rem;
+              font-size: 1.1rem;
+          }
+
+          @media (max-width: 768px) {
+              .admin-dashboard {
+                  padding: 1rem 0;
+              }
+              
+              .stats-grid {
+                  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                  gap: 1rem;
+              }
+              
+              .admin-sidebar {
+                  margin-bottom: 1.5rem;
+                  position: static;
+              }
+              
+              .quick-actions {
+                  grid-template-columns: 1fr;
+              }
+          }
+
+          /* Admin Tables and Forms Styling */
+          .admin-content .table {
+              background: var(--card-bg);
+              border: 1px solid var(--border-color);
+              border-radius: 12px;
+              overflow: hidden;
+              margin-bottom: 0;
+          }
+
+          .admin-content .table thead th {
+              background: var(--secondary-bg);
+              border-color: var(--border-color);
+              color: var(--text-primary);
+              font-weight: 600;
+              padding: 1rem;
+              border-bottom: 2px solid var(--border-color);
+          }
+
+          .admin-content .table tbody td {
+              background: var(--card-bg);
+              border-color: var(--border-color);
+              color: var(--text-primary);
+              padding: 1rem;
+              vertical-align: middle;
+          }
+
+          .admin-content .table tbody tr:hover {
+              background: var(--hover-bg);
+          }
+
+          .admin-content .table tbody tr:hover td {
+              background: var(--hover-bg);
+          }
+
+          /* Form Controls */
+          .admin-content .form-control,
+          .admin-content .form-select {
+              background: var(--secondary-bg);
+              border: 1px solid var(--border-color);
+              border-radius: 8px;
+              color: var(--text-primary);
+              padding: 0.75rem 1rem;
+              transition: all 0.3s ease;
+          }
+
+          .admin-content .form-control:focus,
+          .admin-content .form-select:focus {
+              background: var(--card-bg);
+              border-color: var(--accent-purple);
+              box-shadow: 0 0 0 0.2rem rgba(139, 92, 246, 0.25);
+              color: var(--text-primary);
+          }
+
+          .admin-content .form-control::placeholder {
+              color: var(--text-secondary);
+          }
+
+          /* Buttons */
+          .admin-content .btn-outline-primary {
+              color: var(--accent-purple);
+              border-color: var(--accent-purple);
+              background: transparent;
+              border-radius: 8px;
+              padding: 0.5rem 1rem;
+              font-weight: 500;
+              transition: all 0.3s ease;
+          }
+
+          .admin-content .btn-outline-primary:hover {
+              background: var(--accent-purple);
+              border-color: var(--accent-purple);
+              color: white;
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+          }
+
+          .admin-content .btn-primary {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              border: none;
+              border-radius: 8px;
+              padding: 0.75rem 1.5rem;
+              font-weight: 500;
+              transition: all 0.3s ease;
+          }
+
+          .admin-content .btn-primary:hover {
+              background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+          }
+
+          .admin-content .btn-success {
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              border: none;
+              border-radius: 8px;
+              padding: 0.75rem 1.5rem;
+              font-weight: 500;
+              transition: all 0.3s ease;
+          }
+
+          .admin-content .btn-success:hover {
+              background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+          }
+
+          .admin-content .btn-danger {
+              background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+              border: none;
+              border-radius: 8px;
+              padding: 0.75rem 1.5rem;
+              font-weight: 500;
+              transition: all 0.3s ease;
+          }
+
+          .admin-content .btn-danger:hover {
+              background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+          }
+
+          .admin-content .btn-warning {
+              background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+              border: none;
+              border-radius: 8px;
+              padding: 0.75rem 1.5rem;
+              font-weight: 500;
+              color: white;
+              transition: all 0.3s ease;
+          }
+
+          .admin-content .btn-warning:hover {
+              background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+              color: white;
+          }
+
+          .admin-content .btn-sm {
+              padding: 0.375rem 0.75rem;
+              font-size: 0.875rem;
+              border-radius: 6px;
+          }
+
+          .admin-content .btn-lg {
+              padding: 0.875rem 2rem;
+              font-size: 1.125rem;
+              border-radius: 10px;
+          }
+
+          /* Pagination */
+          .admin-content .pagination .page-link {
+              background: var(--card-bg);
+              border: 1px solid var(--border-color);
+              color: var(--text-primary);
+              padding: 0.5rem 0.75rem;
+              margin: 0 0.125rem;
+              border-radius: 6px;
+              transition: all 0.3s ease;
+          }
+
+          .admin-content .pagination .page-link:hover {
+              background: var(--hover-bg);
+              border-color: var(--accent-purple);
+              color: var(--text-primary);
+          }
+
+          .admin-content .pagination .page-item.active .page-link {
+              background: var(--accent-purple);
+              border-color: var(--accent-purple);
+              color: white;
+          }
+
+          /* Badges */
+          .admin-content .badge {
+              border-radius: 6px;
+              padding: 0.375rem 0.75rem;
+              font-weight: 500;
+              font-size: 0.75rem;
+          }
+
+          .admin-content .badge.bg-success {
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+          }
+
+          .admin-content .badge.bg-danger {
+              background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+          }
+
+          .admin-content .badge.bg-warning {
+              background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+              color: white !important;
+          }
+
+          .admin-content .badge.bg-primary {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+          }
+
+          /* Modals */
+          .admin-content .modal-content {
+              background: var(--card-bg);
+              border: 1px solid var(--border-color);
+              border-radius: 12px;
+          }
+
+          .admin-content .modal-header {
+              border-bottom: 1px solid var(--border-color);
+              background: var(--secondary-bg);
+              border-radius: 12px 12px 0 0;
+          }
+
+          .admin-content .modal-title {
+              color: var(--text-primary);
+          }
+
+          .admin-content .modal-body {
+              background: var(--card-bg);
+              color: var(--text-primary);
+          }
+
+          .admin-content .modal-footer {
+              border-top: 1px solid var(--border-color);
+              background: var(--secondary-bg);
+              border-radius: 0 0 12px 12px;
+          }
+
+          /* Alerts */
+          .admin-content .alert {
+              border: 1px solid var(--border-color);
+              border-radius: 10px;
+              padding: 1rem 1.25rem;
+              margin-bottom: 1rem;
+          }
+
+          .admin-content .alert-success {
+              background: rgba(16, 185, 129, 0.1);
+              border-color: rgba(16, 185, 129, 0.3);
+              color: #10b981;
+          }
+
+          .admin-content .alert-danger {
+              background: rgba(239, 68, 68, 0.1);
+              border-color: rgba(239, 68, 68, 0.3);
+              color: #ef4444;
+          }
+
+          .admin-content .alert-warning {
+              background: rgba(245, 158, 11, 0.1);
+              border-color: rgba(245, 158, 11, 0.3);
+              color: #f59e0b;
+          }
+
+          .admin-content .alert-info {
+              background: rgba(59, 130, 246, 0.1);
+              border-color: rgba(59, 130, 246, 0.3);
+              color: #3b82f6;
+          }
+
+          /* Checkboxes */
+          .admin-content .form-check-input {
+              background: var(--secondary-bg);
+              border: 1px solid var(--border-color);
+              border-radius: 4px;
+          }
+
+          .admin-content .form-check-input:checked {
+              background: var(--accent-purple);
+              border-color: var(--accent-purple);
+          }
+
+          .admin-content .form-check-input:focus {
+              box-shadow: 0 0 0 0.2rem rgba(139, 92, 246, 0.25);
+          }
+
+          .admin-content .form-check-label {
+              color: var(--text-primary);
+          }
     </style>
 </head>
 <body>
