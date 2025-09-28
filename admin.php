@@ -225,16 +225,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             case 'delete_license':
                 $license_id = (int)$_POST['license_id'];
                 
-                // Verifica se la licenza è in uso
-                $stmt = $pdo->prepare("SELECT COUNT(*) FROM sl_servers WHERE license_key = (SELECT license_key FROM sl_server_licenses WHERE id = ?)");
+                // Eliminazione forzata - rimuovi prima l'associazione dal server se esiste
+                $stmt = $pdo->prepare("UPDATE sl_servers SET license_key = NULL WHERE id IN (SELECT server_id FROM sl_server_licenses WHERE id = ?)");
                 $stmt->execute([$license_id]);
-                $usage_count = $stmt->fetchColumn();
                 
-                if ($usage_count > 0) {
-                    echo json_encode(['success' => false, 'message' => 'Impossibile eliminare: licenza in uso']);
-                    exit;
-                }
-                
+                // Ora elimina la licenza
                 $stmt = $pdo->prepare("DELETE FROM sl_server_licenses WHERE id = ?");
                 $stmt->execute([$license_id]);
                 
@@ -242,12 +237,160 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 break;
 
             case 'generate_license':
-                $license_key = 'LIC_' . strtoupper(bin2hex(random_bytes(8)));
+                $server_id = isset($_POST['server_id']) ? (int)$_POST['server_id'] : null;
                 
-                $stmt = $pdo->prepare("INSERT INTO sl_server_licenses (license_key, is_active, created_at) VALUES (?, 1, NOW())");
-                $stmt->execute([$license_key]);
+                if (!$server_id) {
+                    echo json_encode(['success' => false, 'message' => 'Server ID richiesto']);
+                    exit;
+                }
                 
-                echo json_encode(['success' => true, 'message' => 'Licenza generata: ' . $license_key]);
+                // Verifica che il server esista
+                $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE id = ? AND is_active = 1");
+                $stmt->execute([$server_id]);
+                $server = $stmt->fetch();
+                
+                if (!$server) {
+                    echo json_encode(['success' => false, 'message' => 'Server non trovato o non attivo']);
+                    exit;
+                }
+                
+                // Genera una licenza univoca di 24 caratteri
+                $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                $max_attempts = 10;
+                $license_key = '';
+                
+                for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
+                    $license_key = '';
+                    for ($i = 0; $i < 24; $i++) {
+                        $license_key .= $characters[random_int(0, strlen($characters) - 1)];
+                    }
+                    
+                    // Verifica che non esista già
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sl_server_licenses WHERE license_key = ?");
+                    $stmt->execute([$license_key]);
+                    
+                    if ($stmt->fetchColumn() == 0) {
+                        break; // Licenza univoca trovata
+                    }
+                    
+                    if ($attempt === $max_attempts - 1) {
+                        echo json_encode(['success' => false, 'message' => 'Impossibile generare una licenza univoca']);
+                        exit;
+                    }
+                }
+                
+                // Inserisci o aggiorna la licenza
+                $stmt = $pdo->prepare("
+                    INSERT INTO sl_server_licenses (server_id, license_key, is_active) 
+                    VALUES (?, ?, 1) 
+                    ON DUPLICATE KEY UPDATE 
+                        license_key = VALUES(license_key),
+                        is_active = 1,
+                        created_at = CURRENT_TIMESTAMP
+                ");
+                $stmt->execute([$server_id, $license_key]);
+                
+                echo json_encode([
+                    'success' => true, 
+                    'message' => 'Licenza generata con successo per ' . htmlspecialchars($server['nome']),
+                    'license_key' => $license_key,
+                    'server_name' => $server['nome']
+                ]);
+                break;
+
+            case 'generate_license_with_input':
+                $server_input = isset($_POST['server_input']) ? trim($_POST['server_input']) : '';
+                
+                if (!$server_input) {
+                    echo json_encode(['success' => false, 'message' => 'Nome o ID server richiesto']);
+                    exit;
+                }
+                
+                // Cerca il server per ID numerico o nome esatto
+                if (is_numeric($server_input)) {
+                    // Ricerca per ID
+                    $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE id = ? AND is_active = 1");
+                    $stmt->execute([(int)$server_input]);
+                } else {
+                    // Ricerca per nome esatto
+                    $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE nome = ? AND is_active = 1");
+                    $stmt->execute([$server_input]);
+                }
+                
+                $server = $stmt->fetch();
+                
+                if (!$server) {
+                    echo json_encode(['success' => false, 'message' => 'Server non trovato. Verifica che il nome sia esatto o che l\'ID sia corretto e che il server sia attivo.']);
+                    exit;
+                }
+                
+                // Genera una licenza univoca di 24 caratteri
+                $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                $max_attempts = 10;
+                $license_key = '';
+                
+                for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
+                    $license_key = '';
+                    for ($i = 0; $i < 24; $i++) {
+                        $license_key .= $characters[random_int(0, strlen($characters) - 1)];
+                    }
+                    
+                    // Verifica che non esista già
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sl_server_licenses WHERE license_key = ?");
+                    $stmt->execute([$license_key]);
+                    
+                    if ($stmt->fetchColumn() == 0) {
+                        break; // Licenza univoca trovata
+                    }
+                    
+                    if ($attempt === $max_attempts - 1) {
+                        echo json_encode(['success' => false, 'message' => 'Impossibile generare una licenza univoca']);
+                        exit;
+                    }
+                }
+                
+                // Inserisci o aggiorna la licenza
+                $stmt = $pdo->prepare("
+                    INSERT INTO sl_server_licenses (server_id, license_key, is_active) 
+                    VALUES (?, ?, 1) 
+                    ON DUPLICATE KEY UPDATE 
+                        license_key = VALUES(license_key),
+                        is_active = 1,
+                        created_at = CURRENT_TIMESTAMP
+                ");
+                $stmt->execute([$server['id'], $license_key]);
+                
+                echo json_encode([
+                    'success' => true, 
+                    'message' => 'Licenza generata con successo per "' . htmlspecialchars($server['nome']) . '" (ID: ' . $server['id'] . ')',
+                    'license_key' => $license_key,
+                    'server_name' => $server['nome'],
+                    'server_id' => $server['id']
+                ]);
+                break;
+
+            case 'search_servers':
+                $search = isset($_POST['search']) ? trim($_POST['search']) : '';
+                
+                if (strlen($search) < 1) {
+                    echo json_encode(['success' => true, 'servers' => []]);
+                    exit;
+                }
+                
+                // Cerca server per nome o ID
+                $stmt = $pdo->prepare("
+                    SELECT id, nome 
+                    FROM sl_servers 
+                    WHERE is_active = 1 
+                    AND (nome LIKE ? OR id LIKE ?) 
+                    ORDER BY nome ASC 
+                    LIMIT 10
+                ");
+                $searchTerm = '%' . $search . '%';
+                $stmt->execute([$searchTerm, $searchTerm]);
+                $servers = $stmt->fetchAll();
+                
+                echo json_encode(['success' => true, 'servers' => $servers]);
                 break;
 
             default:
@@ -267,7 +410,8 @@ include 'header.php';
 .admin-container {
     background: var(--secondary-bg);
     min-height: 100vh;
-    padding-top: 2rem;
+    padding: 2rem 0 2rem 0;
+    margin-bottom: -4rem;
 }
 
 .admin-sidebar {
@@ -391,6 +535,23 @@ include 'header.php';
     background: var(--accent-purple);
     border-color: var(--accent-purple);
 }
+
+/* Alert persistenti - non scompaiono mai */
+.alert-persistent {
+    animation: none !important;
+    transition: none !important;
+}
+
+.alert-persistent .btn-close {
+    display: none !important;
+}
+
+/* Assicura che gli alert warning rimangano sempre visibili */
+.alert-warning.alert-persistent {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+}
 </style>
 
 <div class="admin-container">
@@ -492,18 +653,53 @@ function makeAjaxRequest(action, data, callback) {
 
 function showAlert(message, type = 'info') {
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-admin alert-dismissible fade show`;
+    alertDiv.className = `alert alert-${type} alert-admin alert-dismissible fade show mb-3`;
+    alertDiv.style.cssText = `
+        border-radius: 8px;
+        border: 1px solid;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        font-weight: 500;
+        position: relative;
+        z-index: 1050;
+    `;
+    
+    // Colori specifici per ogni tipo
+    if (type === 'warning') {
+        alertDiv.style.borderColor = '#ffc107';
+        alertDiv.style.backgroundColor = '#fff3cd';
+        alertDiv.style.color = '#856404';
+    } else if (type === 'danger') {
+        alertDiv.style.borderColor = '#dc3545';
+        alertDiv.style.backgroundColor = '#f8d7da';
+        alertDiv.style.color = '#721c24';
+    } else if (type === 'success') {
+        alertDiv.style.borderColor = '#28a745';
+        alertDiv.style.backgroundColor = '#d4edda';
+        alertDiv.style.color = '#155724';
+    } else {
+        alertDiv.style.borderColor = '#17a2b8';
+        alertDiv.style.backgroundColor = '#d1ecf1';
+        alertDiv.style.color = '#0c5460';
+    }
+    
     alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="d-flex align-items-center">
+            <div class="flex-grow-1">${message}</div>
+            <button type="button" class="btn-close ms-3" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     `;
     
     const container = document.querySelector('.admin-content');
     container.insertBefore(alertDiv, container.firstChild);
     
-    setTimeout(() => {
-        alertDiv.remove();
-    }, 5000);
+    // Gli alert warning rimangono fissi, gli altri scompaiono dopo 5 secondi
+    if (type !== 'warning') {
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
 }
 
 function confirmAction(message, callback) {
@@ -1563,13 +1759,71 @@ function include_rewards() {
  }
  
  function include_licenses() {
-     global $pdo;
-     
-     $page = (int)($_GET['page'] ?? 1);
-     $limit = 20;
-     $offset = ($page - 1) * $limit;
-     $search = $_GET['search'] ?? '';
-     $status_filter = $_GET['status_filter'] ?? '';
+    global $pdo;
+    
+    $page = (int)($_GET['page'] ?? 1);
+    $limit = 20;
+    $offset = ($page - 1) * $limit;
+    $search = $_GET['search'] ?? '';
+    $status_filter = $_GET['status_filter'] ?? '';
+    
+    // Query per server attivi (per dropdown)
+    $servers = [];
+    $servers_without_license = [];
+    $license_stats = [];
+    
+    try {
+        // Ottieni tutti i server attivi per il dropdown
+        $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE is_active = 1 ORDER BY nome");
+        $stmt->execute();
+        $servers = $stmt->fetchAll();
+        
+        // Ottieni server attivi senza licenza attiva
+        $stmt = $pdo->prepare("
+            SELECT s.id, s.nome, s.data_inserimento 
+            FROM sl_servers s 
+            LEFT JOIN sl_server_licenses sl ON s.id = sl.server_id AND sl.is_active = 1
+            WHERE s.is_active = 1 AND sl.server_id IS NULL
+            ORDER BY s.nome
+        ");
+        $stmt->execute();
+        $servers_without_license = $stmt->fetchAll();
+        
+        // Statistiche licenze - TUTTI i server (attivi e non attivi)
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM sl_servers");
+        $stmt->execute();
+        $total_servers = $stmt->fetchColumn();
+        
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM sl_servers s 
+            INNER JOIN sl_server_licenses sl ON s.id = sl.server_id 
+            WHERE sl.is_active = 1
+        ");
+        $stmt->execute();
+        $servers_with_active_license = $stmt->fetchColumn();
+        
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM sl_servers s 
+            INNER JOIN sl_server_licenses sl ON s.id = sl.server_id 
+            WHERE sl.is_active = 0
+        ");
+        $stmt->execute();
+        $servers_with_inactive_license = $stmt->fetchColumn();
+        
+        $servers_without_any_license = $total_servers - $servers_with_active_license - $servers_with_inactive_license;
+        
+        $license_stats = [
+            'total_servers' => $total_servers,
+            'with_active_license' => $servers_with_active_license,
+            'with_inactive_license' => $servers_with_inactive_license,
+            'without_license' => $servers_without_any_license
+        ];
+        
+    } catch (PDOException $e) {
+        // In caso di errore, array vuoti
+    }
      
      // Costruisci query con filtri
      $where_conditions = [];
@@ -1618,9 +1872,85 @@ function include_rewards() {
      ?>
      
      <h2><i class="bi bi-key"></i> Gestione Licenze</h2>
-     <p class="text-secondary">Gestisci licenze server e chiavi di accesso</p>
-     
-     <!-- Filtri e azioni -->
+    <p class="text-secondary">Gestisci licenze server e chiavi di accesso</p>
+    
+    <!-- Statistiche Licenze -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body">
+                    <h5 class="card-title text-success"><i class="bi bi-bar-chart"></i> Statistiche Licenze</h5>
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <div class="stat-item">
+                                <h3 class="text-primary"><?= $license_stats['total_servers'] ?></h3>
+                                <p class="text-secondary mb-0">Server Totali</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-item">
+                                <h3 class="text-success"><?= $license_stats['with_active_license'] ?></h3>
+                                <p class="text-secondary mb-0">Licenze Attive</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-item">
+                                <h3 class="text-warning"><?= $license_stats['with_inactive_license'] ?></h3>
+                                <p class="text-secondary mb-0">Licenze Disattivate</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-item">
+                                <h3 class="text-danger"><?= $license_stats['without_license'] ?></h3>
+                                <p class="text-secondary mb-0">Senza Licenza</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-item">
+                                <h3 class="text-info"><?= $license_stats['total_servers'] > 0 ? round(($license_stats['with_active_license'] / $license_stats['total_servers']) * 100, 1) : 0 ?>%</h3>
+                                <p class="text-secondary mb-0">Copertura Attiva</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-item">
+                                <h3 class="text-secondary"><?= $license_stats['total_servers'] > 0 ? round((($license_stats['with_active_license'] + $license_stats['with_inactive_license']) / $license_stats['total_servers']) * 100, 1) : 0 ?>%</h3>
+                                <p class="text-secondary mb-0">Copertura Totale</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <?php if (!empty($servers_without_license)): ?>
+    <!-- Server Senza Licenza -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-warning alert-persistent" style="border-radius: 8px; border: 1px solid #ffc107; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: 500; position: relative; z-index: 1050;">
+                <h5 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> Server Senza Licenza (<?= count($servers_without_license) ?>)</h5>
+                <p>I seguenti server attivi non hanno una licenza generata:</p>
+                <div class="row">
+                    <?php foreach ($servers_without_license as $server): ?>
+                        <div class="col-md-6 col-lg-4 mb-2">
+                            <div class="d-flex justify-content-between align-items-center bg-dark p-2 rounded">
+                                <div>
+                                    <strong><?= htmlspecialchars($server['nome']) ?></strong><br>
+                                    <small class="text-secondary">ID: <?= $server['id'] ?> - <?= date('d/m/Y', strtotime($server['data_inserimento'])) ?></small>
+                                </div>
+                                <button class="btn btn-sm btn-success" onclick="generateLicenseForServer(<?= $server['id'] ?>, '<?= htmlspecialchars($server['nome']) ?>')">
+                                    <i class="bi bi-plus"></i> Genera
+                                </button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    
+    <!-- Filtri e azioni -->
      <div class="row mb-4">
          <div class="col-md-5">
              <form method="GET" class="d-flex">
@@ -1724,17 +2054,178 @@ function include_rewards() {
      
      <script>
      function generateLicense() {
-         confirmAction('Sei sicuro di voler generare una nuova licenza?', () => {
-             makeAjaxRequest('generate_license', {}, (response) => {
-                 if (response.success) {
-                     showAlert(response.message, 'success');
-                     setTimeout(() => location.reload(), 1000);
-                 } else {
-                     showAlert(response.message, 'danger');
-                 }
-             });
-         });
-     }
+        // Apri modal per selezione server
+        const modal = new bootstrap.Modal(document.getElementById('generateLicenseModal'));
+        modal.show();
+    }
+    
+    function generateLicenseForServer(serverId, serverName) {
+        confirmAction(`Sei sicuro di voler generare una licenza per "${serverName}"?`, () => {
+            makeAjaxRequest('generate_license', {
+                server_id: serverId
+            }, (response) => {
+                if (response.success) {
+                    showAlert(response.message + '<br><strong>Licenza:</strong> <code>' + response.license_key + '</code>', 'success');
+                    setTimeout(() => location.reload(), 3000);
+                } else {
+                    showAlert(response.message, 'danger');
+                }
+            });
+        });
+    }
+    
+    function submitGenerateLicense() {
+        const selectedServerId = document.getElementById('selectedServerId').value;
+        const serverInput = document.getElementById('serverInput').value.trim();
+        
+        if (!selectedServerId && !serverInput) {
+            showAlert('Seleziona un server dalla lista o inserisci nome/ID', 'warning');
+            return;
+        }
+        
+        // Chiudi modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('generateLicenseModal'));
+        modal.hide();
+        
+        if (selectedServerId) {
+            // Usa l'ID selezionato dal dropdown
+            const serverName = document.getElementById('serverInput').value;
+            generateLicenseForServer(selectedServerId, serverName);
+        } else {
+            // Fallback al metodo manuale
+            generateLicenseWithInput(serverInput);
+        }
+    }
+    
+    function generateLicenseWithInput(serverInput) {
+        // Mostra messaggio di caricamento
+        showAlert('Ricerca server in corso...', 'info');
+        
+        // Chiama il backend per generare la licenza con input manuale
+        makeAjaxRequest('generate_license_with_input', {
+            server_input: serverInput
+        }, (response) => {
+            if (response.success) {
+                showAlert(response.message, 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showAlert(response.message, 'danger');
+            }
+        });
+    }
+    
+    function generateLicenseForServer(serverId, serverName) {
+        showAlert('Generazione licenza in corso...', 'info');
+        
+        makeAjaxRequest('generate_license', {
+            server_id: serverId
+        }, (response) => {
+            if (response.success) {
+                showAlert(`Licenza generata con successo per ${serverName}: ${response.license_key}`, 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showAlert(response.message, 'danger');
+            }
+        });
+    }
+    
+    // Autocomplete per server
+    let searchTimeout;
+    
+    function initServerAutocomplete() {
+        const serverInput = document.getElementById('serverInput');
+        const serverDropdown = document.getElementById('serverDropdown');
+        const selectedServerId = document.getElementById('selectedServerId');
+        
+        if (!serverInput) return;
+        
+        serverInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            // Resetta selezione
+            selectedServerId.value = '';
+            
+            // Cancella timeout precedente
+            clearTimeout(searchTimeout);
+            
+            if (query.length < 1) {
+                serverDropdown.style.display = 'none';
+                return;
+            }
+            
+            // Debounce per evitare troppe richieste
+            searchTimeout = setTimeout(() => {
+                searchServers(query);
+            }, 300);
+        });
+        
+        // Nascondi dropdown quando si clicca fuori
+        document.addEventListener('click', function(e) {
+            if (!serverInput.contains(e.target) && !serverDropdown.contains(e.target)) {
+                serverDropdown.style.display = 'none';
+            }
+        });
+    }
+    
+    function searchServers(query) {
+        makeAjaxRequest('search_servers', {
+            search: query
+        }, (response) => {
+            if (response.success) {
+                displayServerResults(response.servers);
+            }
+        });
+    }
+    
+    function displayServerResults(servers) {
+        const serverDropdown = document.getElementById('serverDropdown');
+        
+        if (servers.length === 0) {
+            serverDropdown.innerHTML = '<div class="dropdown-item text-secondary">Nessun server trovato</div>';
+            serverDropdown.style.display = 'block';
+            return;
+        }
+        
+        let html = '';
+        servers.forEach(server => {
+            html += `
+                <div class="dropdown-item server-option" data-id="${server.id}" data-name="${server.nome}" style="cursor: pointer;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>${server.nome}</strong></span>
+                        <small class="text-secondary">ID: ${server.id}</small>
+                    </div>
+                </div>
+            `;
+        });
+        
+        serverDropdown.innerHTML = html;
+        serverDropdown.style.display = 'block';
+        
+        // Aggiungi event listener per la selezione
+        serverDropdown.querySelectorAll('.server-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const serverId = this.dataset.id;
+                const serverName = this.dataset.name;
+                
+                document.getElementById('serverInput').value = serverName;
+                document.getElementById('selectedServerId').value = serverId;
+                serverDropdown.style.display = 'none';
+            });
+        });
+    }
+    
+    // Inizializza autocomplete quando si apre il modal
+    document.getElementById('generateLicenseModal').addEventListener('shown.bs.modal', function() {
+        initServerAutocomplete();
+        document.getElementById('serverInput').focus();
+    });
+    
+    // Reset form quando si chiude il modal
+    document.getElementById('generateLicenseModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('serverInput').value = '';
+        document.getElementById('selectedServerId').value = '';
+        document.getElementById('serverDropdown').style.display = 'none';
+    });
      
      function toggleLicense(licenseId, currentStatus) {
          const action = currentStatus ? 'disattivare' : 'attivare';
@@ -1802,6 +2293,43 @@ function include_rewards() {
     </div>
 </div>
 
+<!-- Modal per generare licenza -->
+<div class="modal fade" id="generateLicenseModal" tabindex="-1" aria-labelledby="generateLicenseModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header">
+                <h5 class="modal-title" id="generateLicenseModalLabel">Genera Licenza Server</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="generateLicenseForm">
+                    <div class="mb-3">
+                        <label for="serverInput" class="form-label">Cerca Server</label>
+                        <div class="position-relative">
+                            <input type="text" class="form-control" id="serverInput" name="server_input" required 
+                                   placeholder="Digita per cercare server..." autocomplete="off">
+                            <input type="hidden" id="selectedServerId" name="selected_server_id">
+                            <div id="serverDropdown" class="dropdown-menu w-100" style="max-height: 200px; overflow-y: auto; display: none;">
+                                <!-- I risultati della ricerca appariranno qui -->
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">
+                            <i class="bi bi-info-circle"></i> Inizia a digitare per vedere i server disponibili. 
+                            Puoi cercare per nome o ID. Se il server ha già una licenza, verrà sostituita.
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-success" onclick="submitGenerateLicense()">
+                    <i class="bi bi-key"></i> Genera Licenza
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function editUser(userId, currentNick) {
     document.getElementById('editUserId').value = userId;
@@ -1836,6 +2364,56 @@ function saveUserChanges() {
         showAlert('Errore durante il salvataggio', 'danger');
     });
 }
+
+// Protezione per alert persistenti
+document.addEventListener('DOMContentLoaded', function() {
+    // Previeni la rimozione automatica degli alert persistenti
+    const persistentAlerts = document.querySelectorAll('.alert-persistent');
+    
+    persistentAlerts.forEach(alert => {
+        // Rimuovi eventuali event listener di Bootstrap per auto-dismiss
+        alert.removeAttribute('data-bs-dismiss');
+        
+        // Previeni la rimozione tramite JavaScript
+        const originalRemove = alert.remove;
+        alert.remove = function() {
+            console.log('Tentativo di rimuovere alert persistente bloccato');
+            return false;
+        };
+        
+        // Previeni la modifica dello stile display
+        const originalStyle = alert.style;
+        Object.defineProperty(alert, 'style', {
+            get: function() { return originalStyle; },
+            set: function(value) {
+                if (typeof value === 'object' && value.display === 'none') {
+                    console.log('Tentativo di nascondere alert persistente bloccato');
+                    return;
+                }
+                return originalStyle;
+            }
+        });
+    });
+    
+    // Osserva mutazioni per prevenire rimozioni
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                mutation.removedNodes.forEach(function(node) {
+                    if (node.nodeType === 1 && node.classList && node.classList.contains('alert-persistent')) {
+                        console.log('Alert persistente rimosso, lo ripristino');
+                        mutation.target.appendChild(node);
+                    }
+                });
+            }
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+});
 </script>
 
  <?php include 'footer.php'; ?>
