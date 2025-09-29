@@ -536,6 +536,8 @@ include 'header.php';
         .server-description .description-text * {
             /* Gli stili inline hanno automaticamente precedenza */
         }
+
+        
 </style>
 
 <!-- Server Page Container -->
@@ -638,15 +640,7 @@ include 'header.php';
                 <div class="tab-content-container">
                     <!-- Description Tab -->
                     <div class="tab-content active" id="description">
-                        <?php if ($server['banner_url']): ?>
-                            <div class="content-banner">
-                                <img src="<?php echo htmlspecialchars($server['banner_url']); ?>" 
-                                     alt="Banner" class="content-banner-img">
-                                <div class="banner-text-overlay">
-                                    <h2><?php echo htmlspecialchars($server['nome']); ?></h2>
-                                </div>
-                            </div>
-                        <?php endif; ?>
+                        <!-- content-banner rimosso (desktop e mobile) -->
                         
                         <div class="server-description">
                             <?php if (!empty($server['descrizione'])): ?>

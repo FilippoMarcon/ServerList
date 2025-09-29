@@ -256,3 +256,45 @@
   }
   
 }
+
+/* ---------------------------
+   Server.php - Mobile tweaks
+   Applica gli stessi fix della homepage
+---------------------------- */
+/* Nascondi le modalità/tags sulla pagina server in mobile */
+.server-info-card .server-tags-section,
+.server-tags-section {
+  display: none !important;
+}
+
+/* IP: leggermente meno padding e più leggibile su mobile */
+.server-ip-display {
+  padding: 0.35rem 0.7rem !important;
+  border-radius: 10px;
+}
+
+/* Su mobile, l'IP diventa a tutta larghezza nella testata */
+.server-details-row .server-ip-display {
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+/* Versione/valori info allineati a sinistra nella card info */
+.server-info-card .info-item .info-value {
+  text-align: left !important;
+  justify-content: flex-start !important;
+}
+
+/* Rendi ben visibili i voti sulla pagina server in mobile */
+.vote-count {
+  display: block !important;
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+}
+
+/* Server.php - Mobile: togli padding tab content e compatta descrizione */
+@media (max-width: 768px) {
+  .tab-content-container { padding: 0 !important; }
+  .server-description .description-text p { line-height: 1 !important; }
+}

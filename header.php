@@ -18,6 +18,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Mobile-only CSS -->
+    <link rel="stylesheet" href="mobile.css" media="(max-width: 768px)">
     <!-- Custom CSS -->
 
     <style>
@@ -1041,19 +1043,19 @@
         
         /* Dropdown menus */
         .dropdown-menu {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
             border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
             z-index: 999999 !important;
             padding: 0.5rem;
             margin-top: 0.5rem;
-            backdrop-filter: blur(20px);
+            backdrop-filter: none;
             min-width: 200px;
         }
         
         .dropdown-item {
-            color: var(--text-primary);
+            color: #111;
             padding: 0.75rem 1rem;
             border-radius: 8px;
             transition: all 0.3s ease;
@@ -1064,13 +1066,13 @@
         }
         
         .dropdown-item:hover, .dropdown-item:focus {
-            background: var(--gradient-primary);
-            color: white;
+            background: #f2f4f7;
+            color: #000;
             transform: translateX(4px);
         }
         
         .dropdown-divider {
-            border-color: var(--border-color);
+            border-color: rgba(0, 0, 0, 0.08);
             margin: 0.5rem 0;
         }
         
