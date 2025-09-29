@@ -6,8 +6,17 @@
 
 require_once 'config.php';
 
+// Routing fallback: se l'hosting reindirizza tutto a index.php,
+// instradiamo le richieste /server/<nome> verso server.php con slug
+$request_path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+if (preg_match('#^/server/([A-Za-z0-9_-]+)/?$#', $request_path, $m)) {
+    $_GET['slug'] = $m[1];
+    include __DIR__ . '/server.php';
+    exit();
+}
+
 // Titolo pagina
-$page_title = "Lista Server Minecraft";
+$page_title = "Lista Server";
 
 // Gestione filtro da URL
 $active_filter = isset($_GET['filter']) ? sanitize($_GET['filter']) : '';

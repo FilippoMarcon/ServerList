@@ -41,11 +41,11 @@
                         <div class="footer-section">
                             <h5 class="section-title">Navigazione</h5>
                             <ul class="footer-links">
-                                <li><a href="index.php">Lista Server</a></li>
-                                <li><a href="login.php">Accedi</a></li>
-                                <li><a href="register.php">Registrati</a></li>
+                                <li><a href="/">Lista Server</a></li>
+                                <li><a href="/login.php">Accedi</a></li>
+                                <li><a href="/register.php">Registrati</a></li>
                                 <?php if (isLoggedIn() && isAdmin()): ?>
-                                <li><a href="admin.php">Admin Panel</a></li>
+                                <li><a href="/admin.php">Admin Panel</a></li>
                                 <?php endif; ?>
                             </ul>
                         </div>
@@ -55,9 +55,9 @@
                         <div class="footer-section">
                             <h5 class="section-title">Modalità Popolari</h5>
                             <ul class="footer-links">
-                                <li><a href="?filter=survival">Survival</a></li>
-                                <li><a href="?filter=roleplay">RolePlay</a></li>
-                                <li><a href="?filter=pvp">PvP</a></li>
+                                <li><a href="/?filter=survival">Survival</a></li>
+                                <li><a href="/?filter=roleplay">RolePlay</a></li>
+                                <li><a href="/?filter=pvp">PvP</a></li>
                                 <li><a href="?filter=minigames">MiniGames</a></li>
                                 <li><a href="?filter=skyblock">SkyBlock</a></li>
                             </ul>

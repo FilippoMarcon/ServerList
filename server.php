@@ -6,8 +6,35 @@
 
 require_once 'config.php';
 
-// Ottieni l'ID del server dall'URL
+// Supporto URL con slug: /server/<slug>, con fallback su id
+$server_slug = isset($_GET['slug']) ? trim($_GET['slug']) : null;
 $server_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+if ($server_slug) {
+    try {
+        // Risolvi direttamente per colonna nome (case-insensitive)
+        $stmt = $pdo->prepare("SELECT id FROM sl_servers WHERE is_active = 1 AND LOWER(nome) = LOWER(?) LIMIT 1");
+        $stmt->execute([$server_slug]);
+        $row = $stmt->fetch();
+        if ($row && isset($row['id'])) {
+            $server_id = (int)$row['id'];
+        } else {
+            // Fallback: prova a cercare lo slug all'interno dell'IP del server
+            $stmt = $pdo->prepare("SELECT id FROM sl_servers WHERE is_active = 1 AND LOWER(ip) LIKE CONCAT('%', LOWER(?), '%') LIMIT 1");
+            $stmt->execute([$server_slug]);
+            $row2 = $stmt->fetch();
+            if ($row2 && isset($row2['id'])) {
+                $server_id = (int)$row2['id'];
+            }
+        }
+        // Debug opzionale della risoluzione dello slug
+        if (isset($_GET['slug_debug'])) {
+            echo "<!-- SLUG DEBUG: input='{$server_slug}' resolved_id='{$server_id}' -->";
+        }
+    } catch (PDOException $e) {
+        redirect('index.php');
+    }
+}
 
 if ($server_id === 0) {
     redirect('index.php');
@@ -24,6 +51,22 @@ try {
     
     if (!$server) {
         redirect('index.php');
+    }
+
+    // Redirect 301 dai vecchi URL (server.php?id=...) ai nuovi URL (/server/<nome>)
+    if (isset($_GET['id']) && !isset($_GET['slug'])) {
+        $norm = function ($str) {
+            $s = mb_strtolower($str, 'UTF-8');
+            $s = preg_replace('/[^a-z0-9]+/i', '-', $s);
+            return trim($s, '-');
+        };
+        $target_slug = $norm($server['nome']);
+        $expected_path = '/server/' . $target_slug;
+        $current_path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        if ($current_path !== $expected_path) {
+            header('Location: ' . $expected_path, true, 301);
+            exit();
+        }
     }
     
     // Calcola il ranking del server usando la stessa query dell'index.php
@@ -751,7 +794,7 @@ function voteServer(serverId) {
         return;
     }
     
-    fetch('vote.php', {
+    fetch('/vote.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',

@@ -1,4 +1,8 @@
+Options -MultiViews
 RewriteEngine On
+
+# Pretty URL per la pagina del singolo server: /server/<slug>
+RewriteRule ^server/([A-Za-z0-9_-]+)/?$ server.php?slug=$1 [QSA,L]
 
 # Redirect /ServerList to index.php
 RewriteRule ^ServerList/?$ index.php [L]
