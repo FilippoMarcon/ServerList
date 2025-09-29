@@ -138,6 +138,7 @@ include 'header.php';
 }
 </style>
 
+
 <div class="container" style="margin-top: 2rem;">
     <div class="row">
         <!-- Main Content -->
@@ -151,7 +152,7 @@ include 'header.php';
                         <div class="sponsored-server-card" data-server-id="<?php echo $sponsored['id']; ?>">
                             <div class="sponsored-overlay">
                                 <i class="bi bi-star-fill"></i>
-                                <span>SPONSORIZZATO</span>
+                                <span>SPONSOR</span>
                             </div>
                             <?php if (!empty($sponsored['logo_url'])): ?>
                                 <img src="<?php echo htmlspecialchars($sponsored['logo_url']); ?>" 

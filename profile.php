@@ -209,6 +209,7 @@ $include_rich_editor = true; // Abilita Quill.js per l'editor rich text
 include 'header.php';
 ?>
 
+
 <div class="profile-container">
     <div class="container">
         <!-- Header del Profilo -->

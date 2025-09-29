@@ -5448,6 +5448,8 @@
               color: var(--text-primary);
           }
     </style>
+    <!-- Mobile-only CSS (loaded AFTER custom styles to properly override them) -->
+    <link rel="stylesheet" href="mobile.css" media="(max-width: 576px)">
 </head>
 <body>
     
