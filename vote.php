@@ -69,7 +69,10 @@ try {
     if ($today_vote) {
         // L'utente ha già votato oggi
         $voted_server_name = $today_vote['nome'];
-        $vote_time = date('H:i', strtotime($today_vote['data_voto']));
+        // Converte dal timestamp UTC del DB al fuso locale configurato
+        $vote_dt = new DateTime($today_vote['data_voto'], new DateTimeZone('UTC'));
+        $vote_dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+        $vote_time = $vote_dt->format('H:i');
         
         // Calcola il tempo fino a mezzanotte
         $now = new DateTime();

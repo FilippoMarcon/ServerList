@@ -200,7 +200,8 @@
         /* Server cards */
         .server-list {
             border-radius: 0 0 16px 16px;
-            overflow: hidden;
+            /* Permette ai dropdown di sovrapporsi correttamente */
+            overflow: visible;
             backdrop-filter: blur(20px);
         }
         
@@ -505,15 +506,21 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         }
 
         .sponsored-header h3 {
-            color: #FFD700;
+            color: #ffffff;
             font-weight: 700;
             margin: 0;
             display: flex;
             align-items: center;
             gap: 8px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
         }
 
         .sponsored-header .bi-star-fill {
@@ -657,6 +664,27 @@
 
 
 
+        .sponsored-cta {
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        .sponsored-cta-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .sponsored-cta-link {
+            font-size: 0.8rem;
+            color: #FFD700;
+            text-decoration: none;
+        }
+
+        .sponsored-cta-link:hover {
+            color: #ffcc33;
+            text-decoration: underline;
+        }
+
         @media (max-width: 768px) {
             .sponsored-servers-grid {
                 grid-template-columns: 1fr;
@@ -728,6 +756,22 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+        }
+
+        /* Evita che indicatori e versioni spariscano durante l'hover del nome */
+        .server-name:hover .sponsored-indicator,
+        .server-name:hover .sponsored-indicator * {
+            -webkit-text-fill-color: initial !important;
+            color: #000 !important;
+            background-clip: border-box;
+            -webkit-background-clip: border-box;
+            opacity: 1 !important;
+        }
+
+        .server-name:hover span {
+            -webkit-text-fill-color: initial !important;
+            color: var(--text-muted) !important;
+            opacity: 1 !important;
         }
         
         .server-ip {
@@ -1001,7 +1045,7 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            z-index: 9999 !important;
+            z-index: 999999 !important;
             padding: 0.5rem;
             margin-top: 0.5rem;
             backdrop-filter: blur(20px);

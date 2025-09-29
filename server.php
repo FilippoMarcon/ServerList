@@ -770,11 +770,15 @@ include 'header.php';
                         <?php 
                         // Mostra TUTTI i voti giornalieri
                         foreach ($voters as $voter): 
+                            // Converte il timestamp del DB (UTC) in fuso orario locale ISO 8601
+                            $vote_dt = new DateTime($voter['data_voto'], new DateTimeZone('UTC'));
+                            $vote_dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                            $vote_iso_local = $vote_dt->format('c'); // es. 2025-09-29T15:44:23+02:00
                         ?>
                             <div class="voter-avatar-modern" 
                                  title="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
                                  data-nickname="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
-                                 data-vote-time="<?php echo $voter['data_voto']; ?>">
+                                 data-vote-time="<?php echo $vote_iso_local; ?>">
                                 <img src="https://mc-heads.net/avatar/<?php echo urlencode($voter['minecraft_nick']); ?>" 
                                      alt="<?php echo htmlspecialchars($voter['minecraft_nick']); ?>"
                                      onerror="this.src='https://via.placeholder.com/32x32/6c757d/ffffff?text=?';">

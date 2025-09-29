@@ -136,23 +136,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 break;
 
             case 'toggle_sponsorship':
-                $server_id = (int)$_POST['server_id'];
-                
-                // Verifica se esiste già una sponsorizzazione
-                $stmt = $pdo->prepare("SELECT id, is_active FROM sl_sponsored_servers WHERE server_id = ?");
-                $stmt->execute([$server_id]);
-                $sponsorship = $stmt->fetch();
-                
-                if ($sponsorship) {
-                    $new_status = $sponsorship['is_active'] ? 0 : 1;
-                    $stmt = $pdo->prepare("UPDATE sl_sponsored_servers SET is_active = ? WHERE server_id = ?");
-                    $stmt->execute([$new_status, $server_id]);
-                } else {
-                    $stmt = $pdo->prepare("INSERT INTO sl_sponsored_servers (server_id, is_active, created_at) VALUES (?, 1, NOW())");
-                    $stmt->execute([$server_id]);
+                // Supporta sia toggle per server_id sia per id sponsor (più robusto)
+                $server_id = isset($_POST['server_id']) ? (int)$_POST['server_id'] : 0;
+                $sponsor_id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+
+                if ($sponsor_id > 0) {
+                    // Toggle tramite ID della sponsorizzazione
+                    $stmt = $pdo->prepare("SELECT id, is_active FROM sl_sponsored_servers WHERE id = ?");
+                    $stmt->execute([$sponsor_id]);
+                    $sponsorship = $stmt->fetch();
+                    if (!$sponsorship) { echo json_encode(['success' => false, 'message' => 'Sponsor non trovato']); break; }
+                    $new_status = ((int)$sponsorship['is_active'] === 1) ? 0 : 1;
+                    $stmt = $pdo->prepare("UPDATE sl_sponsored_servers SET is_active = ? WHERE id = ?");
+                    $stmt->execute([$new_status, $sponsor_id]);
+                    $msg = $new_status ? 'Sponsor attivato' : 'Sponsor disattivato';
+                    echo json_encode(['success' => true, 'message' => $msg]);
+                    break;
                 }
-                
-                echo json_encode(['success' => true, 'message' => 'Sponsorizzazione aggiornata']);
+
+                if ($server_id > 0) {
+                    // Toggle tramite server_id (comportamento esistente)
+                    $stmt = $pdo->prepare("SELECT id, is_active FROM sl_sponsored_servers WHERE server_id = ?");
+                    $stmt->execute([$server_id]);
+                    $sponsorship = $stmt->fetch();
+                    if ($sponsorship) {
+                        $new_status = ((int)$sponsorship['is_active'] === 1) ? 0 : 1;
+                        $stmt = $pdo->prepare("UPDATE sl_sponsored_servers SET is_active = ? WHERE server_id = ?");
+                        $stmt->execute([$new_status, $server_id]);
+                        $msg = $new_status ? 'Sponsor attivato' : 'Sponsor disattivato';
+                        echo json_encode(['success' => true, 'message' => $msg]);
+                        break;
+                    } else {
+                        $stmt = $pdo->prepare("INSERT INTO sl_sponsored_servers (server_id, is_active, created_at) VALUES (?, 1, NOW())");
+                        $stmt->execute([$server_id]);
+                        echo json_encode(['success' => true, 'message' => 'Sponsor creato e attivato']);
+                        break;
+                    }
+                }
+
+                echo json_encode(['success' => false, 'message' => 'Parametri mancanti (id o server_id)']);
+                break;
+
+            case 'add_sponsorship':
+                $server_id = (int)($_POST['server_id'] ?? 0);
+                $priority = (int)($_POST['priority'] ?? 1);
+                $expires_at = $_POST['expires_at'] ?? null;
+
+                if ($server_id <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'Server non valido']);
+                    break;
+                }
+
+                // Verifica server esistente e attivo
+                $stmt = $pdo->prepare("SELECT id, nome, is_active FROM sl_servers WHERE id = ?");
+                $stmt->execute([$server_id]);
+                $server = $stmt->fetch();
+                if (!$server) { echo json_encode(['success' => false, 'message' => 'Server non trovato']); break; }
+                if ((int)$server['is_active'] !== 1) { echo json_encode(['success' => false, 'message' => 'Il server non è attivo']); break; }
+
+                // Evita duplicati
+                $stmt = $pdo->prepare("SELECT id FROM sl_sponsored_servers WHERE server_id = ?");
+                $stmt->execute([$server_id]);
+                if ($stmt->fetch()) { echo json_encode(['success' => false, 'message' => 'Server già sponsorizzato']); break; }
+
+                if ($expires_at === '') { $expires_at = null; }
+                $stmt = $pdo->prepare("INSERT INTO sl_sponsored_servers (server_id, priority, is_active, created_at, expires_at) VALUES (?, ?, 1, NOW(), ?)");
+                $stmt->execute([$server_id, $priority, $expires_at]);
+                echo json_encode(['success' => true, 'message' => 'Sponsor creato con successo']);
+                break;
+
+            case 'update_sponsorship':
+                $sponsor_id = (int)($_POST['id'] ?? 0);
+                $priority = isset($_POST['priority']) ? (int)$_POST['priority'] : null;
+                $expires_at = $_POST['expires_at'] ?? null;
+                if ($sponsor_id <= 0) { echo json_encode(['success' => false, 'message' => 'ID sponsor non valido']); break; }
+                $fields = [];
+                $params = [];
+                if ($priority !== null) { $fields[] = 'priority = ?'; $params[] = $priority; }
+                if ($expires_at !== null) { if ($expires_at === '') { $fields[] = 'expires_at = NULL'; } else { $fields[] = 'expires_at = ?'; $params[] = $expires_at; } }
+                if (empty($fields)) { echo json_encode(['success' => false, 'message' => 'Nessuna modifica fornita']); break; }
+                $params[] = $sponsor_id;
+                $sql = 'UPDATE sl_sponsored_servers SET ' . implode(', ', $fields) . ' WHERE id = ?';
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                echo json_encode(['success' => true, 'message' => 'Sponsor aggiornato']);
+                break;
+
+            case 'delete_sponsorship':
+                $sponsor_id = (int)($_POST['id'] ?? 0);
+                if ($sponsor_id <= 0) { echo json_encode(['success' => false, 'message' => 'ID sponsor non valido']); break; }
+                $stmt = $pdo->prepare("DELETE FROM sl_sponsored_servers WHERE id = ?");
+                $stmt->execute([$sponsor_id]);
+                echo json_encode(['success' => true, 'message' => 'Sponsor eliminato']);
                 break;
 
             case 'delete_server':
@@ -224,10 +299,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
 
             case 'delete_license':
                 $license_id = (int)$_POST['license_id'];
-                
-                // Eliminazione forzata - rimuovi prima l'associazione dal server se esiste
-                $stmt = $pdo->prepare("UPDATE sl_servers SET license_key = NULL WHERE id IN (SELECT server_id FROM sl_server_licenses WHERE id = ?)");
-                $stmt->execute([$license_id]);
                 
                 // Ora elimina la licenza
                 $stmt = $pdo->prepare("DELETE FROM sl_server_licenses WHERE id = ?");
@@ -393,6 +464,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 echo json_encode(['success' => true, 'servers' => $servers]);
                 break;
 
+            // Annunci Management
+            case 'create_annuncio':
+                $title = trim($_POST['title'] ?? '');
+                $body = trim($_POST['body'] ?? '');
+                $author_id = (int)($_POST['author_id'] ?? 0);
+                $is_published = isset($_POST['is_published']) ? (int)$_POST['is_published'] : 1;
+                $created_at_in = trim($_POST['created_at'] ?? '');
+                if (!$title || !$body || $author_id <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'Titolo, contenuto e autore sono obbligatori']);
+                    break;
+                }
+                // Normalizza datetime-local (YYYY-MM-DDTHH:MM) -> Y-m-d H:i:s
+                $created_at = $created_at_in ? str_replace('T', ' ', $created_at_in) . ':00' : date('Y-m-d H:i:s');
+                $stmt = $pdo->prepare("INSERT INTO sl_annunci (title, body, author_id, is_published, created_at) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$title, $body, $author_id, $is_published, $created_at]);
+                echo json_encode(['success' => true, 'message' => 'Annuncio creato']);
+                break;
+
+            case 'update_annuncio':
+                $id = (int)($_POST['id'] ?? 0);
+                $title = trim($_POST['title'] ?? '');
+                $body = trim($_POST['body'] ?? '');
+                $author_id = (int)($_POST['author_id'] ?? 0);
+                $is_published = isset($_POST['is_published']) ? (int)$_POST['is_published'] : 1;
+                $created_at_in = trim($_POST['created_at'] ?? '');
+                if ($id <= 0 || !$title || !$body || $author_id <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'ID, titolo, contenuto e autore sono obbligatori']);
+                    break;
+                }
+                $created_at = $created_at_in ? str_replace('T', ' ', $created_at_in) . ':00' : null;
+                $sql = "UPDATE sl_annunci SET title = ?, body = ?, author_id = ?, is_published = ?, updated_at = NOW()";
+                $params = [$title, $body, $author_id, $is_published];
+                if ($created_at) { $sql .= ", created_at = ?"; $params[] = $created_at; }
+                $sql .= " WHERE id = ?"; $params[] = $id;
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                echo json_encode(['success' => true, 'message' => 'Annuncio aggiornato']);
+                break;
+
+            case 'delete_annuncio':
+                $id = (int)($_POST['id'] ?? 0);
+                if ($id <= 0) { echo json_encode(['success' => false, 'message' => 'ID annuncio non valido']); break; }
+                $pdo->beginTransaction();
+                $pdo->prepare("DELETE FROM sl_annunci_likes WHERE annuncio_id = ?")->execute([$id]);
+                $pdo->prepare("DELETE FROM sl_annunci WHERE id = ?")->execute([$id]);
+                $pdo->commit();
+                echo json_encode(['success' => true, 'message' => 'Annuncio eliminato']);
+                break;
+
             default:
                 echo json_encode(['success' => false, 'message' => 'Azione non riconosciuta']);
         }
@@ -404,6 +524,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
 
 $page_title = 'Pannello Admin';
 include 'header.php';
+?>
+<style>
+/* Stile migliorato per le intestazioni delle card nell'Admin */
+.card-header {
+    background: var(--card-bg) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 1rem 1.25rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+}
+
+.card-header .card-title,
+.card-header h5,
+.card-header h6 {
+    color: var(--text-primary) !important;
+    margin: 0 !important;
+    font-weight: 700 !important;
+}
+
+.card-header .badge,
+.card-header .btn {
+    margin-left: auto;
+}
+</style>
+<?php
 ?>
 
 <style>
@@ -457,24 +603,90 @@ include 'header.php';
 .stat-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 15px;
-    padding: 1.5rem;
-    text-align: center;
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
     transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    column-gap: 1rem;
+    row-gap: 0.5rem;
+    align-items: start;
+}
+
+.stat-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+    opacity: 0.6;
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+    border-color: var(--accent-purple);
 }
 
-.stat-number {
-    font-size: 2rem;
-    font-weight: bold;
+.stat-card h6 {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0 0 0.75rem 0;
+    font-weight: 800;
     background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    grid-column: 1 / -1;
+}
+
+.stat-card h6 i {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gradient-primary);
+    color: #fff;
+    -webkit-text-fill-color: #fff !important;
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+/* Disporre le voci su una singola riga e prevenire a capo */
+.stat-card > div {
+    white-space: normal;
+    font-weight: 600;
+}
+
+@media (max-width: 992px) {
+    .stat-card {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+    }
+}
+
+@media (max-width: 576px) {
+    .stat-card {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Migliora la leggibilità di "Sponsorizzati" dentro le stat-card */
+.stat-card .text-info {
+    color: #7dd3fc !important; /* cyan chiaro ad alto contrasto */
+    font-weight: 700;
 }
 
 .data-table {
@@ -552,6 +764,121 @@ include 'header.php';
     visibility: visible !important;
     display: block !important;
 }
+/* ======= Admin Dashboard Upgrade ======= */
+/* Hero banner */
+.admin-hero {
+    background: linear-gradient(135deg, rgba(102,126,234,0.25), rgba(118,75,162,0.25)) , var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 1.5rem 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.admin-hero .hero-title {
+    margin: 0;
+    font-weight: 800;
+    font-size: 1.6rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.admin-hero .hero-subtitle {
+    margin: 0.25rem 0 0 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.btn-hero {
+    border-radius: 10px !important;
+    border: 1px solid var(--border-color) !important;
+    background: var(--primary-bg) !important;
+    color: var(--text-secondary) !important;
+}
+
+.btn-hero:hover {
+    background: var(--accent-purple) !important;
+    color: #fff !important;
+    transform: translateY(-2px);
+}
+
+/* Metric cards grid */
+.admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.metric-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    transition: all 0.25s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.25);
+    border-color: var(--accent-purple);
+}
+
+.metric-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gradient-primary);
+    color: #fff;
+    flex-shrink: 0;
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.35);
+}
+
+.metric-content {
+    flex: 1;
+}
+
+.metric-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.metric-value {
+    margin: 0.1rem 0 0 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.metric-meta {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+    .admin-hero {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
 </style>
 
 <div class="admin-container">
@@ -578,6 +905,12 @@ include 'header.php';
                     </a>
                     <a href="?action=licenses" class="admin-nav-item <?= $action === 'licenses' ? 'active' : '' ?>">
                         <i class="bi bi-key"></i> Gestione Licenze
+                    </a>
+                    <a href="?action=annunci" class="admin-nav-item <?= $action === 'annunci' ? 'active' : '' ?>">
+                        <i class="bi bi-megaphone"></i> Gestione Annunci
+                    </a>
+                    <a href="?action=sponsors" class="admin-nav-item <?= $action === 'sponsors' ? 'active' : '' ?>">
+                        <i class="bi bi-star"></i> Gestione Sponsor
                     </a>
                     <hr>
             <a href="/" class="admin-nav-item">
@@ -608,6 +941,9 @@ include 'header.php';
                         case 'servers':
                             include_servers();
                             break;
+                        case 'sponsors':
+                            include_sponsors();
+                            break;
                         case 'votes':
                             include_votes();
                             break;
@@ -616,6 +952,9 @@ include 'header.php';
                             break;
                         case 'licenses':
                             include_licenses();
+                            break;
+                        case 'annunci':
+                            include_annunci();
                             break;
                         default:
                             include_dashboard();
@@ -723,9 +1062,31 @@ function updateDashboardStats(stats) {
     for (const [key, value] of Object.entries(stats)) {
         const element = document.getElementById(key);
         if (element) {
-            element.textContent = value;
+            element.setAttribute('data-count', value);
+            animateCount(element, parseInt(value));
         }
     }
+}
+
+// Animazione contatori
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-count]').forEach(el => {
+        const target = parseInt(el.getAttribute('data-count')) || parseInt(el.textContent) || 0;
+        animateCount(el, target);
+    });
+});
+
+function animateCount(el, target) {
+    const start = parseInt(el.textContent) || 0;
+    const duration = 800;
+    const startTime = performance.now();
+    function tick(now) {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const value = Math.floor(start + (target - start) * progress);
+        el.textContent = value;
+        if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
 }
 </script>
 
@@ -779,67 +1140,75 @@ function include_dashboard() {
     ")->fetchAll();
     ?>
     
-    <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
-    <p class="text-secondary">Panoramica generale del sistema</p>
-    
-    <!-- Statistiche principali -->
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-number" id="total_users"><?= $stats['total_users'] ?></div>
-                <div class="text-secondary">Utenti Totali</div>
-                <small class="text-success"><?= $stats['admin_users'] ?> admin</small>
+    <div class="admin-hero">
+        <div>
+            <h2 class="hero-title"><i class="bi bi-speedometer2"></i> Admin Dashboard</h2>
+            <p class="hero-subtitle">Panoramica e controllo rapido del sistema</p>
+        </div>
+        <div class="quick-actions">
+            <a href="?action=users" class="btn btn-hero"><i class="bi bi-people"></i> Utenti</a>
+            <a href="?action=servers" class="btn btn-hero"><i class="bi bi-server"></i> Server</a>
+            <a href="?action=licenses" class="btn btn-hero"><i class="bi bi-key"></i> Licenze</a>
+            <a href="?action=rewards" class="btn btn-hero"><i class="bi bi-gift"></i> Reward</a>
+        </div>
+    </div>
+
+    <!-- Statistiche principali - nuove metriche -->
+    <div class="admin-stats-grid">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Utenti Totali</p>
+                <h3 class="metric-value" id="total_users" data-count="<?= (int)$stats['total_users'] ?>"><?= (int)$stats['total_users'] ?></h3>
+                <span class="metric-meta">Admin: <?= (int)$stats['admin_users'] ?></span>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-number" id="total_servers"><?= $stats['total_servers'] ?></div>
-                <div class="text-secondary">Server Totali</div>
-                <small class="text-success"><?= $stats['active_servers'] ?> attivi</small>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-server"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Server Totali</p>
+                <h3 class="metric-value" id="total_servers" data-count="<?= (int)$stats['total_servers'] ?>"><?= (int)$stats['total_servers'] ?></h3>
+                <span class="metric-meta">Attivi: <?= (int)$stats['active_servers'] ?></span>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-number" id="total_votes"><?= $stats['total_votes'] ?></div>
-                <div class="text-secondary">Voti Totali</div>
-                <small class="text-info"><?= $stats['today_votes'] ?> oggi</small>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-hand-thumbs-up"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Voti Totali</p>
+                <h3 class="metric-value" id="total_votes" data-count="<?= (int)$stats['total_votes'] ?>"><?= (int)$stats['total_votes'] ?></h3>
+                <span class="metric-meta">Oggi: <?= (int)$stats['today_votes'] ?></span>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-number" id="total_licenses"><?= $stats['total_licenses'] ?></div>
-                <div class="text-secondary">Licenze</div>
-                <small class="text-success"><?= $stats['active_licenses'] ?> attive</small>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-key-fill"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Licenze</p>
+                <h3 class="metric-value" id="total_licenses" data-count="<?= (int)$stats['total_licenses'] ?>"><?= (int)$stats['total_licenses'] ?></h3>
+                <span class="metric-meta">Attive: <?= (int)$stats['active_licenses'] ?></span>
             </div>
         </div>
     </div>
     
     <!-- Statistiche dettagliate -->
-    <div class="row mb-4">
-        <div class="col-md-4 mb-3">
-            <div class="stat-card">
-                <h6>Server per Stato</h6>
-                <div class="text-success">Attivi: <?= $stats['active_servers'] ?></div>
-                <div class="text-warning">In Attesa: <?= $stats['pending_servers'] ?></div>
-                <div class="text-danger">Disabilitati: <?= $stats['disabled_servers'] ?></div>
-                <div class="text-info">Sponsorizzati: <?= $stats['sponsored_servers'] ?></div>
-            </div>
+    <div class="admin-stats-grid">
+        <div class="stat-card">
+            <h6><i class="bi bi-bar-chart"></i> Server per Stato</h6>
+            <div class="text-success">Attivi: <?= $stats['active_servers'] ?></div>
+            <div class="text-warning">In Attesa: <?= $stats['pending_servers'] ?></div>
+            <div class="text-danger">Disabilitati: <?= $stats['disabled_servers'] ?></div>
+            <div class="text-info">Sponsorizzati: <?= $stats['sponsored_servers'] ?></div>
         </div>
-        <div class="col-md-4 mb-3">
-            <div class="stat-card">
-                <h6>Reward Status</h6>
-                <div class="text-success">Successo: <?= $stats['successful_rewards'] ?></div>
-                <div class="text-danger">Errori: <?= $stats['failed_rewards'] ?></div>
-                <div class="text-warning">Codici Pending: <?= $stats['pending_vote_codes'] ?></div>
-            </div>
+        <div class="stat-card">
+            <h6><i class="bi bi-gift"></i> Reward Status</h6>
+            <div class="text-success">Successo: <?= $stats['successful_rewards'] ?></div>
+            <div class="text-danger">Errori: <?= $stats['failed_rewards'] ?></div>
+            <div class="text-warning">Codici Pending: <?= $stats['pending_vote_codes'] ?></div>
         </div>
-        <div class="col-md-4 mb-3">
-            <div class="stat-card">
-                <h6>Sistema</h6>
-                <div class="text-info">Uptime: Online</div>
-                <div class="text-success">Database: OK</div>
-                <div class="text-primary">Ultimo aggiornamento: <?= date('H:i:s') ?></div>
-            </div>
+        <div class="stat-card">
+            <h6><i class="bi bi-cpu"></i> Sistema</h6>
+            <div class="text-info">Uptime: Online</div>
+            <div class="text-success">Database: OK</div>
+            <div class="text-primary">Ultimo aggiornamento: <?= date('H:i:s') ?></div>
         </div>
     </div>
     
@@ -955,33 +1324,75 @@ function include_users() {
     $stmt->execute($params);
     $total_users = $stmt->fetchColumn();
     $total_pages = ceil($total_users / $limit);
+
+    // Metriche per header utenti
+    $admin_count = (int)$pdo->query("SELECT COUNT(*) FROM sl_users WHERE is_admin = 1")->fetchColumn();
+    $users_with_servers = (int)$pdo->query("SELECT COUNT(DISTINCT owner_id) FROM sl_servers WHERE owner_id IS NOT NULL")->fetchColumn();
+    $users_with_votes = (int)$pdo->query("SELECT COUNT(DISTINCT user_id) FROM sl_votes")->fetchColumn();
     ?>
     
-    <h2><i class="bi bi-people"></i> Gestione Utenti</h2>
-    <p class="text-secondary">Gestisci utenti, admin e statistiche</p>
+    <!-- Header moderno utenti -->
+    <div class="admin-hero mb-3">
+        <div>
+            <h2 class="hero-title"><i class="bi bi-people"></i> Gestione Utenti</h2>
+            <p class="hero-subtitle">Gestisci ruoli, attività e overview utenti</p>
+        </div>
+    </div>
+
+    <!-- Metriche utenti -->
+    <div class="admin-stats-grid mb-4">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Utenti Totali</p>
+                <h3 class="metric-value"><?= (int)$total_users ?></h3>
+                <span class="metric-meta">Admin: <?= (int)$admin_count ?></span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-hdd-network"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Utenti con Server</p>
+                <h3 class="metric-value"><?= (int)$users_with_servers ?></h3>
+                <span class="metric-meta">Owner attivi</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-hand-thumbs-up"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Utenti con Voti</p>
+                <h3 class="metric-value"><?= (int)$users_with_votes ?></h3>
+                <span class="metric-meta">Partecipazione</span>
+            </div>
+        </div>
+    </div>
     
-    <!-- Filtri -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <form method="GET" class="d-flex">
-                <input type="hidden" name="action" value="users">
-                <input type="text" name="search" class="form-control me-2" placeholder="Cerca minecraft nick..." value="<?= htmlspecialchars($search) ?>">
-                <button type="submit" class="btn btn-primary btn-admin">Cerca</button>
-            </form>
-        </div>
-        <div class="col-md-3">
-            <form method="GET">
-                <input type="hidden" name="action" value="users">
-                <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
-                <select name="role_filter" class="form-select" onchange="this.form.submit()">
-                    <option value="">Tutti i ruoli</option>
-                    <option value="1" <?= $role_filter === '1' ? 'selected' : '' ?>>Solo Admin</option>
-                    <option value="0" <?= $role_filter === '0' ? 'selected' : '' ?>>Solo Utenti</option>
-                </select>
-            </form>
-        </div>
-        <div class="col-md-3 text-end">
-            <span class="text-secondary">Totale: <?= $total_users ?> utenti</span>
+    <!-- Filtri moderni -->
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-6">
+                    <form method="GET" class="d-flex">
+                        <input type="hidden" name="action" value="users">
+                        <input type="text" name="search" class="form-control me-2" placeholder="Cerca minecraft nick..." value="<?= htmlspecialchars($search) ?>">
+                        <button type="submit" class="btn btn-primary btn-admin"><i class="bi bi-search"></i> Cerca</button>
+                    </form>
+                </div>
+                <div class="col-md-3">
+                    <form method="GET" class="d-flex">
+                        <input type="hidden" name="action" value="users">
+                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                        <select name="role_filter" class="form-select" onchange="this.form.submit()">
+                            <option value="">Tutti i ruoli</option>
+                            <option value="1" <?= $role_filter === '1' ? 'selected' : '' ?>>Solo Admin</option>
+                            <option value="0" <?= $role_filter === '0' ? 'selected' : '' ?>>Solo Utenti</option>
+                        </select>
+                    </form>
+                </div>
+                <div class="col-md-3 text-end">
+                    <span class="text-secondary"><i class="bi bi-person-lines-fill"></i> Totale: <?= $total_users ?> utenti</span>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -1158,34 +1569,85 @@ function include_servers() {
     $stmt->execute($params);
     $total_servers = $stmt->fetchColumn();
     $total_pages = ceil($total_servers / $limit);
+
+    // Metriche per header server
+    $active_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_servers WHERE is_active = 1")->fetchColumn();
+    $pending_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_servers WHERE is_active = 2")->fetchColumn();
+    $disabled_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_servers WHERE is_active = 0")->fetchColumn();
+    $sponsored_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1")->fetchColumn();
     ?>
     
-    <h2><i class="bi bi-server"></i> Gestione Server</h2>
-    <p class="text-secondary">Gestisci server, stato e sponsorizzazioni</p>
+    <!-- Header moderno server -->
+    <div class="admin-hero mb-3">
+        <div>
+            <h2 class="hero-title"><i class="bi bi-server"></i> Gestione Server</h2>
+            <p class="hero-subtitle">Gestisci stato, sponsorizzazioni e performance</p>
+        </div>
+    </div>
+
+    <!-- Metriche server -->
+    <div class="admin-stats-grid mb-4">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-hdd-network"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Server Totali</p>
+                <h3 class="metric-value"><?= (int)$total_servers ?></h3>
+                <span class="metric-meta">Sponsored: <?= (int)$sponsored_servers ?></span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-check-circle"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Attivi</p>
+                <h3 class="metric-value"><?= (int)$active_servers ?></h3>
+                <span class="metric-meta">Online</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-hourglass-split"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">In Attesa</p>
+                <h3 class="metric-value"><?= (int)$pending_servers ?></h3>
+                <span class="metric-meta">Review</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-slash-circle"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Disabilitati</p>
+                <h3 class="metric-value"><?= (int)$disabled_servers ?></h3>
+                <span class="metric-meta">Offline</span>
+            </div>
+        </div>
+    </div>
     
-    <!-- Filtri -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <form method="GET" class="d-flex">
-                <input type="hidden" name="action" value="servers">
-                <input type="text" name="search" class="form-control me-2" placeholder="Cerca nome, IP o descrizione..." value="<?= htmlspecialchars($search) ?>">
-                <button type="submit" class="btn btn-primary btn-admin">Cerca</button>
-            </form>
-        </div>
-        <div class="col-md-3">
-            <form method="GET">
-                <input type="hidden" name="action" value="servers">
-                <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
-                <select name="status_filter" class="form-select" onchange="this.form.submit()">
-                    <option value="">Tutti gli stati</option>
-                    <option value="1" <?= $status_filter === '1' ? 'selected' : '' ?>>Attivi</option>
-                    <option value="2" <?= $status_filter === '2' ? 'selected' : '' ?>>In Attesa</option>
-                    <option value="0" <?= $status_filter === '0' ? 'selected' : '' ?>>Disabilitati</option>
-                </select>
-            </form>
-        </div>
-        <div class="col-md-3 text-end">
-            <span class="text-secondary">Totale: <?= $total_servers ?> server</span>
+    <!-- Filtri moderni -->
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-6">
+                    <form method="GET" class="d-flex">
+                        <input type="hidden" name="action" value="servers">
+                        <input type="text" name="search" class="form-control me-2" placeholder="Cerca nome, IP o descrizione..." value="<?= htmlspecialchars($search) ?>">
+                        <button type="submit" class="btn btn-primary btn-admin"><i class="bi bi-search"></i> Cerca</button>
+                    </form>
+                </div>
+                <div class="col-md-3">
+                    <form method="GET" class="d-flex">
+                        <input type="hidden" name="action" value="servers">
+                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                        <select name="status_filter" class="form-select" onchange="this.form.submit()">
+                            <option value="">Tutti gli stati</option>
+                            <option value="1" <?= $status_filter === '1' ? 'selected' : '' ?>>Attivi</option>
+                            <option value="2" <?= $status_filter === '2' ? 'selected' : '' ?>>In Attesa</option>
+                            <option value="0" <?= $status_filter === '0' ? 'selected' : '' ?>>Disabilitati</option>
+                        </select>
+                    </form>
+                </div>
+                <div class="col-md-3 text-end">
+                    <span class="text-secondary"><i class="bi bi-hdd-network"></i> Totale: <?= $total_servers ?> server</span>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -1320,6 +1782,21 @@ function include_servers() {
             });
         });
     }
+
+    function toggleSponsorById(sponsorId) {
+        confirmAction('Sei sicuro di voler modificare lo stato di sponsorizzazione?', () => {
+            makeAjaxRequest('toggle_sponsorship', {
+                id: sponsorId
+            }, (response) => {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(response.message || 'Errore nel toggle sponsor', 'danger');
+                }
+            });
+        });
+    }
     
     function deleteServer(serverId) {
         confirmAction('Sei sicuro di voler eliminare questo server? Tutti i dati correlati verranno eliminati!', () => {
@@ -1337,6 +1814,344 @@ function include_servers() {
     }
     </script>
     
+    <?php
+}
+
+function include_sponsors() {
+    global $pdo;
+
+    $page = (int)($_GET['page'] ?? 1);
+    $limit = 20;
+    $offset = ($page - 1) * $limit;
+    $search = $_GET['search'] ?? '';
+    $status_filter = $_GET['status_filter'] ?? '';
+    $expiry_filter = $_GET['expiry_filter'] ?? '';
+
+    // Costruisci condizioni WHERE
+    $where_conditions = [];
+    $params = [];
+    if ($search) {
+        $where_conditions[] = "(s.nome LIKE ? OR s.ip LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+    if ($status_filter !== '') {
+        $where_conditions[] = "ss.is_active = ?";
+        $params[] = (int)$status_filter;
+    }
+    if ($expiry_filter === 'expired') {
+        $where_conditions[] = "ss.expires_at IS NOT NULL AND ss.expires_at <= NOW()";
+    } elseif ($expiry_filter === 'valid') {
+        $where_conditions[] = "(ss.expires_at IS NULL OR ss.expires_at > NOW())";
+    }
+    $where_clause = $where_conditions ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+
+    // Query sponsorships
+    $query = "
+        SELECT ss.*, s.nome, s.ip, s.is_active AS server_status
+        FROM sl_sponsored_servers ss
+        JOIN sl_servers s ON s.id = ss.server_id
+        $where_clause
+        ORDER BY ss.priority ASC, ss.created_at DESC
+        LIMIT $limit OFFSET $offset
+    ";
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    $sponsors = $stmt->fetchAll();
+
+    // Conteggio totale per paginazione
+    $count_query = "
+        SELECT COUNT(*)
+        FROM sl_sponsored_servers ss
+        JOIN sl_servers s ON s.id = ss.server_id
+        $where_clause
+    ";
+    $stmt = $pdo->prepare($count_query);
+    $stmt->execute($params);
+    $total_sponsors = (int)$stmt->fetchColumn();
+    $total_pages = ceil($total_sponsors / $limit);
+
+    // Statistiche
+    $stats = [
+        'total' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers")->fetchColumn(),
+        'active' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1")->fetchColumn(),
+        'expired' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE expires_at IS NOT NULL AND expires_at <= NOW() ")->fetchColumn(),
+    ];
+    ?>
+
+    <div class="admin-hero mb-3">
+        <div>
+            <h2 class="hero-title"><i class="bi bi-star"></i> Gestione Sponsor</h2>
+            <p class="hero-subtitle">Crea, aggiorna e monitora sponsorizzazioni dei server</p>
+        </div>
+        <div>
+            <button class="btn btn-warning btn-admin" data-bs-toggle="modal" data-bs-target="#addSponsorModal">
+                <i class="bi bi-plus-lg"></i> Aggiungi Sponsor
+            </button>
+        </div>
+    </div>
+
+    <div class="admin-stats-grid mb-4">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-collection"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Sponsor Totali</p>
+                <h3 class="metric-value"><?= (int)$stats['total'] ?></h3>
+                <span class="metric-meta">Filtrati: <?= (int)$total_sponsors ?></span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-check-circle"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Attivi</p>
+                <h3 class="metric-value"><?= (int)$stats['active'] ?></h3>
+                <span class="metric-meta">Online</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-clock-history"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Scaduti</p>
+                <h3 class="metric-value"><?= (int)$stats['expired'] ?></h3>
+                <span class="metric-meta">Expired</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-6">
+                    <form method="GET" class="d-flex">
+                        <input type="hidden" name="action" value="sponsors">
+                        <input type="text" name="search" class="form-control me-2" placeholder="Cerca per nome o IP..." value="<?= htmlspecialchars($search) ?>">
+                        <button type="submit" class="btn btn-primary btn-admin">Cerca</button>
+                    </form>
+                </div>
+                <div class="col-md-3">
+                    <form method="GET">
+                        <input type="hidden" name="action" value="sponsors">
+                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                        <select name="status_filter" class="form-select" onchange="this.form.submit()">
+                            <option value="">Tutti gli stati</option>
+                            <option value="1" <?= $status_filter === '1' ? 'selected' : '' ?>>Attivi</option>
+                            <option value="0" <?= $status_filter === '0' ? 'selected' : '' ?>>Disattivati</option>
+                        </select>
+                    </form>
+                </div>
+                <div class="col-md-3">
+                    <form method="GET">
+                        <input type="hidden" name="action" value="sponsors">
+                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                        <input type="hidden" name="status_filter" value="<?= htmlspecialchars($status_filter) ?>">
+                        <select name="expiry_filter" class="form-select" onchange="this.form.submit()">
+                            <option value="">Valide e scadute</option>
+                            <option value="valid" <?= $expiry_filter === 'valid' ? 'selected' : '' ?>>Solo valide</option>
+                            <option value="expired" <?= $expiry_filter === 'expired' ? 'selected' : '' ?>>Solo scadute</option>
+                        </select>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="data-table">
+        <div class="card-header bg-transparent border-bottom">
+            <h6 class="mb-0"><i class="bi bi-star"></i> Sponsorizzazioni</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Server</th>
+                        <th>Priorità</th>
+                        <th>Stato Sponsor</th>
+                        <th>Scadenza</th>
+                        <th>Creato</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($sponsors as $sp): ?>
+                    <tr>
+                        <td><?= (int)$sp['id'] ?></td>
+                        <td>
+                            <strong><?= htmlspecialchars($sp['nome']) ?></strong>
+                            <div><code><?= htmlspecialchars($sp['ip']) ?></code></div>
+                            <small class="text-secondary">Server <?= (int)$sp['server_status'] === 1 ? 'attivo' : 'non attivo' ?></small>
+                        </td>
+                        <td style="max-width:120px;">
+                            <input type="number" class="form-control form-control-sm" id="priority-<?= (int)$sp['id'] ?>" value="<?= (int)$sp['priority'] ?>" min="1">
+                        </td>
+                        <td>
+                            <?php if ((int)$sp['is_active'] === 1): ?>
+                                <span class="badge bg-success">Attivo</span>
+                            <?php else: ?>
+                                <span class="badge bg-danger">Disattivato</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="max-width:180px;">
+                            <input type="date" class="form-control form-control-sm" id="expires-<?= (int)$sp['id'] ?>" value="<?= !empty($sp['expires_at']) ? date('Y-m-d', strtotime($sp['expires_at'])) : '' ?>">
+                            <small class="text-secondary">Vuoto = senza scadenza</small>
+                        </td>
+                        <td><small><?= htmlspecialchars(date('Y-m-d H:i', strtotime($sp['created_at']))) ?></small></td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-primary btn-admin" onclick="updateSponsorship(<?= (int)$sp['id'] ?>)"><i class="bi bi-save"></i></button>
+                                <button class="btn btn-sm btn-warning btn-admin" onclick="toggleSponsorById(<?= (int)$sp['id'] ?>)"><i class="bi bi-toggle2-on"></i></button>
+                                <button class="btn btn-sm btn-outline-danger btn-admin" onclick="deleteSponsorship(<?= (int)$sp['id'] ?>)"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <?php if ($total_pages > 1): ?>
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                    <a class="page-link" href="?action=sponsors&page=<?= $i ?>&search=<?= urlencode($search) ?>&status_filter=<?= urlencode($status_filter) ?>&expiry_filter=<?= urlencode($expiry_filter) ?>">
+                        <?= $i ?>
+                    </a>
+                </li>
+            <?php endfor; ?>
+        </ul>
+    </nav>
+    <?php endif; ?>
+
+    <!-- Modal Aggiungi Sponsor -->
+    <div class="modal fade" id="addSponsorModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-star"></i> Aggiungi Sponsor</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3 position-relative">
+                        <label class="form-label">Server</label>
+                        <input type="text" id="sponsorServerInput" class="form-control" placeholder="Cerca server attivo per nome o ID...">
+                        <input type="hidden" id="selectedSponsorServerId" value="">
+                        <div id="sponsorServerDropdown" class="dropdown-menu show" style="display:none; position:absolute; width:100%; max-height:220px; overflow:auto;">
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Priorità</label>
+                            <input type="number" id="sponsorPriority" class="form-control" value="1" min="1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Scadenza (opzionale)</label>
+                            <input type="date" id="sponsorExpires" class="form-control">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-warning btn-admin w-100" onclick="addSponsorship()"><i class="bi bi-plus-lg"></i> Crea Sponsor</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function initSponsorAutocomplete() {
+        const input = document.getElementById('sponsorServerInput');
+        const dropdown = document.getElementById('sponsorServerDropdown');
+        let timeout;
+        input.addEventListener('input', function() {
+            const q = this.value.trim();
+            document.getElementById('selectedSponsorServerId').value = '';
+            if (timeout) clearTimeout(timeout);
+            if (q.length < 1) { dropdown.style.display = 'none'; return; }
+            timeout = setTimeout(() => {
+                makeAjaxRequest('search_servers', { search: q }, (response) => {
+                    if (response.success) {
+                        if (!response.servers || response.servers.length === 0) {
+                            dropdown.innerHTML = '<div class="dropdown-item text-secondary">Nessun server trovato</div>';
+                            dropdown.style.display = 'block';
+                        } else {
+                            let html = '';
+                            response.servers.forEach(s => {
+                                html += `
+                                    <div class="dropdown-item sponsor-option" data-id="${s.id}" data-name="${s.nome}" style="cursor:pointer;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span><strong>${s.nome}</strong></span>
+                                            <small class="text-secondary">ID: ${s.id}</small>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            dropdown.innerHTML = html;
+                            dropdown.style.display = 'block';
+                            dropdown.querySelectorAll('.sponsor-option').forEach(opt => {
+                                opt.addEventListener('click', function() {
+                                    document.getElementById('sponsorServerInput').value = this.dataset.name;
+                                    document.getElementById('selectedSponsorServerId').value = this.dataset.id;
+                                    dropdown.style.display = 'none';
+                                });
+                            });
+                        }
+                    }
+                });
+            }, 300);
+        });
+        document.addEventListener('click', function(e) {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+
+    document.getElementById('addSponsorModal').addEventListener('shown.bs.modal', function() {
+        initSponsorAutocomplete();
+        document.getElementById('sponsorServerInput').focus();
+    });
+    document.getElementById('addSponsorModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('sponsorServerInput').value = '';
+        document.getElementById('selectedSponsorServerId').value = '';
+        document.getElementById('sponsorPriority').value = 1;
+        document.getElementById('sponsorExpires').value = '';
+        document.getElementById('sponsorServerDropdown').style.display = 'none';
+    });
+
+    function addSponsorship() {
+        const serverId = document.getElementById('selectedSponsorServerId').value;
+        const priority = parseInt(document.getElementById('sponsorPriority').value || '1', 10);
+        const expires = document.getElementById('sponsorExpires').value;
+        if (!serverId) { showAlert('Seleziona un server valido', 'warning'); return; }
+        makeAjaxRequest('add_sponsorship', { server_id: serverId, priority: priority, expires_at: expires }, (response) => {
+            if (response.success) {
+                showAlert(response.message, 'success');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showAlert(response.message || 'Errore durante la creazione sponsor', 'danger');
+            }
+        });
+    }
+
+    function updateSponsorship(id) {
+        const pr = parseInt(document.getElementById('priority-' + id).value || '1', 10);
+        const ex = document.getElementById('expires-' + id).value;
+        makeAjaxRequest('update_sponsorship', { id: id, priority: pr, expires_at: ex }, (response) => {
+            if (response.success) { showAlert(response.message, 'success'); }
+            else { showAlert(response.message || 'Errore aggiornamento sponsor', 'danger'); }
+        });
+    }
+
+    function deleteSponsorship(id) {
+        confirmAction('Eliminare questo sponsor?', () => {
+            makeAjaxRequest('delete_sponsorship', { id: id }, (response) => {
+                if (response.success) { showAlert(response.message, 'success'); setTimeout(() => location.reload(), 800); }
+                else { showAlert(response.message || 'Errore eliminazione sponsor', 'danger'); }
+            });
+        });
+    }
+    </script>
     <?php
 }
 
@@ -1455,7 +2270,13 @@ function include_votes() {
                             <strong><?= htmlspecialchars($vote['server_name'] ?? 'N/A') ?></strong><br>
                             <small class="text-secondary"><?= htmlspecialchars($vote['server_ip'] ?? 'N/A') ?></small>
                         </td>
-                        <td><?= date('d/m/Y H:i', strtotime($vote['data_voto'])) ?></td>
+                        <td>
+                            <?php
+                                $dt = new DateTime($vote['data_voto'], new DateTimeZone('UTC'));
+                                $dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                                echo $dt->format('d/m/Y H:i');
+                            ?>
+                        </td>
                         <td>
                             <?php if ($vote['vote_code']): ?>
                                 <code><?= htmlspecialchars($vote['vote_code']) ?></code>
@@ -1567,7 +2388,7 @@ function include_rewards() {
     $params = [];
     
     if ($search) {
-        $where_conditions[] = "(u.minecraft_nick LIKE ? OR s.nome LIKE ? OR rl.command LIKE ?)";
+        $where_conditions[] = "(u.minecraft_nick LIKE ? OR s.nome LIKE ? OR rl.commands_executed LIKE ?)";
         $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
@@ -1650,9 +2471,8 @@ function include_rewards() {
                          <th>ID</th>
                          <th>Utente</th>
                          <th>Server</th>
-                         <th>Comando</th>
+                         <th>Tipo</th>
                          <th>Stato</th>
-                         <th>Retry</th>
                          <th>Data</th>
                          <th>Azioni</th>
                      </tr>
@@ -1664,7 +2484,19 @@ function include_rewards() {
                          <td><?= htmlspecialchars($reward['username'] ?? 'N/A') ?></td>
                          <td><?= htmlspecialchars($reward['server_name'] ?? 'N/A') ?></td>
                          <td>
-                             <code><?= htmlspecialchars($reward['command'] ?? 'N/A') ?></code>
+                             <?php
+                                 $tipo = 'N/A';
+                                 $executedRaw = $reward['commands_executed'] ?? '';
+                                 if (!empty($executedRaw)) {
+                                     $decoded = json_decode($executedRaw, true);
+                                     if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                                         if (!empty($decoded['auto_distributed'])) {
+                                             $tipo = 'Auto Distribuito';
+                                         }
+                                     }
+                                 }
+                             ?>
+                             <code><?= htmlspecialchars($tipo) ?></code>
                          </td>
                          <td>
                              <?php
@@ -1684,17 +2516,13 @@ function include_rewards() {
                              ?>
                          </td>
                          <td>
-                             <span class="badge bg-info"><?= $reward['retry_count'] ?? 0 ?></span>
+                             <?php
+                                 $dt = new DateTime($reward['executed_at'], new DateTimeZone('UTC'));
+                                 $dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                                 echo $dt->format('d/m/Y H:i');
+                             ?>
                          </td>
-                         <td><?= date('d/m/Y H:i', strtotime($reward['executed_at'])) ?></td>
                          <td>
-                             <?php if ($reward['reward_status'] === 'error'): ?>
-                                 <button class="btn btn-sm btn-outline-warning btn-admin" 
-                                         onclick="retryReward(<?= $reward['id'] ?>)"
-                                         title="Riprova">
-                                     <i class="bi bi-arrow-clockwise"></i>
-                                 </button>
-                             <?php endif; ?>
                              <button class="btn btn-sm btn-outline-danger btn-admin" 
                                      onclick="deleteRewardLog(<?= $reward['id'] ?>)"
                                      title="Elimina">
@@ -1724,21 +2552,6 @@ function include_rewards() {
      <?php endif; ?>
      
      <script>
-     function retryReward(logId) {
-         confirmAction('Sei sicuro di voler riprovare questo reward?', () => {
-             makeAjaxRequest('retry_reward', {
-                 log_id: logId
-             }, (response) => {
-                 if (response.success) {
-                     showAlert(response.message, 'success');
-                     setTimeout(() => location.reload(), 1000);
-                 } else {
-                     showAlert(response.message, 'danger');
-                 }
-             });
-         });
-     }
-     
      function deleteRewardLog(logId) {
          confirmAction('Sei sicuro di voler eliminare questo log?', () => {
              makeAjaxRequest('delete_reward_log', {
@@ -1778,12 +2591,12 @@ function include_rewards() {
         $stmt->execute();
         $servers = $stmt->fetchAll();
         
-        // Ottieni server attivi senza licenza attiva
+        // Ottieni server senza alcuna licenza (attivi e inattivi), per allineare lista e statistica "Senza Licenza"
         $stmt = $pdo->prepare("
-            SELECT s.id, s.nome, s.data_inserimento 
-            FROM sl_servers s 
-            LEFT JOIN sl_server_licenses sl ON s.id = sl.server_id AND sl.is_active = 1
-            WHERE s.is_active = 1 AND sl.server_id IS NULL
+            SELECT s.id, s.nome, s.data_inserimento, s.is_active
+            FROM sl_servers s
+            LEFT JOIN sl_server_licenses sl ON s.id = sl.server_id
+            WHERE sl.server_id IS NULL
             ORDER BY s.nome
         ");
         $stmt->execute();
@@ -1874,81 +2687,83 @@ function include_rewards() {
      <h2><i class="bi bi-key"></i> Gestione Licenze</h2>
     <p class="text-secondary">Gestisci licenze server e chiavi di accesso</p>
     
-    <!-- Statistiche Licenze -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card bg-dark border-secondary">
-                <div class="card-body">
-                    <h5 class="card-title text-success"><i class="bi bi-bar-chart"></i> Statistiche Licenze</h5>
-                    <div class="row text-center">
-                        <div class="col-md-2">
-                            <div class="stat-item">
-                                <h3 class="text-primary"><?= $license_stats['total_servers'] ?></h3>
-                                <p class="text-secondary mb-0">Server Totali</p>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="stat-item">
-                                <h3 class="text-success"><?= $license_stats['with_active_license'] ?></h3>
-                                <p class="text-secondary mb-0">Licenze Attive</p>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="stat-item">
-                                <h3 class="text-warning"><?= $license_stats['with_inactive_license'] ?></h3>
-                                <p class="text-secondary mb-0">Licenze Disattivate</p>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="stat-item">
-                                <h3 class="text-danger"><?= $license_stats['without_license'] ?></h3>
-                                <p class="text-secondary mb-0">Senza Licenza</p>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="stat-item">
-                                <h3 class="text-info"><?= $license_stats['total_servers'] > 0 ? round(($license_stats['with_active_license'] / $license_stats['total_servers']) * 100, 1) : 0 ?>%</h3>
-                                <p class="text-secondary mb-0">Copertura Attiva</p>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="stat-item">
-                                <h3 class="text-secondary"><?= $license_stats['total_servers'] > 0 ? round((($license_stats['with_active_license'] + $license_stats['with_inactive_license']) / $license_stats['total_servers']) * 100, 1) : 0 ?>%</h3>
-                                <p class="text-secondary mb-0">Copertura Totale</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <!-- Statistiche Licenze (Metric Cards) -->
+    <div class="admin-stats-grid mb-4">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-collection"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Server Totali</p>
+                <h3 class="metric-value text-light"><?= (int)$license_stats['total_servers'] ?></h3>
+                <span class="metric-meta">Registrati</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-key"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Licenze Attive</p>
+                <h3 class="metric-value text-success"><?= (int)$license_stats['with_active_license'] ?></h3>
+                <span class="metric-meta">Valide</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-slash-circle"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Licenze Disattivate</p>
+                <h3 class="metric-value text-warning"><?= (int)$license_stats['with_inactive_license'] ?></h3>
+                <span class="metric-meta">Non attive</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Senza Licenza</p>
+                <h3 class="metric-value text-danger"><?= (int)$license_stats['without_license'] ?></h3>
+                <span class="metric-meta">Da generare</span>
             </div>
         </div>
     </div>
     
-    <?php if (!empty($servers_without_license)): ?>
     <!-- Server Senza Licenza -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="alert alert-warning alert-persistent" style="border-radius: 8px; border: 1px solid #ffc107; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: 500; position: relative; z-index: 1050;">
                 <h5 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> Server Senza Licenza (<?= count($servers_without_license) ?>)</h5>
-                <p>I seguenti server attivi non hanno una licenza generata:</p>
-                <div class="row">
-                    <?php foreach ($servers_without_license as $server): ?>
-                        <div class="col-md-6 col-lg-4 mb-2">
-                            <div class="d-flex justify-content-between align-items-center bg-dark p-2 rounded">
-                                <div>
-                                    <strong><?= htmlspecialchars($server['nome']) ?></strong><br>
-                                    <small class="text-secondary">ID: <?= $server['id'] ?> - <?= date('d/m/Y', strtotime($server['data_inserimento'])) ?></small>
+                <?php if (!empty($servers_without_license)): ?>
+                    <p>I seguenti server non hanno alcuna licenza:</p>
+                    <div class="row">
+                        <?php foreach ($servers_without_license as $server): ?>
+                            <div class="col-md-6 col-lg-4 mb-2">
+                                <div class="d-flex justify-content-between align-items-center bg-dark p-2 rounded">
+                                    <div>
+                                        <strong><?= htmlspecialchars($server['nome']) ?></strong>
+                                        <?php if ((int)$server['is_active'] === 0): ?>
+                                            <span class="badge bg-secondary ms-2">Inattivo</span>
+                                        <?php endif; ?>
+                                        <br>
+                                        <small class="text-secondary">ID: <?= $server['id'] ?> - <?= date('d/m/Y', strtotime($server['data_inserimento'])) ?></small>
+                                    </div>
+                                    <?php if ((int)$server['is_active'] === 1): ?>
+                                        <button class="btn btn-sm btn-success" onclick="generateLicenseForServer(<?= $server['id'] ?>, '<?= htmlspecialchars($server['nome']) ?>')">
+                                            <i class="bi bi-plus"></i> Genera
+                                        </button>
+                                    <?php else: ?>
+                                        <button class="btn btn-sm btn-outline-secondary" disabled title="Server inattivo">
+                                            <i class="bi bi-slash-circle"></i> Inattivo
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
-                                <button class="btn btn-sm btn-success" onclick="generateLicenseForServer(<?= $server['id'] ?>, '<?= htmlspecialchars($server['nome']) ?>')">
-                                    <i class="bi bi-plus"></i> Genera
-                                </button>
                             </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <p class="mb-2">Tutti i server attivi hanno già una licenza.</p>
+                    <button class="btn btn-sm btn-success" onclick="generateLicense()">
+                        <i class="bi bi-plus"></i> Genera Licenza
+                    </button>
+                <?php endif; ?>
             </div>
         </div>
     </div>
-    <?php endif; ?>
     
     <!-- Filtri e azioni -->
      <div class="row mb-4">
@@ -2263,6 +3078,274 @@ function include_rewards() {
      <?php
  }
  ?>
+
+<?php
+function include_annunci() {
+    global $pdo;
+    // Crea tabelle se non esistono (robustezza)
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sl_annunci (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(200) NOT NULL,
+            body TEXT NOT NULL,
+            author_id INT NOT NULL,
+            is_published TINYINT(1) DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            INDEX(author_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sl_annunci_likes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            annuncio_id INT NOT NULL,
+            user_id INT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_like (annuncio_id, user_id),
+            INDEX(annuncio_id),
+            INDEX(user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Exception $e) {}
+
+    $search = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $limit = 15;
+    $offset = ($page - 1) * $limit;
+
+    // Utenti per selezione autore
+    $users = [];
+    try {
+        $users = $pdo->query("SELECT id, minecraft_nick FROM sl_users ORDER BY minecraft_nick ASC")->fetchAll();
+    } catch (Exception $e) { $users = []; }
+
+    // Annunci con conteggio like
+    $where = '';
+    $params = [];
+    if ($search !== '') {
+        $where = 'WHERE (a.title LIKE ? OR a.body LIKE ? OR u.minecraft_nick LIKE ?)';
+        $params = ['%'.$search.'%', '%'.$search.'%', '%'.$search.'%'];
+    }
+    $sql = "
+        SELECT a.*, u.minecraft_nick,
+               COALESCE(l.cnt, 0) as likes
+        FROM sl_annunci a
+        JOIN sl_users u ON u.id = a.author_id
+        LEFT JOIN (
+            SELECT annuncio_id, COUNT(*) AS cnt
+            FROM sl_annunci_likes
+            GROUP BY annuncio_id
+        ) l ON l.annuncio_id = a.id
+        $where
+        ORDER BY a.created_at DESC
+        LIMIT $limit OFFSET $offset
+    ";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $annunci = $stmt->fetchAll();
+
+    $count_sql = "SELECT COUNT(*) FROM sl_annunci a JOIN sl_users u ON u.id = a.author_id $where";
+    $stmt = $pdo->prepare($count_sql);
+    $stmt->execute($params);
+    $total = (int)$stmt->fetchColumn();
+    $total_pages = max(1, (int)ceil($total / $limit));
+    ?>
+
+    <h2><i class="bi bi-megaphone"></i> Gestione Annunci</h2>
+    <p class="text-secondary">Crea, modifica e pubblica annunci. Gli utenti possono mettere like.</p>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <form method="GET" class="d-flex">
+                <input type="hidden" name="action" value="annunci">
+                <input type="text" name="search" class="form-control me-2" placeholder="Cerca per titolo, testo o autore" value="<?= htmlspecialchars($search) ?>">
+                <button type="submit" class="btn btn-primary btn-admin"><i class="bi bi-search"></i> Cerca</button>
+            </form>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-success btn-admin" onclick="openCreateAnnuncio()"><i class="bi bi-plus-circle"></i> Nuovo Annuncio</button>
+        </div>
+    </div>
+
+    <div class="data-table">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Titolo</th>
+                        <th>Autore</th>
+                        <th>Likes</th>
+                        <th>Stato</th>
+                        <th>Creato</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($annunci as $a): 
+                        $avatar = getMinecraftAvatar($a['minecraft_nick'], 24);
+                        $createdVal = date('Y-m-d\TH:i', strtotime($a['created_at']));
+                    ?>
+                        <tr>
+                            <td><?= (int)$a['id'] ?></td>
+                            <td><?= htmlspecialchars($a['title']) ?></td>
+                            <td>
+                                <img src="<?= htmlspecialchars($avatar) ?>" alt="Avatar" width="24" height="24" class="rounded-circle me-1">
+                                <?= htmlspecialchars($a['minecraft_nick']) ?>
+                            </td>
+                            <td><i class="bi bi-heart-fill text-danger"></i> <?= (int)$a['likes'] ?></td>
+                            <td>
+                                <?php if ((int)$a['is_published'] === 1): ?>
+                                    <span class="badge bg-success">Pubblicato</span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary">Bozza</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= date('d/m/Y H:i', strtotime($a['created_at'])) ?></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary btn-admin"
+                                        data-id="<?= (int)$a['id'] ?>"
+                                        data-title="<?= htmlspecialchars($a['title']) ?>"
+                                        data-body="<?= htmlspecialchars($a['body']) ?>"
+                                        data-author="<?= (int)$a['author_id'] ?>"
+                                        data-published="<?= (int)$a['is_published'] ?>"
+                                        data-created="<?= htmlspecialchars($createdVal) ?>"
+                                        onclick="editAnnuncioFromButton(this)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger btn-admin" onclick="deleteAnnuncio(<?= (int)$a['id'] ?>)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <?php if ($total_pages > 1): ?>
+    <nav class="mt-3">
+        <ul class="pagination justify-content-center">
+            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                    <a class="page-link" href="?action=annunci&page=<?= $i ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
+                </li>
+            <?php endfor; ?>
+        </ul>
+    </nav>
+    <?php endif; ?>
+
+    <!-- Modal Annuncio -->
+    <div class="modal fade" id="annuncioModal" tabindex="-1" aria-labelledby="annuncioModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="annuncioModalLabel">Nuovo Annuncio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="annuncioForm">
+                        <input type="hidden" id="annuncioId">
+                        <div class="mb-3">
+                            <label class="form-label">Titolo</label>
+                            <input type="text" class="form-control" id="annuncioTitolo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Autore</label>
+                            <select class="form-select" id="annuncioAutore" required>
+                                <option value="">Seleziona autore</option>
+                                <?php foreach ($users as $u): ?>
+                                    <option value="<?= (int)$u['id'] ?>"><?= htmlspecialchars($u['minecraft_nick']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Stato</label>
+                            <select class="form-select" id="annuncioPubblicato">
+                                <option value="1">Pubblicato</option>
+                                <option value="0">Bozza</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Data di creazione</label>
+                            <input type="datetime-local" class="form-control" id="annuncioCreatedAt">
+                            <div class="form-text">Lascia vuoto per usare l'ora attuale.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Contenuto</label>
+                            <textarea class="form-control" id="annuncioBody" rows="6" required></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAnnuncio()">Salva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function openCreateAnnuncio() {
+        document.getElementById('annuncioModalLabel').textContent = 'Nuovo Annuncio';
+        document.getElementById('annuncioId').value = '';
+        document.getElementById('annuncioTitolo').value = '';
+        document.getElementById('annuncioAutore').value = '';
+        document.getElementById('annuncioPubblicato').value = '1';
+        document.getElementById('annuncioCreatedAt').value = '';
+        document.getElementById('annuncioBody').value = '';
+        new bootstrap.Modal(document.getElementById('annuncioModal')).show();
+    }
+
+    function editAnnuncioFromButton(btn) {
+        document.getElementById('annuncioModalLabel').textContent = 'Modifica Annuncio';
+        document.getElementById('annuncioId').value = btn.dataset.id;
+        document.getElementById('annuncioTitolo').value = btn.dataset.title;
+        document.getElementById('annuncioAutore').value = btn.dataset.author;
+        document.getElementById('annuncioPubblicato').value = btn.dataset.published;
+        document.getElementById('annuncioCreatedAt').value = btn.dataset.created || '';
+        document.getElementById('annuncioBody').value = btn.dataset.body;
+        new bootstrap.Modal(document.getElementById('annuncioModal')).show();
+    }
+
+    function submitAnnuncio() {
+        const id = document.getElementById('annuncioId').value.trim();
+        const title = document.getElementById('annuncioTitolo').value.trim();
+        const author_id = document.getElementById('annuncioAutore').value;
+        const is_published = document.getElementById('annuncioPubblicato').value;
+        const created_at = document.getElementById('annuncioCreatedAt').value.trim();
+        const body = document.getElementById('annuncioBody').value.trim();
+        if (!title || !author_id || !body) {
+            showAlert('Titolo, autore e contenuto sono obbligatori', 'warning');
+            return;
+        }
+        const action = id ? 'update_annuncio' : 'create_annuncio';
+        makeAjaxRequest(action, { id, title, author_id, is_published, created_at, body }, (response) => {
+            if (response.success) {
+                showAlert(response.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('annuncioModal')).hide();
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showAlert(response.message || 'Errore', 'danger');
+            }
+        });
+    }
+
+    function deleteAnnuncio(id) {
+        confirmAction('Eliminare definitivamente questo annuncio?', () => {
+            makeAjaxRequest('delete_annuncio', { id }, (response) => {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showAlert(response.message || 'Errore', 'danger');
+                }
+            });
+        });
+    }
+    </script>
+
+    <?php
+}
+?>
 
 <!-- Modal per modificare utente -->
 <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">

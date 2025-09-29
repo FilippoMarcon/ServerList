@@ -63,6 +63,8 @@ try {
     // Prima verifica se la tabella sponsored_servers esiste
     $stmt = $pdo->query("SHOW TABLES LIKE 'sl_sponsored_servers'");
     if ($stmt->rowCount() > 0) {
+        // Mostra 2 sponsor alla volta, a rotazione ad ogni caricamento
+        // Mantiene la priorità come primo criterio, e ruota tra gli sponsor dello stesso livello
         $stmt = $pdo->query("
             SELECT s.*, COUNT(v.id) as voti_totali, ss.priority, ss.expires_at
             FROM sl_servers s 
@@ -71,8 +73,8 @@ try {
             WHERE s.is_active = 1 AND ss.is_active = 1 
             AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
             GROUP BY s.id 
-            ORDER BY ss.priority ASC, voti_totali DESC
-            LIMIT 3
+            ORDER BY ss.priority ASC, RAND()
+            LIMIT 2
         ");
         $sponsored_servers = $stmt->fetchAll();
     }
@@ -103,77 +105,36 @@ include 'header.php';
 ?>
 
 <style>
-/* FLOATING DROPDOWN - MASSIMA PRIORITÀ */
-.floating-dropdown {
-    position: relative !important;
-    z-index: 99999 !important;
+.sort-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
 }
 
-.floating-dropdown .nav-item.dropdown {
-    position: relative !important;
-    z-index: 99999 !important;
+.btn-sort {
+    background: var(--gradient-primary);
+    color: white;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
-.floating-dropdown .filters-btn {
-    background: var(--gradient-primary) !important;
-    border: none !important;
-    color: white !important;
-    padding: 0.75rem 1.5rem !important;
-    border-radius: 12px !important;
-    cursor: pointer !important;
-    transition: all 0.3s ease !important;
-    font-weight: 600 !important;
-    text-decoration: none !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 0.5rem !important;
+.btn-sort:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
 }
 
-.floating-dropdown .filters-btn:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4) !important;
-    color: white !important;
-    text-decoration: none !important;
+.btn-sort.active {
+    background: var(--gradient-secondary);
+    border-color: transparent;
 }
 
-.floating-dropdown .dropdown-menu {
-    position: fixed !important;
-    z-index: 999999 !important;
-    background: rgba(30, 30, 30, 0.95) !important;
-    backdrop-filter: blur(10px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
-    padding: 0.5rem 0 !important;
-    margin-top: 0.5rem !important;
-    min-width: 200px !important;
-    transform: none !important;
-}
-
-.floating-dropdown .dropdown-menu.show {
-    z-index: 999999 !important;
-    display: block !important;
-    position: fixed !important;
-}
-
-.floating-dropdown .dropdown-item {
-    color: var(--text-primary) !important;
-    padding: 0.75rem 1rem !important;
-    border-radius: 8px !important;
-    transition: all 0.3s ease !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 0.5rem !important;
-    font-weight: 500 !important;
-    text-decoration: none !important;
-}
-
-.floating-dropdown .dropdown-item:hover,
-.floating-dropdown .dropdown-item:focus {
-    background: var(--gradient-primary) !important;
-    color: white !important;
-    transform: translateX(4px) !important;
-    text-decoration: none !important;
+.btn-sort .sort-arrow {
+    margin-left: 6px;
+    font-weight: 700;
 }
 </style>
 
@@ -185,10 +146,6 @@ include 'header.php';
             <!-- Sponsored Servers Section -->
             <?php if (!empty($sponsored_servers)): ?>
             <div class="sponsored-servers-section">
-                <div class="sponsored-header">
-                    <h3><i class="bi bi-star-fill"></i> Server Sponsorizzati</h3>
-                    <span class="sponsored-badge">SPONSOR</span>
-                </div>
                 <div class="sponsored-servers-grid">
                     <?php foreach ($sponsored_servers as $sponsored): ?>
                         <div class="sponsored-server-card" data-server-id="<?php echo $sponsored['id']; ?>">
@@ -224,35 +181,30 @@ include 'header.php';
                         </div>
                     <?php endforeach; ?>
                 </div>
+                <div class="sponsored-cta">
+                    <span class="sponsored-cta-text">Se vuoi sponsorizzare il tuo server </span>
+                    <a href="forum" class="sponsored-cta-link">clicca qui</a>
+                </div>
             </div>
             <?php endif; ?>
             
             <!-- Server List Header -->
             <div class="server-list-header">
                 <div class="d-flex align-items-center">
-                    <h3>Voti</h3>
-                    <h3 class="ms-5">Server</h3>
+                    <div class="sort-controls" role="group" aria-label="Ordinamento">
+                        <button type="button" class="sort-option btn-sort active" data-sort="votes">
+                            <i class="bi bi-trophy"></i> Voti <span class="sort-arrow" id="arrow-votes">↓</span>
+                        </button>
+                        <button type="button" class="sort-option btn-sort" data-sort="name">
+                            <i class="bi bi-server"></i> Server <span class="sort-arrow" id="arrow-name"></span>
+                        </button>
+                        <button type="button" class="sort-option btn-sort" data-sort="players">
+                            <i class="bi bi-people"></i> Player <span class="sort-arrow" id="arrow-players"></span>
+                        </button>
+                    </div>
                 </div>
                 <div class="search-container">
                     <input type="text" class="search-input" placeholder="Cerca" id="searchInput">
-                    <div class="floating-dropdown">
-                        <div class="nav-item dropdown">
-                            <a class="filters-btn dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="sortButton">
-                                <i class="bi bi-funnel"></i> Ordina <span id="sortArrow"></span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item sort-option" href="#" data-sort="votes">
-                                    <i class="bi bi-trophy"></i> Ordina per Voti <span class="sort-arrow" id="arrow-votes"></span>
-                                </a></li>
-                                <li><a class="dropdown-item sort-option" href="#" data-sort="name">
-                                    <i class="bi bi-server"></i> Ordina per Server <span class="sort-arrow" id="arrow-name"></span>
-                                </a></li>
-                                <li><a class="dropdown-item sort-option" href="#" data-sort="players">
-                                    <i class="bi bi-people"></i> Ordina per Players <span class="sort-arrow" id="arrow-players"></span>
-                                </a></li>
-                            </ul>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -306,21 +258,14 @@ include 'header.php';
                     ?>
                         <div class="homepage-server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" data-server-id="<?php echo $server['id']; ?>" data-votes="<?php echo $server['voti_totali']; ?>">
                             <div class="server-rank-container">
-                                <?php if ($rank > 3): ?>
-                                    <div class="rank-number-top"><?php echo $rank; ?>°</div>
-                                <?php endif; ?>
                                 <div class="server-rank <?php echo ($rank > 3) ? 'outlined' : $rank_class; ?>">
                                     <?php if ($rank <= 3): ?>
                                         <i class="bi bi-trophy-fill" style="margin-right: 6px;"></i><?php echo $rank; ?>°
-                                    <?php else: ?>
-                                        +<?php echo $server['voti_totali']; ?>
                                     <?php endif; ?>
                                 </div>
-                                <?php if ($rank <= 3): ?>
-                                    <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;">
-                                        +<?php echo $server['voti_totali']; ?>
-                                    </div>
-                                <?php endif; ?>
+                                <div class="rank-votes" style="font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;">
+                                    +<?php echo $server['voti_totali']; ?>
+                                </div>
                             </div>
                             
                             <?php if ($server['logo_url']): ?>
@@ -514,19 +459,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const name = card.getAttribute('data-name');
         console.log(`Server ${index + 1}: ID=${serverId}, Votes=${votes}, Name=${name}`);
     });
-    
-    // Force floating dropdown z-index
-    const dropdownToggle = document.querySelector('.floating-dropdown .dropdown-toggle');
-    if (dropdownToggle) {
-        dropdownToggle.addEventListener('shown.bs.dropdown', function() {
-            const dropdownMenu = document.querySelector('.floating-dropdown .dropdown-menu');
-            if (dropdownMenu) {
-                dropdownMenu.style.zIndex = '99999';
-                dropdownMenu.style.position = 'absolute';
-                console.log('Floating dropdown z-index forced to 99999');
-            }
-        });
-    }
 });
 
 function applyFilters() {
@@ -633,25 +565,14 @@ function updateRankings() {
         const rankContainer = server.querySelector('.server-rank-container');
         const rankElement = server.querySelector('.server-rank');
         const rankNumberTop = server.querySelector('.rank-number-top');
+        const votesValue = parseInt(server.getAttribute('data-votes')) || 0;
+        let bottomVotes = rankContainer ? rankContainer.querySelector('.rank-votes') : null;
         
         if (!rankContainer || !rankElement) return;
         
-        // Aggiorna il numero di ranking in alto (per rank > 3)
-        if (rank > 3) {
-            if (rankNumberTop) {
-                rankNumberTop.textContent = rank + '°';
-            } else {
-                // Crea l'elemento se non esiste
-                const newRankNumber = document.createElement('div');
-                newRankNumber.className = 'rank-number-top';
-                newRankNumber.textContent = rank + '°';
-                rankContainer.insertBefore(newRankNumber, rankElement);
-            }
-        } else {
-            // Rimuovi il numero se rank <= 3
-            if (rankNumberTop) {
-                rankNumberTop.remove();
-            }
+        // Non mostrare mai il numero in alto (rimuovi se esiste)
+        if (rankNumberTop) {
+            rankNumberTop.remove();
         }
         
         // Aggiorna le classi CSS per i colori
@@ -664,21 +585,36 @@ function updateRankings() {
             rankElement.classList.add('bronze');
         }
         
-        // Aggiorna l'icona del trofeo e il testo
+        // Aggiorna contenuto e box voti in base al rank
         if (rank <= 3) {
-            // Per i primi 3 posti, ricostruisci completamente il contenuto
+            // Mostra trofeo + posizione
             rankElement.innerHTML = '';
             const icon = document.createElement('i');
             icon.className = 'bi bi-trophy-fill';
             icon.style.marginRight = '6px';
             rankElement.appendChild(icon);
             rankElement.appendChild(document.createTextNode(rank + '°'));
-        } else {
-            // Per gli altri posti, rimuovi il trofeo se presente
-            const trophyIcon = rankElement.querySelector('.bi-trophy-fill');
-            if (trophyIcon) {
-                trophyIcon.remove();
+
+            // Crea/aggiorna box voti sotto
+            if (!bottomVotes) {
+                bottomVotes = document.createElement('div');
+                bottomVotes.className = 'rank-votes';
+                bottomVotes.style.cssText = 'font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;';
+                rankContainer.appendChild(bottomVotes);
             }
+            bottomVotes.textContent = '+' + votesValue;
+        } else {
+            // Per rank > 3: il badge mostra la posizione, sotto il box mostra +voti
+            const trophyIcon = rankElement.querySelector('.bi-trophy-fill');
+            if (trophyIcon) trophyIcon.remove();
+            rankElement.textContent = rank + '°';
+            if (!bottomVotes) {
+                bottomVotes = document.createElement('div');
+                bottomVotes.className = 'rank-votes';
+                bottomVotes.style.cssText = 'font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;';
+                rankContainer.appendChild(bottomVotes);
+            }
+            bottomVotes.textContent = '+' + votesValue;
         }
     });
 }
@@ -708,8 +644,11 @@ function getPlayerCount(serverCard) {
 }
 
 function loadSavedSort() {
-    const savedSort = sessionStorage.getItem('serverSort') || 'votes';
-    const savedDirection = sessionStorage.getItem('sortDirection') || 'desc';
+    // Default sempre a VOTI DESC all'aggiornamento pagina
+    const savedSort = 'votes';
+    const savedDirection = 'desc';
+    sessionStorage.setItem('serverSort', savedSort);
+    sessionStorage.setItem('sortDirection', savedDirection);
     applySorting(savedSort, savedDirection);
     updateSortArrows(savedSort, savedDirection);
 }
@@ -719,31 +658,17 @@ function updateSortArrows(activeSort, direction) {
     document.querySelectorAll('.sort-arrow').forEach(arrow => {
         arrow.textContent = '';
     });
-    
-    // Aggiorna la freccia del bottone principale
-    const mainArrow = document.getElementById('sortArrow');
-    if (mainArrow) {
-        mainArrow.textContent = direction === 'desc' ? '↓' : '↑';
-    }
-    
     // Aggiorna la freccia dell'opzione attiva
     const activeArrow = document.getElementById(`arrow-${activeSort}`);
     if (activeArrow) {
         activeArrow.textContent = direction === 'desc' ? '↓' : '↑';
         activeArrow.style.color = 'var(--primary-color)';
     }
-    
-    // Aggiorna il testo del bottone principale
-    const sortButton = document.getElementById('sortButton');
-    if (sortButton) {
-        const sortNames = {
-            'votes': 'Voti',
-            'name': 'Server', 
-            'players': 'Players'
-        };
-        const sortName = sortNames[activeSort] || 'Ordina';
-        sortButton.innerHTML = `<i class="bi bi-funnel"></i> ${sortName} <span id="sortArrow">${direction === 'desc' ? '↓' : '↑'}</span>`;
-    }
+
+    // Aggiorna lo stato attivo dei pulsanti
+    document.querySelectorAll('.sort-option').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-sort') === activeSort);
+    });
 }
 
 function updateResultsCount(count) {

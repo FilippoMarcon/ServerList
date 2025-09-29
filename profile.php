@@ -329,7 +329,9 @@ include 'header.php';
                             </div>
                             <div class="vote-time">
                                 <?php 
-                                $vote_datetime = new DateTime($daily_vote['data_voto']);
+                                // Converte dal timestamp UTC del DB al fuso locale configurato
+                                $vote_datetime = new DateTime($daily_vote['data_voto'], new DateTimeZone('UTC'));
+                                $vote_datetime->setTimezone(new DateTimeZone(date_default_timezone_get()));
                                 echo $vote_datetime->format('H:i'); 
                                 ?>
                             </div>
@@ -382,7 +384,9 @@ include 'header.php';
                                 <div class="vote-date">
                                     <i class="bi bi-calendar"></i>
                                     <?php 
-                                    $vote_datetime = new DateTime($vote['data_voto']);
+                                    // Converte dal timestamp UTC del DB al fuso locale configurato
+                                    $vote_datetime = new DateTime($vote['data_voto'], new DateTimeZone('UTC'));
+                                    $vote_datetime->setTimezone(new DateTimeZone(date_default_timezone_get()));
                                     echo $vote_datetime->format('d/m/Y H:i'); 
                                     ?>
                                 </div>
