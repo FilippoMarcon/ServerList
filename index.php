@@ -7,12 +7,30 @@
 require_once 'config.php';
 
 // Routing fallback: se l'hosting reindirizza tutto a index.php,
-// instradiamo le richieste /server/<nome> verso server.php con slug
+// instradiamo le richieste verso le pagine senza estensione
 $request_path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+// /server/<slug>
 if (preg_match('#^/server/([A-Za-z0-9_-]+)/?$#', $request_path, $m)) {
     $_GET['slug'] = $m[1];
     include __DIR__ . '/server.php';
     exit();
+}
+
+// Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
+if (preg_match('#^/(forum|annunci|login|register|profile|admin)/?$#', $request_path, $m)) {
+    $map = [
+        'forum' => 'forum.php',
+        'annunci' => 'annunci.php',
+        'login' => 'login.php',
+        'register' => 'register.php',
+        'profile' => 'profile.php',
+        'admin' => 'admin.php',
+    ];
+    $target = $map[$m[1]] ?? null;
+    if ($target) {
+        include __DIR__ . '/' . $target;
+        exit();
+    }
 }
 
 // Titolo pagina

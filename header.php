@@ -5410,9 +5410,9 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-mc">
         <div class="container">
-            <a class="navbar-brand" href="index.php">
-                <i class="bi bi-boxes"></i> Blocksy
-            </a>
+                        <a class="navbar-brand" href="/">
+                            <i class="bi bi-boxes"></i> Blocksy
+                        </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -5421,12 +5421,12 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'forum.php' ? 'active' : ''; ?>" href="/forum.php">
+                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'forum.php' ? 'active' : ''; ?>" href="/forum">
                             <i class="bi bi-chat-dots"></i> Forum
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'annunci.php' ? 'active' : ''; ?>" href="/annunci.php">
+                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'annunci.php' ? 'active' : ''; ?>" href="/annunci">
                             <i class="bi bi-megaphone"></i> Annunci
                         </a>
                     </li>
@@ -5447,11 +5447,11 @@
                             <?php echo htmlspecialchars($_SESSION['minecraft_nick']); ?>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="profile.php">
+                        <li><a class="dropdown-item" href="/profile">
                                 <i class="bi bi-person"></i> Profilo
                             </a></li>
                             <?php if (isAdmin()): ?>
-                            <li><a class="dropdown-item" href="admin.php">
+                        <li><a class="dropdown-item" href="/admin">
                                 <i class="bi bi-gear-fill"></i> Admin Dashboard
                             </a></li>
                             <?php endif; ?>
@@ -5463,12 +5463,12 @@
                     </li>
                     <?php else: ?>
                     <li class="nav-item">
-                        <a class="nav-link" href="login.php">
+                        <a class="nav-link" href="/login">
                             <i class="bi bi-box-arrow-in-right"></i> Login
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="register.php">
+                        <a class="nav-link" href="/register">
                             <i class="bi bi-person-plus"></i> Registrati
                         </a>
                     </li>

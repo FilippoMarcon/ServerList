@@ -29,10 +29,10 @@ include 'header.php';
                         Stiamo lavorando per portarti la migliore esperienza di forum per la community Minecraft.
                     </p>
                     <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-                        <a href="index.php" class="btn" style="background: var(--gradient-primary); color: white; padding: 0.75rem 1.5rem; border-radius: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.3s ease;">
+<a href="/" class="btn" style="background: var(--gradient-primary); color: white; padding: 0.75rem 1.5rem; border-radius: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.3s ease;">
                             <i class="bi bi-list-ul"></i> Lista Server
                         </a>
-                        <a href="register.php" class="btn" style="background: var(--gradient-secondary); color: white; padding: 0.75rem 1.5rem; border-radius: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.3s ease;">
+<a href="/register" class="btn" style="background: var(--gradient-secondary); color: white; padding: 0.75rem 1.5rem; border-radius: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.3s ease;">
                             <i class="bi bi-person-plus"></i> Registrati
                         </a>
                     </div>

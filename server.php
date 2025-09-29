@@ -32,12 +32,12 @@ if ($server_slug) {
             echo "<!-- SLUG DEBUG: input='{$server_slug}' resolved_id='{$server_id}' -->";
         }
     } catch (PDOException $e) {
-        redirect('index.php');
+redirect('/');
     }
 }
 
 if ($server_id === 0) {
-    redirect('index.php');
+redirect('/');
 }
 
 try {
@@ -50,7 +50,7 @@ try {
     $server = $stmt->fetch();
     
     if (!$server) {
-        redirect('index.php');
+redirect('/');
     }
 
     // Redirect 301 dai vecchi URL (server.php?id=...) ai nuovi URL (/server/<nome>)
@@ -156,7 +156,7 @@ try {
     }
     
 } catch (PDOException $e) {
-    redirect('index.php');
+redirect('/');
 }
 
 $page_title = htmlspecialchars($server['nome']);

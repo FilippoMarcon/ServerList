@@ -8,7 +8,7 @@ require_once 'config.php';
 
 // Se l'utente è già loggato, reindirizza alla homepage
 if (isLoggedIn()) {
-    redirect('index.php');
+    redirect('/');
 }
 
 $error = '';
@@ -214,7 +214,7 @@ include 'header.php';
                     
                     <div class="auth-footer">
                         <p class="auth-switch-text">Hai già un account?</p>
-                        <a href="login.php" class="auth-switch-link">
+<a href="/login" class="auth-switch-link">
                             <i class="bi bi-box-arrow-in-right"></i> Accedi ora
                         </a>
                     </div>

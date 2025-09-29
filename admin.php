@@ -3,7 +3,7 @@ require_once 'config.php';
 
 // Verifica autenticazione admin
 if (!isLoggedIn() || !isAdmin()) {
-    redirect('login.php');
+    redirect('/login');
 }
 
 // Connessione mysqli per compatibilità
@@ -580,9 +580,9 @@ include 'header.php';
                         <i class="bi bi-key"></i> Gestione Licenze
                     </a>
                     <hr>
-                    <a href="index.php" class="admin-nav-item">
-                        <i class="bi bi-house"></i> Torna al Sito
-                    </a>
+            <a href="/" class="admin-nav-item">
+                <i class="bi bi-house"></i> Torna al Sito
+            </a>
                 </div>
             </div>
 

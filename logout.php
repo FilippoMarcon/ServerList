@@ -23,4 +23,4 @@ session_destroy();
 
 // Reindirizza alla homepage con messaggio di successo
 $_SESSION['success_message'] = 'Logout effettuato con successo!';
-redirect('index.php');
+redirect('/');

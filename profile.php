@@ -8,7 +8,7 @@ require_once 'config.php';
 
 // Controlla se l'utente è loggato
 if (!isLoggedIn()) {
-    redirect('login.php');
+    redirect('/login');
 }
 
 $user_id = $_SESSION['user_id'];
@@ -118,7 +118,7 @@ try {
     $user = $stmt->fetch();
 
     if (!$user) {
-        redirect('login.php');
+    redirect('/login');
     }
 } catch (PDOException $e) {
     error_log("Errore nel recupero dati utente: " . $e->getMessage());
@@ -340,7 +340,7 @@ include 'header.php';
                                 <i class="bi bi-clock"></i>
                                 <span>Non hai ancora votato oggi</span>
                             </div>
-                            <a href="index.php" class="vote-btn">
+<a href="/" class="vote-btn">
                                 <i class="bi bi-hand-thumbs-up"></i> Vota ora
                             </a>
                         </div>
@@ -394,7 +394,7 @@ include 'header.php';
                         <i class="bi bi-hand-thumbs-up no-votes-icon"></i>
                         <h3>Nessun Voto</h3>
                         <p>Non hai ancora votato nessun server. Inizia a votare per supportare i tuoi server preferiti!</p>
-                        <a href="index.php" class="btn-primary">
+<a href="/" class="btn-primary">
                             <i class="bi bi-hand-thumbs-up"></i> Vota ora
                         </a>
                     </div>
