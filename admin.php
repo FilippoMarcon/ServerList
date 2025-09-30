@@ -258,8 +258,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 $vote_id = (int)$_POST['vote_id'];
                 
                 $pdo->beginTransaction();
+                // Elimina prima i reward logs legati ai codici del voto
+                $pdo->prepare("DELETE FROM sl_reward_logs WHERE vote_code_id IN (SELECT id FROM sl_vote_codes WHERE vote_id = ?)")->execute([$vote_id]);
+                // Poi elimina i codici di voto associati
                 $pdo->prepare("DELETE FROM sl_vote_codes WHERE vote_id = ?")->execute([$vote_id]);
-                $pdo->prepare("DELETE FROM sl_reward_logs WHERE vote_id = ?")->execute([$vote_id]);
                 $pdo->prepare("DELETE FROM sl_votes WHERE id = ?")->execute([$vote_id]);
                 $pdo->commit();
                 
