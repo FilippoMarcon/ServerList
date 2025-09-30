@@ -28,6 +28,68 @@ if (!isLoggedIn()) {
     exit;
 }
 
+// Throttling anti-abuso (per sessione e IP)
+// - Max 1 richiesta ogni 5 secondi
+// - Max 30 richieste al minuto (endpoint vote.php)
+$now = time();
+$clientIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+
+if (!isset($_SESSION['rate_limits'])) {
+    $_SESSION['rate_limits'] = [
+        'vote' => [
+            'last_ts' => 0,
+            'window_start' => $now,
+            'count_minute' => 0,
+            'ip_counts' => []
+        ]
+    ];
+}
+
+$rl = &$_SESSION['rate_limits']['vote'];
+
+// Reset della finestra di 60s se scaduta
+if ($now - $rl['window_start'] >= 60) {
+    $rl['window_start'] = $now;
+    $rl['count_minute'] = 0;
+    $rl['ip_counts'] = [];
+}
+
+// Controllo richieste ravvicinate (cooldown 5s)
+if ($rl['last_ts'] && ($now - $rl['last_ts'] < 5)) {
+    $wait = 5 - ($now - $rl['last_ts']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Richieste troppo frequenti. Riprova tra ' . $wait . 's.'
+    ]);
+    exit;
+}
+
+// Controllo rate per minuto
+$rl['count_minute']++;
+if ($rl['count_minute'] > 30) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Troppe richieste in un minuto. Attendi un momento.'
+    ]);
+    exit;
+}
+
+// Controllo rate per IP nella finestra
+if (!isset($rl['ip_counts'][$clientIp])) {
+    $rl['ip_counts'][$clientIp] = 0;
+}
+$rl['ip_counts'][$clientIp]++;
+if ($rl['ip_counts'][$clientIp] > 20) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Troppe richieste dal tuo IP. Rallenta.'
+    ]);
+    exit;
+}
+
+// Aggiorna timestamp ultima richiesta
+$rl['last_ts'] = $now;
+
 // Ottieni i dati dalla richiesta
 $server_id = isset($_POST['server_id']) ? (int)$_POST['server_id'] : 0;
 $action = isset($_POST['action']) ? sanitize($_POST['action']) : '';

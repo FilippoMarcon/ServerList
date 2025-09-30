@@ -10,6 +10,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($page_title) ? $page_title . ' - ' : ''; ?><?php echo SITE_NAME; ?></title>
+    <?php
+        // Meta SEO dinamici
+        $page_description = isset($page_description) ? $page_description : (defined('SITE_NAME') ? ('Scopri i migliori server Minecraft su ' . SITE_NAME) : 'Scopri i migliori server Minecraft');
+        $base_url = (defined('SITE_URL') ? SITE_URL : ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST']));
+        $page_url = $base_url . ($_SERVER['REQUEST_URI'] ?? '/');
+        $og_image = isset($og_image) ? $og_image : ($base_url . '/logo.png');
+    ?>
+    <meta name="description" content="<?php echo htmlspecialchars($page_description); ?>">
+    <meta property="og:title" content="<?php echo isset($page_title) ? htmlspecialchars($page_title) . ' - ' : ''; ?><?php echo htmlspecialchars(SITE_NAME); ?>">
+    <meta property="og:description" content="<?php echo htmlspecialchars($page_description); ?>">
+    <meta property="og:url" content="<?php echo htmlspecialchars($page_url); ?>">
+    <meta property="og:image" content="<?php echo htmlspecialchars($og_image); ?>">
+    <meta name="twitter:card" content="summary_large_image">
+    <script>
+    (function() {
+        try {
+            var saved = localStorage.getItem('theme');
+            var theme = saved || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            window.toggleTheme = function() {
+                var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                var next = current === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                try { localStorage.setItem('theme', next); } catch(e) {}
+                var icon = document.getElementById('themeToggleIcon');
+                if (icon) {
+                    icon.className = next === 'dark' ? 'bi bi-moon-stars' : 'bi bi-brightness-high';
+                }
+            };
+        } catch (e) {}
+    })();
+    </script>
     
     <!-- Favicon -->
     <link rel="icon" href="logo.png" type="image/png">
@@ -40,6 +72,18 @@
             --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        /* Tema chiaro: override variabili */
+        [data-theme="light"] {
+            --primary-bg: #f8fafc;
+            --secondary-bg: #ffffff;
+            --card-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --hover-bg: #f1f5f9;
         }
         
         body {
@@ -4209,7 +4253,7 @@
               backdrop-filter: blur(20px) !important;
               position: relative !important;
               z-index: 2 !important;
-              max-width: 700px !important;
+              max-width: 900px !important;
               width: 100% !important;
               margin: 0 auto !important;
               animation: authCardSlideIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -4233,7 +4277,7 @@
                   grid-template-columns: 1fr 1fr !important;
                   gap: 3rem !important;
                   align-items: center !important;
-                  max-width: 900px !important;
+                  max-width: 1100px !important;
                   padding: 4rem !important;
               }
               
@@ -5501,6 +5545,9 @@
     $is_home    = $request_path === '/'
                || (bool)preg_match('#^/index\.php$#i', $request_path)
                || (bool)preg_match('#^/server/#i', $request_path);
+    // Pagine di autenticazione
+    $is_login   = (bool)preg_match('#^/(login|login\.php)/?$#i', $request_path);
+    $is_register= (bool)preg_match('#^/(register|register\.php)/?$#i', $request_path);
     ?>
     <nav class="navbar navbar-expand-lg navbar-mc">
         <div class="container">
@@ -5533,6 +5580,12 @@
                 </ul>
                 
                 <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <button class="nav-link" type="button" onclick="toggleTheme()" title="Toggle tema">
+                            <i id="themeToggleIcon" class="bi bi-moon-stars"></i>
+                            Tema
+                        </button>
+                    </li>
                     <?php if (isLoggedIn()): ?>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
@@ -5550,19 +5603,19 @@
                             </a></li>
                             <?php endif; ?>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="logout.php">
+                            <li><a class="dropdown-item" href="/logout">
                                 <i class="bi bi-box-arrow-right"></i> Logout
                             </a></li>
                         </ul>
                     </li>
                     <?php else: ?>
                     <li class="nav-item">
-                        <a class="nav-link" href="/login">
+                        <a class="nav-link <?php echo $is_login ? 'active' : ''; ?>" href="/login">
                             <i class="bi bi-box-arrow-in-right"></i> Login
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/register">
+                        <a class="nav-link <?php echo $is_register ? 'active' : ''; ?>" href="/register">
                             <i class="bi bi-person-plus"></i> Registrati
                         </a>
                     </li>

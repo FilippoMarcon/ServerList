@@ -140,6 +140,16 @@
     
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Inizializza esplicitamente i dropdown per maggiore affidabilità
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.bootstrap && document.querySelectorAll('.dropdown-toggle').length) {
+                document.querySelectorAll('.dropdown-toggle').forEach(function (el) {
+                    try { new bootstrap.Dropdown(el); } catch (e) {}
+                });
+            }
+        });
+    </script>
     
     <!-- MC Player Counter Script -->
     <script src="https://cdn.jsdelivr.net/gh/leonardosnt/mc-player-counter/dist/mc-player-counter.min.js"></script>

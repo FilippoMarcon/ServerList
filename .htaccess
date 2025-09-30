@@ -1,6 +1,32 @@
 Options -MultiViews
 RewriteEngine On
 
+# Forum SEO-friendly URLs
+RewriteRule ^forum/([0-9]+)-([a-z0-9-]+)/?$ forum.php?view=thread&thread=$1 [L,QSA]
+RewriteRule ^forum/category/([0-9]+)-([a-z0-9-]+)/?$ forum.php?view=category&category=$1 [L,QSA]
+
+# Sitemap route
+RewriteRule ^sitemap.xml$ sitemap.php [L,QSA]
+
+# Security Headers
+<IfModule mod_headers.c>
+    # Strict-Transport-Security solo in HTTPS
+    <If "%{HTTPS} == 'on'">
+        Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    </If>
+
+    # Protezioni base
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Cross-Origin-Resource-Policy "same-origin"
+
+    # Content Security Policy (permette CDN usate e inline necessario)
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net; connect-src 'self'; frame-ancestors 'none'; object-src 'none'"
+</IfModule>
+
 # Pretty URL per la pagina del singolo server: /server/<slug>
 RewriteRule ^server/([A-Za-z0-9_-]+)/?$ server.php?slug=$1 [QSA,L]
 

@@ -16,8 +16,22 @@ if (preg_match('#^/server/([A-Za-z0-9_-]+)/?$#', $request_path, $m)) {
     exit();
 }
 
+// Forum SEO subpaths: /forum/<id>-<slug> e /forum/category/<id>-<slug>
+if (preg_match('#^/forum/([0-9]+)-[A-Za-z0-9_-]+/?$#', $request_path, $m)) {
+    $_GET['view'] = 'thread';
+    $_GET['thread'] = (int)$m[1];
+    include __DIR__ . '/forum.php';
+    exit();
+}
+if (preg_match('#^/forum/category/([0-9]+)-[A-Za-z0-9_-]+/?$#', $request_path, $m)) {
+    $_GET['view'] = 'category';
+    $_GET['category'] = (int)$m[1];
+    include __DIR__ . '/forum.php';
+    exit();
+}
+
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
-if (preg_match('#^/(forum|annunci|login|register|profile|admin)/?$#', $request_path, $m)) {
+if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset)/?$#', $request_path, $m)) {
     $map = [
         'forum' => 'forum.php',
         'annunci' => 'annunci.php',
@@ -25,6 +39,8 @@ if (preg_match('#^/(forum|annunci|login|register|profile|admin)/?$#', $request_p
         'register' => 'register.php',
         'profile' => 'profile.php',
         'admin' => 'admin.php',
+        'forgot' => 'forgot.php',
+        'reset' => 'reset.php',
     ];
     $target = $map[$m[1]] ?? null;
     if ($target) {
@@ -38,6 +54,11 @@ $page_title = "Lista Server";
 
 // Gestione filtro da URL
 $active_filter = isset($_GET['filter']) ? sanitize($_GET['filter']) : '';
+
+// Paginazione homepage: definisci valori sicuri
+$page = max(1, (int)($_GET['page'] ?? 1));
+$per_page = 20;
+$offset = ($page - 1) * $per_page;
 
 // Crea la tabella sponsored_servers se non esiste
 try {
@@ -99,6 +120,13 @@ try {
 } catch (PDOException $e) {
     $servers = [];
     $error = "Errore nel caricamento dei server: " . $e->getMessage();
+}
+
+// Applica paginazione lato PHP se non ci sono errori
+if (!isset($error)) {
+    $total_servers = isset($servers) ? count($servers) : 0;
+    $total_pages = max(1, (int)ceil($total_servers / $per_page));
+    $servers = array_slice($servers, $offset, $per_page);
 }
 
 include 'header.php';
@@ -168,7 +196,7 @@ include 'header.php';
                                 </div>
                             <?php endif; ?>
                             <div class="server-info">
-                                <h4><a href="server.php?id=<?php echo $sponsored['id']; ?>" style="text-decoration: none; color: inherit;"><?php echo htmlspecialchars($sponsored['nome']); ?></a></h4>
+                                <h4><a href="<?php $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($sponsored['nome'])); echo '/server/' . urlencode(trim($slug, '-')); ?>" style="text-decoration: none; color: inherit;"><?php echo htmlspecialchars($sponsored['nome']); ?></a></h4>
                                 <p class="server-ip"><?php echo htmlspecialchars($sponsored['ip']); ?></p>
                                 <div class="server-stats">
                                     <span class="votes-count">
@@ -184,7 +212,7 @@ include 'header.php';
                 </div>
                 <div class="sponsored-cta">
                     <span class="sponsored-cta-text">Se vuoi sponsorizzare il tuo server </span>
-                    <a href="forum" class="sponsored-cta-link">clicca qui</a>
+                    <a href="/forum" class="sponsored-cta-link">clicca qui</a>
                 </div>
             </div>
             <?php endif; ?>
@@ -281,7 +309,7 @@ include 'header.php';
                             
                             <div class="server-info">
                                 <div class="server-basic-info">
-                                    <a href="server.php?id=<?php echo $server['id']; ?>" class="server-name">
+                                    <a href="<?php $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($server['nome'])); echo '/server/' . urlencode(trim($slug, '-')); ?>" class="server-name">
                                         <?php echo htmlspecialchars($server['nome']); ?> 
                                         <?php if ($server['is_sponsored']): ?>
                                             <span class="sponsored-indicator">

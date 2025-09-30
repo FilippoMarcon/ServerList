@@ -16,7 +16,12 @@ $success = '';
 
 // Gestione del form di registrazione
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // CSRF check
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $error = 'Sessione scaduta o token non valido. Ricarica la pagina e riprova.';
+    }
     $minecraft_nick = sanitize($_POST['minecraft_nick'] ?? '');
+    $email = sanitize($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $password_confirm = $_POST['password_confirm'] ?? '';
     $captcha_response = $_POST['g-recaptcha-response'] ?? '';
@@ -32,6 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Le password non coincidono.';
     } elseif (!preg_match('/^[a-zA-Z0-9_]+$/', $minecraft_nick)) {
         $error = 'Il nickname può contenere solo lettere, numeri e underscore.';
+    } elseif (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Inserisci un indirizzo email valido.';
     } else {
         // Verifica reCAPTCHA di Google
         $secret_key = RECAPTCHA_SECRET_KEY;
@@ -75,8 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $password_hash = password_hash($password, PASSWORD_DEFAULT);
                     $data_registrazione = date('Y-m-d H:i:s');
                     
-                    $stmt = $pdo->prepare("INSERT INTO sl_users (minecraft_nick, password_hash, data_registrazione) VALUES (?, ?, ?)");
-                    $stmt->execute([$minecraft_nick, $password_hash, $data_registrazione]);
+                    // Assicura colonna email (se già esiste, ignora errore)
+                    try { $pdo->exec("ALTER TABLE sl_users ADD COLUMN email VARCHAR(255) NULL"); } catch (Exception $e) {}
+                    $stmt = $pdo->prepare("INSERT INTO sl_users (minecraft_nick, email, password_hash, data_registrazione) VALUES (?, ?, ?, ?)");
+                    $stmt->execute([$minecraft_nick, ($email ?: null), $password_hash, $data_registrazione]);
                     
                     $success = 'Registrazione completata con successo! Ora puoi effettuare il login.';
                     
@@ -156,40 +165,64 @@ include 'header.php';
                         <?php endif; ?>
                         
                         <form method="POST" action="register.php" id="registerForm" class="auth-form">
-                            <div class="form-group">
-                                <label for="minecraft_nick" class="form-label">
-                                    <i class="bi bi-person"></i> Nickname Minecraft
-                                </label>
-                                <input type="text" class="form-input" id="minecraft_nick" name="minecraft_nick" 
-                                       value="<?php echo htmlspecialchars($_POST['minecraft_nick'] ?? ''); ?>" required
-                                       placeholder="Il tuo nickname Minecraft" maxlength="16">
-                                <div class="form-hint">3-16 caratteri, solo lettere, numeri e underscore</div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="password" class="form-label">
-                                    <i class="bi bi-lock"></i> Password
-                                </label>
-                                <div class="password-input-group">
-                                    <input type="password" class="form-input" id="password" name="password" required
-                                           placeholder="Crea una password sicura">
-                                    <button type="button" class="password-toggle" id="togglePassword">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
+                            <?php echo csrfInput(); ?>
+
+                            <!-- Riga 1: Nick a sinistra, Email a destra -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="minecraft_nick" class="form-label">
+                                            <i class="bi bi-person"></i> Nickname Minecraft
+                                        </label>
+                                        <input type="text" class="form-input" id="minecraft_nick" name="minecraft_nick" 
+                                               value="<?php echo htmlspecialchars($_POST['minecraft_nick'] ?? ''); ?>" required
+                                               placeholder="Il tuo nickname Minecraft" maxlength="16">
+                                        <div class="form-hint">3-16 caratteri, solo lettere, numeri e underscore</div>
+                                    </div>
                                 </div>
-                                <div class="form-hint">Minimo 6 caratteri</div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="email" class="form-label">
+                                            <i class="bi bi-envelope"></i> Email
+                                        </label>
+                                        <input type="email" class="form-input" id="email" name="email" 
+                                               value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>"
+                                               placeholder="La tua email (consigliato)">
+                                        <div class="form-hint">Serve per il recupero password e comunicazioni importanti</div>
+                                    </div>
+                                </div>
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="password_confirm" class="form-label">
-                                    <i class="bi bi-lock-fill"></i> Conferma Password
-                                </label>
-                                <div class="password-input-group">
-                                    <input type="password" class="form-input" id="password_confirm" name="password_confirm" required
-                                           placeholder="Ripeti la password">
-                                    <button type="button" class="password-toggle" id="togglePasswordConfirm">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
+
+                            <!-- Riga 2: Password in basso a sinistra, Conferma in basso a destra -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="password" class="form-label">
+                                            <i class="bi bi-lock"></i> Password
+                                        </label>
+                                        <div class="password-input-group">
+                                            <input type="password" class="form-input" id="password" name="password" required
+                                                   placeholder="Crea una password sicura">
+                                            <button type="button" class="password-toggle" id="togglePassword">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </div>
+                                        <div class="form-hint">Minimo 6 caratteri</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="password_confirm" class="form-label">
+                                            <i class="bi bi-lock-fill"></i> Conferma Password
+                                        </label>
+                                        <div class="password-input-group">
+                                            <input type="password" class="form-input" id="password_confirm" name="password_confirm" required
+                                                   placeholder="Ripeti la password">
+                                            <button type="button" class="password-toggle" id="togglePasswordConfirm">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             

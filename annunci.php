@@ -39,6 +39,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['ac
         echo json_encode(['success' => false, 'message' => 'Devi essere loggato per mettere like.']);
         exit;
     }
+    // CSRF check
+    $csrf = $_POST['csrf_token'] ?? '';
+    if (!verifyCsrfToken($csrf)) {
+        echo json_encode(['success' => false, 'message' => 'Verifica CSRF fallita. Riprova.']);
+        exit;
+    }
+
+    // Throttling semplice: max 30 richieste/minuto e 1 ogni 3 secondi
+    $now = time();
+    if (!isset($_SESSION['rate_limits'])) { $_SESSION['rate_limits'] = []; }
+    if (!isset($_SESSION['rate_limits']['annunci_like'])) {
+        $_SESSION['rate_limits']['annunci_like'] = [
+            'window_start' => $now,
+            'count_minute' => 0,
+            'last_ts' => 0
+        ];
+    }
+    $rl = &$_SESSION['rate_limits']['annunci_like'];
+    if ($now - ($rl['last_ts'] ?? 0) < 3) {
+        echo json_encode(['success' => false, 'message' => 'Attendi qualche secondo prima di riprovare.']);
+        exit;
+    }
+    if ($now - $rl['window_start'] >= 60) { $rl['window_start'] = $now; $rl['count_minute'] = 0; }
+    if ($rl['count_minute'] >= 30) {
+        echo json_encode(['success' => false, 'message' => 'Troppe richieste. Riprova più tardi.']);
+        exit;
+    }
+    $rl['count_minute']++; $rl['last_ts'] = $now;
     $annuncio_id = (int)($_POST['annuncio_id'] ?? 0);
     $user_id = (int)($_SESSION['user_id'] ?? 0);
     if ($annuncio_id <= 0 || $user_id <= 0) {
@@ -71,9 +99,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['ac
 $page_title = "Annunci";
 include 'header.php';
 
-// Recupera annunci pubblicati con autore e conteggio like
+// Parametri listing: pagina e ricerca
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$limit = 10;
+$offset = ($page - 1) * $limit;
+$search = sanitize($_GET['search'] ?? '');
+
+// Recupera annunci pubblicati con autore e conteggio like, con ricerca/paginazione
 $annunci = [];
+$total_pages = 1;
 try {
+    $where = 'WHERE a.is_published = 1';
+    $params = [];
+    if ($search !== '') {
+        $where .= ' AND (a.title LIKE ? OR a.body LIKE ? OR u.minecraft_nick LIKE ?)';
+        $params = ['%'.$search.'%', '%'.$search.'%', '%'.$search.'%'];
+    }
+
     $query = "
         SELECT a.id, a.title, a.body, a.author_id, a.created_at, a.updated_at, u.minecraft_nick,
                COALESCE(l.cnt, 0) AS likes
@@ -84,14 +126,23 @@ try {
             FROM sl_annunci_likes
             GROUP BY annuncio_id
         ) l ON l.annuncio_id = a.id
-        WHERE a.is_published = 1
+        $where
         ORDER BY a.created_at DESC
-        LIMIT 50
+        LIMIT $limit OFFSET $offset
     ";
-    $stmt = $pdo->query($query);
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
     $annunci = $stmt->fetchAll();
+
+    // Conteggio totale per paginazione
+    $count_sql = "SELECT COUNT(*) FROM sl_annunci a JOIN sl_users u ON u.id = a.author_id $where";
+    $stmt = $pdo->prepare($count_sql);
+    $stmt->execute($params);
+    $total = (int)$stmt->fetchColumn();
+    $total_pages = max(1, (int)ceil($total / $limit));
 } catch (Exception $e) {
     $annunci = [];
+    $total_pages = 1;
 }
 
 // Utility: verifica se l'utente ha messo like
@@ -206,11 +257,20 @@ function applyInlineDiscord($text) {
                     <h1 class="hero-title">Annunci</h1>
                     <p class="hero-subtitle">Ultimi aggiornamenti, comunicazioni e anteprime dal team.</p>
                 </div>
-                <?php if (isAdmin()): ?>
-                    <a href="/admin?action=annunci" class="btn btn-hero">
-                        <i class="bi bi-megaphone"></i> Gestisci Annunci
-                    </a>
-                <?php endif; ?>
+                <div class="d-flex align-items-center" style="gap: 0.75rem;">
+                    <form method="GET" class="d-flex" style="gap: 0.5rem;">
+                        <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Cerca..." class="form-control" style="max-width: 220px;">
+                        <button class="btn btn-hero" type="submit"><i class="bi bi-search"></i></button>
+                        <?php if ($search !== ''): ?>
+                            <a class="btn btn-hero" href="/annunci"><i class="bi bi-x"></i></a>
+                        <?php endif; ?>
+                    </form>
+                    <?php if (isAdmin()): ?>
+                        <a href="/admin?action=annunci" class="btn btn-hero">
+                            <i class="bi bi-megaphone"></i> Gestisci Annunci
+                        </a>
+                    <?php endif; ?>
+                </div>
             </div>
             <?php if (empty($annunci)): ?>
                 <div class="text-center" style="padding: 3rem; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px;">
@@ -245,6 +305,17 @@ function applyInlineDiscord($text) {
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
+            <?php if ($total_pages > 1): ?>
+                <nav class="mt-3">
+                    <ul class="pagination justify-content-center">
+                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                            <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                                <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
+                            </li>
+                        <?php endfor; ?>
+                    </ul>
+                </nav>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -257,7 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch('annunci.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ ajax: 1, action: 'toggle_like', annuncio_id: id })
+                body: new URLSearchParams({ ajax: 1, action: 'toggle_like', annuncio_id: id, csrf_token: CSRF_TOKEN })
             })
             .then(r => r.json())
             .then(data => {
@@ -280,6 +351,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+</script>
+
+<script>
+// CSRF token per richieste like
+const CSRF_TOKEN = '<?= generateCsrfToken(); ?>';
 </script>
 
 <style>

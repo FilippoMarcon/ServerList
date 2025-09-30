@@ -15,6 +15,13 @@ $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
 
+// Verifica CSRF per tutte le richieste POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $error = 'Sessione scaduta o token non valido. Ricarica la pagina e riprova.';
+    }
+}
+
 // Gestione form di richiesta nuovo server
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_server'])) {
     $nome = sanitize($_POST['nome'] ?? '');
@@ -374,7 +381,7 @@ include 'header.php';
                                     
                                     <div class="server-details">
                                         <h4 class="server-name">
-                                            <a href="server.php?id=<?php echo $vote['server_id']; ?>">
+                                            <a href="<?php $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($vote['server_name'])); echo '/server/' . urlencode(trim($slug, '-')); ?>">
                                                 <?php echo htmlspecialchars($vote['server_name']); ?>
                                             </a>
                                         </h4>
@@ -414,6 +421,7 @@ include 'header.php';
                 </div>
                 
                 <form method="POST" class="server-request-form">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="request_server" value="1">
                     
                     <div class="form-row">
@@ -469,6 +477,7 @@ include 'header.php';
                 <div class="edit-server-form">
                     <h3><i class="bi bi-pencil"></i> Modifica Server</h3>
                     <form method="POST">
+                        <?php echo csrfInput(); ?>
                         <input type="hidden" name="edit_server" value="1">
                         <input type="hidden" name="server_id" value="<?php echo $server_to_edit['id']; ?>">
                         
@@ -572,7 +581,7 @@ include 'header.php';
                                         <div class="server-info">
                                             <h4 class="server-name">
                                                 <?php if ($server['is_active'] == 1): ?>
-                                                    <a href="server.php?id=<?php echo $server['id']; ?>">
+                                                    <a href="<?php $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($server['nome'])); echo '/server/' . urlencode(trim($slug, '-')); ?>">
                                                         <?php echo htmlspecialchars($server['nome']); ?>
                                                     </a>
                                                 <?php else: ?>
@@ -602,10 +611,10 @@ include 'header.php';
                                     <div class="server-card-body">
                                         <?php if ($server['is_active'] == 1): ?>
                             <div class="server-actions">
-                                <a href="server.php?id=<?php echo $server['id']; ?>" class="btn-view-server">
+                                <a href="<?php $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($server['nome'])); echo '/server/' . urlencode(trim($slug, '-')); ?>" class="btn-view-server">
                                     <i class="bi bi-eye"></i> Visualizza
                                 </a>
-                                <a href="profile.php?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
+                                <a href="/profile?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
                                     <i class="bi bi-pencil"></i> Modifica
                                 </a>
                             </div>

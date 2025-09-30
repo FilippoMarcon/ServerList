@@ -24,15 +24,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($minecraft_nick) || empty($password)) {
         $error = 'Per favore, compila tutti i campi.';
     } else {
-        // Verifica CAPTCHA (usa reCAPTCHA di Google, opzionale)
-        $secret_key = defined('RECAPTCHA_SECRET_KEY') ? RECAPTCHA_SECRET_KEY : '';
-        if ($secret_key && !empty($captcha_response)) {
-            $verify = @file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret={$secret_key}&response={$captcha_response}");
-            if ($verify !== false) {
-                $captcha_success = json_decode($verify);
-                if (!$captcha_success || empty($captcha_success->success)) {
-                    $error = 'Verifica CAPTCHA fallita. Riprova.';
-                }
+        // Verifica CAPTCHA (usa reCAPTCHA di Google)
+        $secret_key = 'YOUR_RECAPTCHA_SECRET_KEY'; // Sostituisci con la tua chiave segreta
+        
+        if (!empty($captcha_response)) {
+            $verify = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret={$secret_key}&response={$captcha_response}");
+            $captcha_success = json_decode($verify);
+            
+            if (!$captcha_success->success) {
+                $error = 'Verifica CAPTCHA fallita. Riprova.';
             }
         }
         
@@ -128,7 +128,7 @@ include 'header.php';
                             </div>
                         <?php endif; ?>
                         
-                        <form method="POST" action="/login" id="loginForm" class="auth-form">
+                        <form method="POST" action="login.php" id="loginForm" class="auth-form">
                             <div class="form-group">
                                 <label for="minecraft_nick" class="form-label">
                                     <i class="bi bi-person"></i> Nickname Minecraft

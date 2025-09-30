@@ -159,7 +159,22 @@ redirect('/');
 redirect('/');
 }
 
+// Meta SEO dinamici per la pagina server
 $page_title = htmlspecialchars($server['nome']);
+// Descrizione breve dai contenuti HTML (strip tags) limitata a ~160 caratteri
+$raw_desc = isset($server['descrizione']) ? strip_tags($server['descrizione']) : '';
+$raw_desc = preg_replace('/\s+/', ' ', $raw_desc);
+$page_description = trim($raw_desc) ? mb_substr(trim($raw_desc), 0, 160) : ('Dettagli e IP di ' . $server['nome'] . ' su ' . SITE_NAME);
+// Immagine Open Graph: preferisci banner, poi logo, fallback al logo del sito
+$base_url = (defined('SITE_URL') ? SITE_URL : ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST']));
+if (!empty($server['banner_url'])) {
+    $og_image = $server['banner_url'];
+} elseif (!empty($server['logo_url'])) {
+    $og_image = $server['logo_url'];
+} else {
+    $og_image = $base_url . '/logo.png';
+}
+
 include 'header.php';
 ?>
 
