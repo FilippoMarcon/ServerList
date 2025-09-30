@@ -126,6 +126,38 @@
         .navbar .dropdown-toggle:hover img {
             border-color: var(--accent-purple);
         }
+
+        /* Dropdown menu styled like the navbar */
+        .navbar-mc .dropdown-menu {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            padding: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .navbar-mc .dropdown-item {
+            color: var(--text-secondary);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .navbar-mc .dropdown-item:hover,
+        .navbar-mc .dropdown-item:focus {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        .navbar-mc .dropdown-divider {
+            border-color: var(--border-color);
+            opacity: 0.6;
+        }
+
+        .navbar-mc .dropdown-header {
+            color: var(--text-secondary);
+        }
         
         /* Main container */
         .container {
@@ -5456,6 +5488,20 @@
 <body>
     
     <!-- Navbar -->
+    <?php
+    // Calcolo robusto della pagina corrente basato sulla REQUEST_URI,
+    // così da gestire correttamente le URL "pulite" (/forum, /annunci, /)
+    $request_path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    if (!$request_path) { $request_path = '/'; }
+
+    // Flag delle sezioni attive
+    $is_forum   = (bool)preg_match('#^/(forum|forum\.php)/?$#i', $request_path);
+    $is_annunci = (bool)preg_match('#^/(annunci|annunci\.php)/?$#i', $request_path);
+    // Home/Lista Server: root, index.php o pagina server dettagli
+    $is_home    = $request_path === '/'
+               || (bool)preg_match('#^/index\.php$#i', $request_path)
+               || (bool)preg_match('#^/server/#i', $request_path);
+    ?>
     <nav class="navbar navbar-expand-lg navbar-mc">
         <div class="container">
                         <a class="navbar-brand" href="/">
@@ -5469,17 +5515,17 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'forum.php' ? 'active' : ''; ?>" href="/forum">
+                        <a class="nav-link <?php echo $is_forum ? 'active' : ''; ?>" href="/forum">
                             <i class="bi bi-chat-dots"></i> Forum
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'annunci.php' ? 'active' : ''; ?>" href="/annunci">
+                        <a class="nav-link <?php echo $is_annunci ? 'active' : ''; ?>" href="/annunci">
                             <i class="bi bi-megaphone"></i> Annunci
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="/">
+                        <a class="nav-link <?php echo $is_home ? 'active' : ''; ?>" href="/">
                             <i class="bi bi-list-ul"></i> Lista Server
                         </a>
                     </li>
