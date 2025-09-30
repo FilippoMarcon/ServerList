@@ -68,7 +68,6 @@ try {
 
 $page_title = "Forum";
 $page_description = "Forum della community: discussioni generali e supporto";
-include 'header.php';
 
 $view = $_GET['view'] ?? '';
 $category_id = isset($_GET['category']) ? max(0, (int)$_GET['category']) : 0;
@@ -200,6 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 function renderText($text) {
     return nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
 }
+include 'header.php';
 ?>
 
 <div class="container" style="margin-top: 2rem;">
@@ -398,9 +398,9 @@ function renderText($text) {
                                         <div class="thread-small">di <?= htmlspecialchars($t['minecraft_nick']) ?> • <?= date('d/m/Y H:i', strtotime($t['created_at'])) ?></div>
                                     </div>
                                 </div>
-                                <div class="d-flex align-items-center thread-stats" style="gap:1rem;">
-                                    <span><i class="bi bi-eye"></i> <?= (int)$t['views'] ?></span>
-                                    <span><i class="bi bi-chat"></i> <?= (int)$t['replies_count'] ?></span>
+                                <div class="d-flex align-items-center thread-stats" style="gap:0.6rem;">
+                                    <span class="stat-chip"><i class="bi bi-eye"></i> <?= (int)$t['views'] ?></span>
+                                    <span class="stat-chip"><i class="bi bi-chat"></i> <?= (int)$t['replies_count'] ?></span>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -454,12 +454,21 @@ function renderText($text) {
                             <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-chat-dots"></i> Ultimi Thread</h6></div>
                             <div class="list-group list-group-flush">
                                 <?php foreach ($latest as $t): ?>
-                                    <a class="list-group-item list-group-item-action bg-transparent text-white" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1"><?= htmlspecialchars($t['title']) ?></h6>
-                                            <small><?= date('d/m/Y H:i', strtotime($t['created_at'])) ?></small>
+                                    <a class="list-group-item list-group-item-action bg-transparent text-white forum-latest-item" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>">
+                                        <div class="d-flex w-100 align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center" style="gap:0.6rem;">
+                                                <img src="<?= htmlspecialchars(getMinecraftAvatar($t['minecraft_nick'], 24)) ?>" alt="Avatar" width="24" height="24" class="rounded-circle forum-avatar">
+                                                <div>
+                                                    <h6 class="mb-1 thread-link" style="margin:0;"><?= htmlspecialchars($t['title']) ?></h6>
+                                                    <div class="thread-small">in <?= htmlspecialchars($t['category_name']) ?> • di <?= htmlspecialchars($t['minecraft_nick']) ?></div>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex align-items-center thread-stats" style="gap:0.6rem;">
+                                                <span class="stat-chip"><i class="bi bi-eye"></i> <?= (int)$t['views'] ?></span>
+                                                <span class="stat-chip"><i class="bi bi-chat"></i> <?= (int)$t['replies_count'] ?></span>
+                                                <small class="text-muted"><?= date('d/m/Y H:i', strtotime($t['created_at'])) ?></small>
+                                            </div>
                                         </div>
-                                        <small>in <?= htmlspecialchars($t['category_name']) ?> • di <?= htmlspecialchars($t['minecraft_nick']) ?> • <i class="bi bi-eye"></i> <?= (int)$t['views'] ?> • <i class="bi bi-chat"></i> <?= (int)$t['replies_count'] ?></small>
                                     </a>
                                 <?php endforeach; ?>
                                 <?php if (empty($latest)): ?>
@@ -495,6 +504,13 @@ function renderText($text) {
 .thread-row .thread-small { font-size:0.85rem; color: var(--text-muted); }
 .thread-stats { color: var(--text-secondary); }
 
+/* Migliorie stile ultimi thread */
+.forum-latest-item { padding: 0.75rem 1rem; transition: background 0.2s ease, transform 0.2s ease; }
+.forum-latest-item:hover { background: var(--secondary-bg); transform: translateY(-1px); }
+.forum-avatar { box-shadow: 0 2px 8px rgba(0,0,0,0.35); border: 1px solid var(--border-color); }
+.stat-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; border-radius: 999px; background: rgba(124,58,237,0.15); color: var(--text-secondary); border: 1px solid rgba(124,58,237,0.25); font-size: 0.8rem; }
+.thread-row:hover { background: rgba(255,255,255,0.03); }
+
 .post-card { background: var(--secondary-bg); border:1px solid var(--border-color); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.75rem; }
 .post-header .post-date { color: var(--text-muted); font-size:0.85rem; }
 /* Padding e bordo per le card header del forum */
@@ -503,5 +519,3 @@ function renderText($text) {
 </style>
 
 <?php include 'footer.php'; ?>
-$error = '';
-$message = '';

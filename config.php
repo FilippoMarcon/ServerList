@@ -121,7 +121,13 @@ function isAdmin() {
  * Reindirizza a una pagina specifica
  */
 function redirect($url) {
-    header("Location: $url");
+    if (!headers_sent()) {
+        header("Location: $url");
+        exit();
+    }
+    // Fallback se gli headers sono già stati inviati
+    echo '<script>window.location.href=' . json_encode($url) . ';</script>';
+    echo '<noscript><meta http-equiv="refresh" content="0;url=' . htmlspecialchars($url, ENT_QUOTES) . '"></noscript>';
     exit();
 }
 
