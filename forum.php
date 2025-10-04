@@ -250,21 +250,26 @@ include 'header.php';
                                 <img src="<?= htmlspecialchars(getMinecraftAvatar($thread['minecraft_nick'], 32)) ?>" alt="Avatar" width="32" height="32" class="rounded-circle">
                                 <div>
                                     <strong class="thread-title"><?= htmlspecialchars($thread['title']) ?></strong>
-                                    <div class="thread-meta">in <?= htmlspecialchars($thread['category_name']) ?> • di <?= htmlspecialchars($thread['minecraft_nick']) ?>
+                                    <div class="thread-meta">
+                                        <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($thread['category_name']) ?></span>
+                                        <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($thread['minecraft_nick']) ?></span>
                                         <?php 
                                         if ((int)($thread['is_admin'] ?? 0) === 1): ?>
-                                            <span class="admin-badge admin-role" style="margin-left:6px;"><i class="bi bi-shield-check"></i> Amministratore</span>
+                                            <span class="admin-badge admin-role"><i class="bi bi-shield-check"></i> Amministratore</span>
                                         <?php elseif (!empty($thread['owned_servers'])): ?>
-                                            <span class="admin-badge owner-role" style="margin-left:6px;"><i class="bi bi-server"></i> Owner di <?= htmlspecialchars($thread['owned_servers']) ?></span>
+                                            <span class="admin-badge owner-role"><i class="bi bi-server"></i> Owner di <?= htmlspecialchars($thread['owned_servers']) ?></span>
                                         <?php else: ?>
-                                            <span class="admin-badge user-role" style="margin-left:6px;"><i class="bi bi-person"></i> Utente</span>
+                                            <span class="admin-badge user-role"><i class="bi bi-person"></i> Utente</span>
                                         <?php endif; ?>
-                                        • <?php 
+                                        <span class="meta-item"><i class="bi bi-clock"></i>
+                                        <?php 
                                             $dt = new DateTime($thread['created_at'], new DateTimeZone('UTC'));
                                             $dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
                                             echo $dt->format('d/m/Y H:i');
-                                        ?> 
-                                        • <?= (int)$thread['views'] ?> visualizzazioni • <?= (int)$thread['replies_count'] ?> risposte</div>
+                                        ?></span>
+                                        <span class="meta-item"><i class="bi bi-eye"></i> <?= (int)$thread['views'] ?> visualizzazioni</span>
+                                        <span class="meta-item"><i class="bi bi-chat"></i> <?= (int)$thread['replies_count'] ?> risposte</span>
+                                    </div>
                                 </div>
                             </div>
                             <a href="/forum/category/<?= (int)$thread['category_id'] ?>-<?= urlencode($thread['category_slug'] ?? 'categoria') ?>" class="btn btn-hero"><i class="bi bi-folder2-open"></i> Categoria</a>
@@ -320,10 +325,10 @@ include 'header.php';
                     <div class="posts-list mt-3">
                         <?php foreach ($posts as $p): ?>
                             <div class="post-card">
-                                <div class="post-header d-flex align-items-center justify-content-between" style="gap:0.5rem;">
-                                    <img src="<?= htmlspecialchars(getMinecraftAvatar($p['minecraft_nick'], 24)) ?>" alt="Avatar" width="24" height="24" class="rounded-circle">
-                                    <div class="d-flex align-items-center" style="gap:0.5rem;">
-                                        <strong><?= htmlspecialchars($p['minecraft_nick']) ?></strong>
+                                <div class="post-header">
+                                    <div class="post-author d-flex align-items-center" style="gap:0.6rem;">
+                                        <img src="<?= htmlspecialchars(getMinecraftAvatar($p['minecraft_nick'], 28)) ?>" alt="Avatar" width="28" height="28" class="rounded-circle post-avatar">
+                                        <strong class="post-nick"><?= htmlspecialchars($p['minecraft_nick']) ?></strong>
                                         <?php 
                                         if ((int)($p['is_admin'] ?? 0) === 1): ?>
                                             <span class="admin-badge admin-role"><i class="bi bi-shield-check"></i> Amministratore</span>
@@ -332,14 +337,14 @@ include 'header.php';
                                         <?php else: ?>
                                             <span class="admin-badge user-role"><i class="bi bi-person"></i> Utente</span>
                                         <?php endif; ?>
-                                        <span class="post-date">
-                                            <?php 
-                                            $dtp = new DateTime($p['created_at'], new DateTimeZone('UTC'));
-                                            $dtp->setTimezone(new DateTimeZone(date_default_timezone_get()));
-                                            echo $dtp->format('d/m/Y H:i');
-                                            ?>
-                                        </span>
                                     </div>
+                                    <span class="post-date">
+                                        <?php 
+                                        $dtp = new DateTime($p['created_at'], new DateTimeZone('UTC'));
+                                        $dtp->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                                        echo $dtp->format('d/m/Y H:i');
+                                        ?>
+                                    </span>
                                     <?php if (isAdmin() || (isLoggedIn() && (int)$_SESSION['user_id'] === (int)$p['author_id'])): ?>
                                         <form method="POST" action="/forum?view=thread&thread=<?= (int)$thread_id ?>" class="d-inline">
                                             <?= csrfInput(); ?>
@@ -436,11 +441,14 @@ include 'header.php';
                                     <img src="<?= htmlspecialchars(getMinecraftAvatar($t['minecraft_nick'], 24)) ?>" alt="Avatar" width="24" height="24" class="rounded-circle">
                                     <div>
                                         <a class="thread-link" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>"><?= htmlspecialchars($t['title']) ?></a>
-                                        <div class="thread-small">di <?= htmlspecialchars($t['minecraft_nick']) ?> • <?php 
-                                            $dtl = new DateTime($t['created_at'], new DateTimeZone('UTC'));
-                                            $dtl->setTimezone(new DateTimeZone(date_default_timezone_get()));
-                                            echo $dtl->format('d/m/Y H:i');
-                                        ?></div>
+                                        <div class="thread-small thread-meta">
+                                            <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></span>
+                                            <span class="meta-item"><i class="bi bi-clock"></i> <?php 
+                                                $dtl = new DateTime($t['created_at'], new DateTimeZone('UTC'));
+                                                $dtl->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                                                echo $dtl->format('d/m/Y H:i');
+                                            ?></span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center thread-stats" style="gap:0.6rem;">
@@ -482,7 +490,7 @@ include 'header.php';
 
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <div class="forum-card">
+                        <div class="forum-card forum-card--categories">
                             <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-folder2"></i> Categorie</h6></div>
                             <ul class="list-group list-group-flush">
                                 <?php foreach ($categories as $c): ?>
@@ -495,7 +503,7 @@ include 'header.php';
                         </div>
                     </div>
                     <div class="col-md-8">
-                        <div class="forum-card">
+                        <div class="forum-card forum-card--latest">
                             <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-chat-dots"></i> Ultimi Thread</h6></div>
                             <div class="list-group list-group-flush">
                                 <?php foreach ($latest as $t): ?>
@@ -505,13 +513,16 @@ include 'header.php';
                                                 <img src="<?= htmlspecialchars(getMinecraftAvatar($t['minecraft_nick'], 24)) ?>" alt="Avatar" width="24" height="24" class="rounded-circle forum-avatar">
                                                 <div>
                                                     <h6 class="mb-1 thread-link" style="margin:0;"><?= htmlspecialchars($t['title']) ?></h6>
-                                                    <div class="thread-small">in <?= htmlspecialchars($t['category_name']) ?> • di <?= htmlspecialchars($t['minecraft_nick']) ?></div>
+                                                    <div class="thread-small thread-meta">
+                                                        <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($t['category_name']) ?></span>
+                                                        <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div class="d-flex align-items-center thread-stats" style="gap:0.6rem;">
                                                 <span class="stat-chip"><i class="bi bi-eye"></i> <?= (int)$t['views'] ?></span>
                                                 <span class="stat-chip"><i class="bi bi-chat"></i> <?= (int)$t['replies_count'] ?></span>
-                                                <small class="text-muted"><?php 
+                                                <small class="text-secondary"><?php 
                                                     $dtlast = new DateTime($t['created_at'], new DateTimeZone('UTC'));
                                                     $dtlast->setTimezone(new DateTimeZone(date_default_timezone_get()));
                                                     echo $dtlast->format('d/m/Y H:i');
@@ -548,23 +559,53 @@ include 'header.php';
 .thread-header .thread-meta { font-size:0.85rem; color: var(--text-muted); }
 
 .thread-row { background: var(--secondary-bg); border:1px solid var(--border-color); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.5rem; }
-.thread-row .thread-link { color: var(--text-primary); text-decoration:none; font-weight:600; }
-.thread-row .thread-link:hover { color: var(--accent-purple); }
-.thread-row .thread-small { font-size:0.85rem; color: var(--text-muted); }
-.thread-stats { color: var(--text-secondary); }
+ /* Thread list base */
+ .threads-list { display: flex; flex-direction: column; gap: 0.5rem; }
+ .thread-row { background: var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:0.75rem 1rem; transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease; }
+ .thread-row .thread-link { color: var(--text-primary); text-decoration:none; font-weight:600; }
+ .thread-row .thread-link:hover { color: var(--accent-purple); }
+ .thread-row .thread-small { font-size:0.85rem; color: var(--text-muted); }
+ .thread-stats { color: var(--text-secondary); }
 
 /* Migliorie stile ultimi thread */
 .forum-latest-item { padding: 0.75rem 1rem; transition: background 0.2s ease, transform 0.2s ease; }
 .forum-latest-item:hover { background: var(--secondary-bg); transform: translateY(-1px); }
 .forum-avatar { box-shadow: 0 2px 8px rgba(0,0,0,0.35); border: 1px solid var(--border-color); }
-.stat-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; border-radius: 999px; background: rgba(124,58,237,0.15); color: var(--text-secondary); border: 1px solid rgba(124,58,237,0.25); font-size: 0.8rem; }
-.thread-row:hover { background: rgba(255,255,255,0.03); }
+ .stat-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.6rem; border-radius: 999px; background: rgba(124,58,237,0.12); color: var(--text-secondary); border: 1px solid rgba(124,58,237,0.25); font-size: 0.82rem; }
+ .thread-row:hover { background: var(--secondary-bg); transform: translateY(-1px); border-color: rgba(124,58,237,0.35); }
+
+ /* Thread detail card */
+ .thread-card { background: var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:1rem; }
+ .thread-header .thread-title { font-size:1.1rem; }
+ .thread-meta { display:flex; flex-wrap:wrap; align-items:center; gap: 0.25rem 0.6rem; color: var(--text-muted); font-size:0.9rem; }
+ .thread-meta .meta-item { display:inline-flex; align-items:center; gap:0.35rem; padding: 0.15rem 0.5rem; border-radius:999px; border:1px solid var(--border-color); background: rgba(255,255,255,0.04); }
+ .admin-badge { display:inline-flex; align-items:center; gap:0.35rem; padding: 0.15rem 0.5rem; border-radius:999px; border:1px solid var(--border-color); background: rgba(255,255,255,0.04); font-size:0.85rem; }
 
 .post-card { background: var(--secondary-bg); border:1px solid var(--border-color); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.75rem; }
+.post-header { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; padding-bottom:0.35rem; border-bottom: 1px dashed rgba(255,255,255,0.08); }
 .post-header .post-date { color: var(--text-muted); font-size:0.85rem; }
-/* Padding e bordo per le card header del forum */
-.forum-card .card-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); }
-.forum-card .list-group-item { padding: 0.75rem 1rem; }
+.post-avatar { box-shadow: 0 2px 8px rgba(0,0,0,0.35); border: 1px solid var(--border-color); }
+ /* Forum sidebar and latest list cards */
+ .forum-card { background: var(--card-bg); border:1px solid var(--border-color); border-radius:12px; overflow:hidden; }
+ .forum-card .card-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); }
+ .forum-card .list-group-item { padding: 0.75rem 1rem; }
+ .forum-link { color: var(--text-primary); text-decoration:none; }
+ .forum-link:hover { color: var(--accent-purple); }
+
+ /* Forum card variants */
+ .forum-card--categories { background: linear-gradient(180deg, rgba(124,58,237,0.12), rgba(124,58,237,0.06)), var(--card-bg); border-color: rgba(124,58,237,0.35); }
+ .forum-card--categories .card-header h6 { font-weight:700; background: var(--gradient-primary); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+ .forum-card--categories .list-group-item { transition: background 0.2s ease, transform 0.2s ease; }
+ .forum-card--categories .list-group-item:hover { background: rgba(124,58,237,0.08); transform: translateX(2px); }
+ .forum-card--categories .badge { background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.3); }
+ .forum-card--categories .forum-link { font-weight:600; }
+
+ .forum-card--latest { background: linear-gradient(180deg, rgba(56,189,248,0.12), rgba(56,189,248,0.06)), var(--card-bg); border-color: rgba(56,189,248,0.35); }
+ .forum-card--latest .forum-latest-item { position: relative; padding-left: 1.1rem; }
+ .forum-card--latest .forum-latest-item::before { content:''; position:absolute; left:0.5rem; top:0.6rem; bottom:0.6rem; width:3px; border-radius:2px; background: linear-gradient(180deg, rgba(56,189,248,0.7), rgba(124,58,237,0.7)); opacity:0.6; transition: opacity 0.2s ease, transform 0.2s ease; }
+ .forum-card--latest .forum-latest-item:hover::before { opacity:1; transform: scaleX(1.05); }
+ .forum-card--latest .forum-avatar { box-shadow: 0 0 0 2px rgba(56,189,248,0.4), 0 2px 8px rgba(0,0,0,0.25); }
+ .forum-card--latest .thread-stats .stat-chip { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.3); }
 </style>
 
 <?php include 'footer.php'; ?>

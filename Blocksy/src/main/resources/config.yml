@@ -9,14 +9,14 @@ server-license: "" # ES: AbC123dEF456gHi789jKL012
 # URL dell'API del sito web (senza slash finale)
 # Website API URL (without trailing slash)
 api:
-  url: "https://www.islandmc.it/ServerList"  # URL dell'API senza spazi extra
+  url: "http://blocksylist.site.namedhosting.com"  # URL dell'API senza spazi extra
   key: ""  # Chiave API opzionale per autenticazione
   timeout: 30  # Timeout in secondi
   max-retries: 3  # Numero massimo di tentativi in caso di errore
 
 # Impostazioni generali
 # General settings
-debug: false  # Abilita la modalità debug per vedere i log
+debug: false  # Abilita la modalità debug per vedere i log dettagliati
 show-vote-reminder-on-join: false  # Mostra promemoria voto quando il giocatore entra
 
 # Messaggi personalizzati
