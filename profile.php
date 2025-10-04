@@ -91,6 +91,15 @@ if ($edit_server_id > 0) {
                     $server_to_edit['staff_list_array'] = $decoded_staff;
                 }
             }
+
+            // Decodifica Social Links esistenti (JSON)
+            $server_to_edit['social_links_array'] = [];
+            if (!empty($server_to_edit['social_links'])) {
+                $decoded_social = json_decode($server_to_edit['social_links'], true);
+                if (is_array($decoded_social)) {
+                    $server_to_edit['social_links_array'] = $decoded_social;
+                }
+            }
         }
     } catch (PDOException $e) {
         $error = 'Errore nel caricamento del server.';
@@ -99,6 +108,12 @@ if ($edit_server_id > 0) {
 
 // Gestione form di modifica server
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
+    // Assicurati che esistano le colonne social (migrazione sicura)
+    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN website_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN shop_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN discord_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN telegram_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN social_links TEXT NULL"); } catch (Exception $e) {}
     $server_id = (int)($_POST['server_id'] ?? 0);
     $nome = sanitize($_POST['nome'] ?? '');
     $ip = sanitize($_POST['ip'] ?? '');
@@ -107,9 +122,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
     $descrizione = sanitizeQuillContent($_POST['descrizione'] ?? '');
     $banner_url = sanitize($_POST['banner_url'] ?? '');
     $logo_url = sanitize($_POST['logo_url'] ?? '');
+    // Campi social
+    $website_url = sanitize($_POST['website_url'] ?? '');
+    $shop_url = sanitize($_POST['shop_url'] ?? '');
+    $discord_url = sanitize($_POST['discord_url'] ?? '');
+    $telegram_url = sanitize($_POST['telegram_url'] ?? '');
     $modalita = isset($_POST['modalita']) ? $_POST['modalita'] : [];
     // StaffList in JSON (array di ranks con staffer)
     $staff_list_json = $_POST['staff_list_json'] ?? '';
+    // Social Links dinamici in JSON (array di {title, url})
+    $social_links_json = $_POST['social_links_json'] ?? '';
     
     // Converti le modalità in JSON
     $modalita_json = json_encode(array_values($modalita));
@@ -124,11 +146,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
             if ($stmt->fetch()) {
                 // Prova ad aggiornare anche staff_list; fallback se la colonna non esiste
                 try {
-                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ?, staff_list = ? WHERE id = ? AND owner_id = ?");
-                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $staff_list_json, $server_id, $user_id]);
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, website_url = ?, shop_url = ?, discord_url = ?, telegram_url = ?, modalita = ?, staff_list = ?, social_links = ? WHERE id = ? AND owner_id = ?");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $website_url, $shop_url, $discord_url, $telegram_url, $modalita_json, $staff_list_json, $social_links_json, $server_id, $user_id]);
                 } catch (PDOException $e1) {
-                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ? WHERE id = ? AND owner_id = ?");
-                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $server_id, $user_id]);
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, website_url = ?, shop_url = ?, discord_url = ?, telegram_url = ?, modalita = ? WHERE id = ? AND owner_id = ?");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $website_url, $shop_url, $discord_url, $telegram_url, $server_id, $user_id]);
                 }
                 $message = 'Server modificato con successo!';
                 $server_to_edit = null;
@@ -570,6 +592,19 @@ include 'header.php';
                             </div>
                             <input type="hidden" name="staff_list_json" id="staff_list_json">
                         </div>
+
+                        <!-- Social Links Editor (dinamico) -->
+                        <div class="form-group">
+                            <label>Link Social (personalizzati)</label>
+                            <div id="sociallinks-editor" style="background:#16213e; padding:12px; border-radius:8px; border:1px solid #28324b; color:white;">
+                                <div class="sociallinks-actions" style="margin-bottom:10px; display:flex; gap:8px;">
+                                    <button type="button" class="btn btn-sm btn-primary" id="add-social-btn"><i class="bi bi-plus"></i> Aggiungi Link</button>
+                                </div>
+                                <div id="sociallinks-list"></div>
+                                <p style="margin-top:8px; font-size:12px; color:#b8c1d9;">Scegli un titolo (es. Instagram, Discord, YouTube, Sito, Shop) e incolla l'URL.</p>
+                            </div>
+                            <input type="hidden" name="social_links_json" id="social_links_json">
+                        </div>
                         
                         <div class="form-row">
                             <div class="form-group">
@@ -581,6 +616,8 @@ include 'header.php';
                                 <input type="url" id="banner_url" name="banner_url" value="<?php echo htmlspecialchars($server_to_edit['banner_url']); ?>">
                             </div>
                         </div>
+
+                        <!-- Link Social legacy rimossi: usare editor dinamico sopra -->
                         
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">
@@ -755,7 +792,7 @@ include 'header.php';
                     <div class="no-licenses-section">
                         <i class="bi bi-key no-licenses-icon"></i>
                         <h3>Nessuna Licenza</h3>
-                        <p>Non hai ancora licenze attive per i tuoi server. Le licenze vengono generate automaticamente quando un server viene aggiunto.</p>
+                        <p>Non hai licenze attive per i tuoi server. Le licenze vengono generate automaticamente quando un server viene aggiunto; se il server risulta attivo ma non ha licenza, è stata disattivata da un amministratore.</p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -996,6 +1033,62 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inizializza
     const initData = Array.isArray(initialStaff) && initialStaff.length ? initialStaff : [];
     renderRanks(initData);
+});
+</script>
+
+<script>
+// Social Links Editor JS
+document.addEventListener('DOMContentLoaded', function() {
+    const listContainer = document.getElementById('sociallinks-list');
+    const addSocialBtn = document.getElementById('add-social-btn');
+    const socialLinksInput = document.getElementById('social_links_json');
+    const initialSocial = <?php echo json_encode($server_to_edit['social_links_array'] ?? []); ?>;
+
+    function renderSocial(data) {
+        listContainer.innerHTML = '';
+        data.forEach((item, idx) => {
+            const row = document.createElement('div');
+            row.className = 'social-row';
+            row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
+            row.innerHTML = `
+                <input type="text" class="social-title-input" placeholder="Titolo (es. Instagram)" value="${escapeHtml(item.title || '')}" style="background: var(--card-bg); color:white; border:1px solid var(--border-color); padding:6px 8px; border-radius:6px; min-width:200px;">
+                <input type="url" class="social-url-input" placeholder="https://..." value="${escapeHtml(item.url || '')}" style="background: var(--card-bg); color:white; border:1px solid var(--border-color); padding:6px 8px; border-radius:6px; min-width:280px;">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-social-btn"><i class="bi bi-x"></i></button>
+            `;
+            listContainer.appendChild(row);
+        });
+        syncSocialInput();
+    }
+
+    function syncSocialInput() {
+        const items = Array.from(listContainer.querySelectorAll('.social-row')).map(row => {
+            const title = row.querySelector('.social-title-input').value.trim();
+            const url = row.querySelector('.social-url-input').value.trim();
+            return { title, url };
+        }).filter(i => i.url.length > 0);
+        socialLinksInput.value = JSON.stringify(items);
+    }
+
+    function escapeHtml(str) { return (str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s])); }
+
+    listContainer.addEventListener('input', function() { syncSocialInput(); });
+    listContainer.addEventListener('click', function(e) {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.classList.contains('remove-social-btn')) {
+            const row = btn.closest('.social-row');
+            row.remove();
+            syncSocialInput();
+        }
+    });
+
+    addSocialBtn.addEventListener('click', function() {
+        initialSocial.push({ title: '', url: '' });
+        renderSocial(initialSocial);
+    });
+
+    const initData = Array.isArray(initialSocial) && initialSocial.length ? initialSocial : [];
+    renderSocial(initData);
 });
 </script>
 

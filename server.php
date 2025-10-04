@@ -8,6 +8,12 @@ require_once 'config.php';
 
 // Assicurati che esista la colonna staff_list per memorizzare lo staff (JSON)
 try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN staff_list JSON NULL"); } catch (Exception $e) {}
+// Assicurati che esistano le colonne social per memorizzare i link
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN website_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN shop_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN discord_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN telegram_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN social_links TEXT NULL"); } catch (Exception $e) {}
 
 // Supporto URL con slug: /server/<slug>, con fallback su id
 $server_slug = isset($_GET['slug']) ? trim($_GET['slug']) : null;
@@ -135,7 +141,50 @@ redirect('/');
         $decoded = json_decode($server['staff_list'], true);
         if (is_array($decoded)) { $server_staff = $decoded; }
     }
-    
+
+    // Aggregazioni voti per grafici
+    // Ultimi 30 giorni (per giorno)
+    $last30_map = [];
+    $stmt = $pdo->prepare("SELECT DATE(data_voto) AS day, COUNT(*) AS votes
+                           FROM sl_votes
+                           WHERE server_id = ? AND data_voto >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                           GROUP BY DATE(data_voto)");
+    $stmt->execute([$server_id]);
+    foreach ($stmt->fetchAll() as $row) {
+        $last30_map[$row['day']] = (int)$row['votes'];
+    }
+    $last30Labels = [];
+    $last30Data = [];
+    for ($i = 29; $i >= 0; $i--) {
+        $d = new DateTime();
+        $d->modify("-{$i} day");
+        $key = $d->format('Y-m-d');
+        $last30Labels[] = $key;
+        $last30Data[] = isset($last30_map[$key]) ? (int)$last30_map[$key] : 0;
+    }
+
+    // Ultimi 12 mesi (per mese)
+    $last12_map = [];
+    $stmt = $pdo->prepare("SELECT DATE_FORMAT(data_voto, '%Y-%m') AS ym, COUNT(*) AS votes
+                           FROM sl_votes
+                           WHERE server_id = ? AND data_voto >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+                           GROUP BY DATE_FORMAT(data_voto, '%Y-%m')");
+    $stmt->execute([$server_id]);
+    foreach ($stmt->fetchAll() as $row) {
+        $last12_map[$row['ym']] = (int)$row['votes'];
+    }
+    $last12Labels = [];
+    $last12Data = [];
+    $start = new DateTime('first day of this month');
+    $start->modify('-11 months');
+    for ($m = 0; $m < 12; $m++) {
+        $curr = clone $start;
+        $curr->modify("+{$m} months");
+        $ym = $curr->format('Y-m');
+        $last12Labels[] = $ym;
+        $last12Data[] = isset($last12_map[$ym]) ? (int)$last12_map[$ym] : 0;
+    }
+
     // Controlla se l'utente loggato può votare (NUOVO SISTEMA)
     $can_vote = false;
     $user_has_voted_today = false;
@@ -696,7 +745,7 @@ include 'header.php';
                                         $members = (isset($group['members']) && is_array($group['members'])) ? $group['members'] : [];
                                         if ($rank_title === '' && empty($members)) continue;
                                     ?>
-                                        <div class="staff-rank-card" style="background: var(--card-bg); border:1px solid var(--border-color); border-radius:10px; padding:10px 12px;">
+                                        <div class="staff-rank-card" style="background: var(--card-bg); border:none; border-radius:10px; padding:10px 12px;">
                                             <?php if ($rank_title !== ''): ?>
                                                 <div class="staff-rank-header" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px; text-align:center;">
                                                     <i class="bi bi-award"></i>
@@ -729,16 +778,15 @@ include 'header.php';
                     <!-- Stats Tab -->
                     <div class="tab-content" id="stats">
                         <div class="stats-section">
-                            <h3>Statistiche Server</h3>
-                            <div class="stats-grid">
-                                <div class="stat-card">
-                                    <div class="stat-number"><?php echo number_format($server['vote_count']); ?></div>
-                                    <div class="stat-label">Voti Totali</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-number"><?php echo count($voters); ?></div>
-                                    <div class="stat-label">Votanti Recenti</div>
-                                </div>
+                            <h3>Ultimi 30 giorni</h3>
+                            <div class="chart-container">
+                                <canvas id="votes30daysChart" height="140"></canvas>
+                            </div>
+                        </div>
+                        <div class="stats-section" style="margin-top: 1.5rem;">
+                            <h3>Ultimi 12 mesi</h3>
+                            <div class="chart-container">
+                                <canvas id="votes12monthsChart" height="140"></canvas>
                             </div>
                         </div>
                     </div>
@@ -789,32 +837,95 @@ include 'header.php';
                     </div>
                 </div>
                 
+                <?php 
+                // Preleva link social dinamici (JSON) e legacy dal DB
+                $website = trim((string)($server['website_url'] ?? ''));
+                $shop = trim((string)($server['shop_url'] ?? ''));
+                $discord = trim((string)($server['discord_url'] ?? ''));
+                $telegram = trim((string)($server['telegram_url'] ?? ''));
+                $social_json = [];
+                if (!empty($server['social_links'])) {
+                    $decoded = json_decode($server['social_links'], true);
+                    if (is_array($decoded)) {
+                        // Normalizza elementi: richiede {title, url}
+                        foreach ($decoded as $item) {
+                            $title = trim((string)($item['title'] ?? ''));
+                            $url = trim((string)($item['url'] ?? ''));
+                            if ($url !== '') {
+                                $social_json[] = ['title' => $title ?: 'Link', 'url' => $url];
+                            }
+                        }
+                    }
+                }
+                $has_social = (!empty($social_json) || $website !== '' || $shop !== '' || $discord !== '' || $telegram !== '');
+                ?>
+                <?php if ($has_social): ?>
                 <!-- Social Links -->
                 <div class="server-social-card">
                     <h4><i class="bi bi-share"></i> Social</h4>
-                    
                     <div class="social-links-modern">
-                        <a href="#" class="social-link-modern website">
-                            <i class="bi bi-globe"></i> Website
-                            <span class="social-url">https://forum.<?php echo strtolower($server['nome']); ?>...</span>
-                        </a>
-                        
-                        <a href="#" class="social-link-modern shop">
-                            <i class="bi bi-shop"></i> Shop
-                            <span class="social-url">https://store.<?php echo strtolower($server['nome']); ?>.c...</span>
-                        </a>
-                        
-                        <a href="#" class="social-link-modern discord">
-                            <i class="bi bi-discord"></i> Discord
-                            <span class="social-url">https://discord.gg/<?php echo strtolower($server['nome']); ?>...</span>
-                        </a>
-                        
-                        <a href="#" class="social-link-modern telegram">
-                            <i class="bi bi-telegram"></i> Telegram
-                            <span class="social-url">https://telegram.me/<?php echo strtolower($server['nome']); ?>...</span>
-                        </a>
-                    </div>
+                        <?php
+                        // Helper per determinare l'icona in base al titolo/URL
+                        $iconFor = function($title, $url) {
+                            $t = strtolower(trim($title));
+                            $u = strtolower($url);
+                            $host = parse_url($url, PHP_URL_HOST) ?: '';
+                            $host = strtolower($host);
+                            if (strpos($u,'instagram')!==false || strpos($host,'instagram')!==false || $t==='instagram') return 'bi-instagram';
+                            if (strpos($u,'discord')!==false || strpos($host,'discord')!==false || $t==='discord') return 'bi-discord';
+                            if (strpos($u,'telegram')!==false || strpos($host,'telegram')!==false || $t==='telegram') return 'bi-telegram';
+                            if (strpos($u,'youtube')!==false || strpos($host,'youtube')!==false || $t==='youtube') return 'bi-youtube';
+                            if (strpos($u,'twitch')!==false || strpos($host,'twitch')!==false || $t==='twitch') return 'bi-twitch';
+                            if (strpos($u,'facebook')!==false || strpos($host,'facebook')!==false || $t==='facebook') return 'bi-facebook';
+                            if (strpos($u,'tiktok')!==false || strpos($host,'tiktok')!==false || $t==='tiktok') return 'bi-tiktok';
+                            if (strpos($u,'x.com')!==false || strpos($host,'x.com')!==false || $t==='twitter' || $t==='x') return 'bi-twitter-x';
+                            if (strpos($u,'store')!==false || strpos($u,'shop')!==false || strpos($host,'store')!==false || strpos($host,'shop')!==false || $t==='shop') return 'bi-shop';
+                            if ($t==='website' || $t==='sito' || $t==='site' || $t==='web') return 'bi-globe';
+                            return 'bi-link-45deg';
+                        };
+
+                        if (!empty($social_json)) {
+                            foreach ($social_json as $item) {
+                                $title = $item['title'];
+                                $url = $item['url'];
+                                $icon = $iconFor($title, $url);
+                                ?>
+                                <a href="<?php echo htmlspecialchars($url); ?>" class="social-link-modern" target="_blank" rel="noopener">
+                                    <i class="bi <?php echo $icon; ?>"></i> <?php echo htmlspecialchars($title); ?>
+                                    <span class="social-url"><?php echo htmlspecialchars($url); ?></span>
+                                </a>
+                                <?php
+                            }
+                        } else {
+                            if ($website !== '') { ?>
+                                <a href="<?php echo htmlspecialchars($website); ?>" class="social-link-modern website" target="_blank" rel="noopener">
+                                    <i class="bi bi-globe"></i> Website
+                                    <span class="social-url"><?php echo htmlspecialchars($website); ?></span>
+                                </a>
+                            <?php } ?>
+                            <?php if ($shop !== '') { ?>
+                                <a href="<?php echo htmlspecialchars($shop); ?>" class="social-link-modern shop" target="_blank" rel="noopener">
+                                    <i class="bi bi-shop"></i> Shop
+                                    <span class="social-url"><?php echo htmlspecialchars($shop); ?></span>
+                                </a>
+                            <?php } ?>
+                            <?php if ($discord !== '') { ?>
+                                <a href="<?php echo htmlspecialchars($discord); ?>" class="social-link-modern discord" target="_blank" rel="noopener">
+                                    <i class="bi bi-discord"></i> Discord
+                                    <span class="social-url"><?php echo htmlspecialchars($discord); ?></span>
+                                </a>
+                            <?php } ?>
+                            <?php if ($telegram !== '') { ?>
+                                <a href="<?php echo htmlspecialchars($telegram); ?>" class="social-link-modern telegram" target="_blank" rel="noopener">
+                                    <i class="bi bi-telegram"></i> Telegram
+                                    <span class="social-url"><?php echo htmlspecialchars($telegram); ?></span>
+                                </a>
+                            <?php } ?>
+                        <?php } ?>
+                        </div>
+
                 </div>
+                <?php endif; ?>
                 
                 <!-- Recent Voters -->
                 <div class="recent-voters-card">
@@ -1075,6 +1186,107 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<!-- Grafici voti (Chart.js) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Dati dal server
+    const last30LabelsRaw = <?php echo json_encode($last30Labels); ?>;
+    const last30Data = <?php echo json_encode($last30Data); ?>;
+    const last12LabelsRaw = <?php echo json_encode($last12Labels); ?>;
+    const last12Data = <?php echo json_encode($last12Data); ?>;
+
+    // Formattazioni
+    function formatDayLabel(isoDate) {
+        const d = new Date(isoDate + 'T00:00:00');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return dd + '/' + mm;
+    }
+    function formatMonthLabel(ym) {
+        const d = new Date(ym + '-01T00:00:00');
+        return d.toLocaleString('it-IT', { month: 'long', year: 'numeric' });
+    }
+
+    // Colori
+    const colorDaily = 'rgba(99, 102, 241, 0.7)'; // indigo
+    const colorMonthly = 'rgba(34, 197, 94, 0.7)'; // green
+
+    // Grafico: Ultimi 30 giorni
+    const ctx30 = document.getElementById('votes30daysChart');
+    if (ctx30) {
+        const chart30 = new Chart(ctx30, {
+            type: 'bar',
+            data: {
+                labels: last30LabelsRaw.map(formatDayLabel),
+                datasets: [{
+                    label: 'Voti',
+                    data: last30Data,
+                    backgroundColor: colorDaily,
+                    borderRadius: 6,
+                    maxBarThickness: 24,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => items[0].label,
+                            label: (item) => 'Voti: ' + item.formattedValue
+                        }
+                    },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { display: false, beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    // Grafico: Ultimi 12 mesi
+    const ctx12 = document.getElementById('votes12monthsChart');
+    if (ctx12) {
+        const chart12 = new Chart(ctx12, {
+            type: 'bar',
+            data: {
+                labels: last12LabelsRaw.map(formatMonthLabel),
+                datasets: [{
+                    label: 'Voti',
+                    data: last12Data,
+                    backgroundColor: colorMonthly,
+                    borderRadius: 6,
+                    maxBarThickness: 36,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => items[0].label,
+                            label: (item) => 'Voti: ' + item.formattedValue
+                        }
+                    },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { display: false, beginAtZero: true }
+                }
+            }
+        });
+    }
+</script>
+
+<style>
+    .stats-section h3 { margin-bottom: 0.75rem; }
+    .chart-container { position: relative; width: 100%; height: 220px; }
+</style>
 
 
 
