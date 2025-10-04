@@ -892,7 +892,7 @@ include 'header.php';
                                 ?>
                                 <a href="<?php echo htmlspecialchars($url); ?>" class="social-link-modern" target="_blank" rel="noopener">
                                     <i class="bi <?php echo $icon; ?>"></i> <?php echo htmlspecialchars($title); ?>
-                                    <span class="social-url"><?php echo htmlspecialchars($url); ?></span>
+                                    <span class="social-url"><?php echo htmlspecialchars(preg_replace('#^https?://#i', '', (string)$url)); ?></span>
                                 </a>
                                 <?php
                             }
@@ -900,25 +900,25 @@ include 'header.php';
                             if ($website !== '') { ?>
                                 <a href="<?php echo htmlspecialchars($website); ?>" class="social-link-modern website" target="_blank" rel="noopener">
                                     <i class="bi bi-globe"></i> Website
-                                    <span class="social-url"><?php echo htmlspecialchars($website); ?></span>
+                                    <span class="social-url"><?php echo htmlspecialchars(preg_replace('#^https?://#i', '', $website)); ?></span>
                                 </a>
                             <?php } ?>
                             <?php if ($shop !== '') { ?>
                                 <a href="<?php echo htmlspecialchars($shop); ?>" class="social-link-modern shop" target="_blank" rel="noopener">
                                     <i class="bi bi-shop"></i> Shop
-                                    <span class="social-url"><?php echo htmlspecialchars($shop); ?></span>
+                                    <span class="social-url"><?php echo htmlspecialchars(preg_replace('#^https?://#i', '', $shop)); ?></span>
                                 </a>
                             <?php } ?>
                             <?php if ($discord !== '') { ?>
                                 <a href="<?php echo htmlspecialchars($discord); ?>" class="social-link-modern discord" target="_blank" rel="noopener">
                                     <i class="bi bi-discord"></i> Discord
-                                    <span class="social-url"><?php echo htmlspecialchars($discord); ?></span>
+                                    <span class="social-url"><?php echo htmlspecialchars(preg_replace('#^https?://#i', '', $discord)); ?></span>
                                 </a>
                             <?php } ?>
                             <?php if ($telegram !== '') { ?>
                                 <a href="<?php echo htmlspecialchars($telegram); ?>" class="social-link-modern telegram" target="_blank" rel="noopener">
                                     <i class="bi bi-telegram"></i> Telegram
-                                    <span class="social-url"><?php echo htmlspecialchars($telegram); ?></span>
+                                    <span class="social-url"><?php echo htmlspecialchars(preg_replace('#^https?://#i', '', $telegram)); ?></span>
                                 </a>
                             <?php } ?>
                         <?php } ?>
