@@ -5,7 +5,7 @@ server-license: ""
 
 # Impostazioni API
 api:
-  url: "https://www.islandmc.it/ServerList"
+  url: "http://blocksylist.site.namedhosting.com"
   debug: true
   timeout: 10
 

@@ -227,7 +227,14 @@ include 'header.php';
                 // Vista thread
                 $thread = null;
                 try {
-                    $stmt = $pdo->prepare("SELECT t.*, u.minecraft_nick, c.name AS category_name, c.slug AS category_slug FROM sl_forum_threads t JOIN sl_users u ON u.id = t.author_id JOIN sl_forum_categories c ON c.id = t.category_id WHERE t.id = ?");
+                    $stmt = $pdo->prepare("SELECT t.*, 
+                            u.minecraft_nick, u.is_admin,
+                            (SELECT GROUP_CONCAT(nome SEPARATOR ' / ') FROM sl_servers WHERE owner_id = u.id) AS owned_servers,
+                            c.name AS category_name, c.slug AS category_slug 
+                        FROM sl_forum_threads t 
+                        JOIN sl_users u ON u.id = t.author_id 
+                        JOIN sl_forum_categories c ON c.id = t.category_id 
+                        WHERE t.id = ?");
                     $stmt->execute([$thread_id]);
                     $thread = $stmt->fetch();
                     if ($thread) {
@@ -243,7 +250,21 @@ include 'header.php';
                                 <img src="<?= htmlspecialchars(getMinecraftAvatar($thread['minecraft_nick'], 32)) ?>" alt="Avatar" width="32" height="32" class="rounded-circle">
                                 <div>
                                     <strong class="thread-title"><?= htmlspecialchars($thread['title']) ?></strong>
-                                    <div class="thread-meta">in <?= htmlspecialchars($thread['category_name']) ?> • di <?= htmlspecialchars($thread['minecraft_nick']) ?> • <?= date('d/m/Y H:i', strtotime($thread['created_at'])) ?> • <?= (int)$thread['views'] ?> visualizzazioni • <?= (int)$thread['replies_count'] ?> risposte</div>
+                                    <div class="thread-meta">in <?= htmlspecialchars($thread['category_name']) ?> • di <?= htmlspecialchars($thread['minecraft_nick']) ?>
+                                        <?php 
+                                        if ((int)($thread['is_admin'] ?? 0) === 1): ?>
+                                            <span class="admin-badge admin-role" style="margin-left:6px;"><i class="bi bi-shield-check"></i> Amministratore</span>
+                                        <?php elseif (!empty($thread['owned_servers'])): ?>
+                                            <span class="admin-badge owner-role" style="margin-left:6px;"><i class="bi bi-server"></i> Owner di <?= htmlspecialchars($thread['owned_servers']) ?></span>
+                                        <?php else: ?>
+                                            <span class="admin-badge user-role" style="margin-left:6px;"><i class="bi bi-person"></i> Utente</span>
+                                        <?php endif; ?>
+                                        • <?php 
+                                            $dt = new DateTime($thread['created_at'], new DateTimeZone('UTC'));
+                                            $dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                                            echo $dt->format('d/m/Y H:i');
+                                        ?> 
+                                        • <?= (int)$thread['views'] ?> visualizzazioni • <?= (int)$thread['replies_count'] ?> risposte</div>
                                 </div>
                             </div>
                             <a href="/forum/category/<?= (int)$thread['category_id'] ?>-<?= urlencode($thread['category_slug'] ?? 'categoria') ?>" class="btn btn-hero"><i class="bi bi-folder2-open"></i> Categoria</a>
@@ -284,7 +305,13 @@ include 'header.php';
                         $stmt = $pdo->prepare("SELECT COUNT(*) FROM sl_forum_posts WHERE thread_id = ?");
                         $stmt->execute([$thread_id]);
                         $total_posts = (int)$stmt->fetchColumn();
-                        $stmt = $pdo->prepare("SELECT p.*, u.minecraft_nick FROM sl_forum_posts p JOIN sl_users u ON u.id = p.author_id WHERE p.thread_id = ? ORDER BY p.created_at ASC LIMIT $posts_limit OFFSET $posts_offset");
+                        $stmt = $pdo->prepare("SELECT p.*, u.minecraft_nick, u.is_admin,
+                                (SELECT GROUP_CONCAT(nome SEPARATOR ' / ') FROM sl_servers WHERE owner_id = u.id) AS owned_servers
+                            FROM sl_forum_posts p 
+                            JOIN sl_users u ON u.id = p.author_id 
+                            WHERE p.thread_id = ? 
+                            ORDER BY p.created_at ASC 
+                            LIMIT $posts_limit OFFSET $posts_offset");
                         $stmt->execute([$thread_id]);
                         $posts = $stmt->fetchAll();
                     } catch (Exception $e) {}
@@ -297,7 +324,21 @@ include 'header.php';
                                     <img src="<?= htmlspecialchars(getMinecraftAvatar($p['minecraft_nick'], 24)) ?>" alt="Avatar" width="24" height="24" class="rounded-circle">
                                     <div class="d-flex align-items-center" style="gap:0.5rem;">
                                         <strong><?= htmlspecialchars($p['minecraft_nick']) ?></strong>
-                                        <span class="post-date"><?= date('d/m/Y H:i', strtotime($p['created_at'])) ?></span>
+                                        <?php 
+                                        if ((int)($p['is_admin'] ?? 0) === 1): ?>
+                                            <span class="admin-badge admin-role"><i class="bi bi-shield-check"></i> Amministratore</span>
+                                        <?php elseif (!empty($p['owned_servers'])): ?>
+                                            <span class="admin-badge owner-role"><i class="bi bi-server"></i> Owner di <?= htmlspecialchars($p['owned_servers']) ?></span>
+                                        <?php else: ?>
+                                            <span class="admin-badge user-role"><i class="bi bi-person"></i> Utente</span>
+                                        <?php endif; ?>
+                                        <span class="post-date">
+                                            <?php 
+                                            $dtp = new DateTime($p['created_at'], new DateTimeZone('UTC'));
+                                            $dtp->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                                            echo $dtp->format('d/m/Y H:i');
+                                            ?>
+                                        </span>
                                     </div>
                                     <?php if (isAdmin() || (isLoggedIn() && (int)$_SESSION['user_id'] === (int)$p['author_id'])): ?>
                                         <form method="POST" action="/forum?view=thread&thread=<?= (int)$thread_id ?>" class="d-inline">
@@ -395,7 +436,11 @@ include 'header.php';
                                     <img src="<?= htmlspecialchars(getMinecraftAvatar($t['minecraft_nick'], 24)) ?>" alt="Avatar" width="24" height="24" class="rounded-circle">
                                     <div>
                                         <a class="thread-link" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>"><?= htmlspecialchars($t['title']) ?></a>
-                                        <div class="thread-small">di <?= htmlspecialchars($t['minecraft_nick']) ?> • <?= date('d/m/Y H:i', strtotime($t['created_at'])) ?></div>
+                                        <div class="thread-small">di <?= htmlspecialchars($t['minecraft_nick']) ?> • <?php 
+                                            $dtl = new DateTime($t['created_at'], new DateTimeZone('UTC'));
+                                            $dtl->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                                            echo $dtl->format('d/m/Y H:i');
+                                        ?></div>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center thread-stats" style="gap:0.6rem;">
@@ -466,7 +511,11 @@ include 'header.php';
                                             <div class="d-flex align-items-center thread-stats" style="gap:0.6rem;">
                                                 <span class="stat-chip"><i class="bi bi-eye"></i> <?= (int)$t['views'] ?></span>
                                                 <span class="stat-chip"><i class="bi bi-chat"></i> <?= (int)$t['replies_count'] ?></span>
-                                                <small class="text-muted"><?= date('d/m/Y H:i', strtotime($t['created_at'])) ?></small>
+                                                <small class="text-muted"><?php 
+                                                    $dtlast = new DateTime($t['created_at'], new DateTimeZone('UTC'));
+                                                    $dtlast->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                                                    echo $dtlast->format('d/m/Y H:i');
+                                                ?></small>
                                             </div>
                                         </div>
                                     </a>

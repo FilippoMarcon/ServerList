@@ -6,6 +6,9 @@
 
 require_once 'config.php';
 
+// Assicurati che esista la colonna staff_list per memorizzare lo staff (JSON)
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN staff_list JSON NULL"); } catch (Exception $e) {}
+
 // Supporto URL con slug: /server/<slug>, con fallback su id
 $server_slug = isset($_GET['slug']) ? trim($_GET['slug']) : null;
 $server_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -125,6 +128,13 @@ redirect('/');
                           ORDER BY v.data_voto DESC");
     $stmt->execute([$server_id]);
     $voters = $stmt->fetchAll();
+
+    // Decodifica StaffList del server
+    $server_staff = [];
+    if (!empty($server['staff_list'])) {
+        $decoded = json_decode($server['staff_list'], true);
+        if (is_array($decoded)) { $server_staff = $decoded; }
+    }
     
     // Controlla se l'utente loggato può votare (NUOVO SISTEMA)
     $can_vote = false;
@@ -174,6 +184,9 @@ if (!empty($server['banner_url'])) {
 } else {
     $og_image = $base_url . '/logo.png';
 }
+
+// Favicon specifico per la pagina server (se disponibile), altrimenti default
+$page_favicon = !empty($server['logo_url']) ? $server['logo_url'] : 'logo.png';
 
 include 'header.php';
 ?>
@@ -676,8 +689,40 @@ include 'header.php';
                     <!-- Staff Tab -->
                     <div class="tab-content" id="staff">
                         <div class="staff-section">
-                            <h3>Team del Server</h3>
-                            <p>Informazioni sullo staff non disponibili al momento.</p>
+                            <?php if (!empty($server_staff)): ?>
+                                <div class="server-staff-list" style="display:flex; flex-direction:column; gap:12px;">
+                                    <?php foreach ($server_staff as $group): 
+                                        $rank_title = isset($group['rank']) ? trim($group['rank']) : '';
+                                        $members = (isset($group['members']) && is_array($group['members'])) ? $group['members'] : [];
+                                        if ($rank_title === '' && empty($members)) continue;
+                                    ?>
+                                        <div class="staff-rank-card" style="background: var(--card-bg); border:1px solid var(--border-color); border-radius:10px; padding:10px 12px;">
+                                            <?php if ($rank_title !== ''): ?>
+                                                <div class="staff-rank-header" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px; text-align:center;">
+                                                    <i class="bi bi-award"></i>
+                                                    <strong style="font-size:1.15rem;"><?= htmlspecialchars($rank_title) ?></strong>
+                                                </div>
+                                            <?php endif; ?>
+                                            <?php if (!empty($members)): ?>
+                                                <div class="staff-rank-members" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center;">
+                                                    <?php foreach ($members as $m): $nick = trim((string)$m); if ($nick==='') continue; ?>
+                                                        <div class="staff-member-card" style="background: var(--card-bg); border:1px solid var(--border-color); border-radius:10px; padding:12px; width:140px; display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center;">
+                                                            <img src="https://mc-heads.net/head/<?= urlencode($nick) ?>" alt="Head" width="80" height="80" style="border-radius:8px;">
+                                                            <div class="staff-member-name" style="font-size:1.05rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                                <?= htmlspecialchars($nick) ?>
+                                                            </div>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php else: ?>
+                                                <div class="text-muted" style="font-size:0.9rem;">Nessuno staffer indicato.</div>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <p>Informazioni sullo staff non disponibili al momento.</p>
+                            <?php endif; ?>
                         </div>
                     </div>
                     

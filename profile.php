@@ -15,6 +15,13 @@ $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
 
+// Assicurati che esista la colonna staff_list per memorizzare lo staff (JSON)
+try {
+    $pdo->exec("ALTER TABLE sl_servers ADD COLUMN staff_list JSON NULL");
+} catch (Exception $e) {
+    // Ignora se già esiste o se l'ALTER non è permesso
+}
+
 // Verifica CSRF per tutte le richieste POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -75,6 +82,15 @@ if ($edit_server_id > 0) {
                     $server_to_edit['modalita_array'] = $decoded_modalita;
                 }
             }
+
+            // Decodifica StaffList esistente
+            $server_to_edit['staff_list_array'] = [];
+            if (!empty($server_to_edit['staff_list'])) {
+                $decoded_staff = json_decode($server_to_edit['staff_list'], true);
+                if (is_array($decoded_staff)) {
+                    $server_to_edit['staff_list_array'] = $decoded_staff;
+                }
+            }
         }
     } catch (PDOException $e) {
         $error = 'Errore nel caricamento del server.';
@@ -92,6 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
     $banner_url = sanitize($_POST['banner_url'] ?? '');
     $logo_url = sanitize($_POST['logo_url'] ?? '');
     $modalita = isset($_POST['modalita']) ? $_POST['modalita'] : [];
+    // StaffList in JSON (array di ranks con staffer)
+    $staff_list_json = $_POST['staff_list_json'] ?? '';
     
     // Converti le modalità in JSON
     $modalita_json = json_encode(array_values($modalita));
@@ -104,8 +122,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
             $stmt->execute([$server_id, $user_id]);
             
             if ($stmt->fetch()) {
-                $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ? WHERE id = ? AND owner_id = ?");
-                $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $server_id, $user_id]);
+                // Prova ad aggiornare anche staff_list; fallback se la colonna non esiste
+                try {
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ?, staff_list = ? WHERE id = ? AND owner_id = ?");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $staff_list_json, $server_id, $user_id]);
+                } catch (PDOException $e1) {
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ? WHERE id = ? AND owner_id = ?");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $server_id, $user_id]);
+                }
                 $message = 'Server modificato con successo!';
                 $server_to_edit = null;
                 $edit_server_id = 0;
@@ -533,6 +557,19 @@ include 'header.php';
                             <label for="descrizione">Descrizione</label>
                             <textarea id="descrizione" name="descrizione" rows="4" style="background-color: #16213e; color: white;"><?php echo htmlspecialchars($server_to_edit['descrizione']); ?></textarea>
                         </div>
+
+                        <!-- StaffList Editor -->
+                        <div class="form-group">
+                            <label>Staff del Server</label>
+                            <div id="stafflist-editor" class="stafflist-editor" style="background:#16213e; padding:12px; border-radius:8px; border:1px solid #28324b; color:white;">
+                                <!-- Ranks e membri verranno generati da JS -->
+                                <div class="stafflist-actions" style="margin-bottom:10px; display:flex; gap:8px;">
+                                    <button type="button" class="btn btn-sm btn-primary" id="add-rank-btn"><i class="bi bi-plus"></i> Aggiungi Rank</button>
+                                </div>
+                                <div id="stafflist-ranks"></div>
+                            </div>
+                            <input type="hidden" name="staff_list_json" id="staff_list_json">
+                        </div>
                         
                         <div class="form-row">
                             <div class="form-group">
@@ -840,6 +877,125 @@ document.addEventListener('DOMContentLoaded', function() {
             serverManagementSection.classList.add('active');
         }
     }
+});
+</script>
+
+<script>
+// StaffList Editor JS
+document.addEventListener('DOMContentLoaded', function() {
+    const AVATAR_API = '<?php echo AVATAR_API; ?>';
+    const ranksContainer = document.getElementById('stafflist-ranks');
+    const addRankBtn = document.getElementById('add-rank-btn');
+    const staffListInput = document.getElementById('staff_list_json');
+
+    // Dati iniziali dal server (PHP → JS)
+    const initialStaff = <?php echo json_encode($server_to_edit['staff_list_array'] ?? []); ?>;
+
+    function renderRanks(data) {
+        ranksContainer.innerHTML = '';
+        data.forEach((group, idx) => {
+            const groupEl = document.createElement('div');
+            groupEl.className = 'staff-rank-group';
+            groupEl.style.cssText = 'background: var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:8px; margin-bottom:10px;';
+
+            const headerEl = document.createElement('div');
+            headerEl.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;';
+            headerEl.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <i class="bi bi-award"></i>
+                    <input type="text" class="rank-title-input" placeholder="Nome Rank (es. Owner, Admin, Helper)" value="${group.rank ? escapeHtml(group.rank) : ''}" style="background: var(--card-bg); color:white; border:1px solid var(--border-color); padding:6px 8px; border-radius:6px; min-width:260px;">
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button type="button" class="btn btn-sm btn-secondary add-member-btn"><i class="bi bi-person-plus"></i> Aggiungi Staffer</button>
+                    <button type="button" class="btn btn-sm btn-danger remove-rank-btn"><i class="bi bi-trash"></i></button>
+                </div>
+            `;
+            groupEl.appendChild(headerEl);
+
+            const membersEl = document.createElement('div');
+            membersEl.className = 'rank-members';
+            membersEl.style.cssText = 'display:flex; flex-direction:column; gap:6px;';
+
+            (group.members || []).forEach(member => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:8px; align-items:center;';
+                const nickSafe = escapeHtml(member);
+                row.innerHTML = `
+                    <img class="member-avatar" src="${AVATAR_API}/${encodeURIComponent(nickSafe || 'MHF_Steve')}" alt="Avatar" width="24" height="24" style="border-radius:50%;">
+                    <input type="text" class="member-name-input" placeholder="Nickname staffer" value="${nickSafe}" style="background: var(--card-bg); color:white; border:1px solid var(--border-color); padding:6px 8px; border-radius:6px; min-width:240px;">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-member-btn"><i class="bi bi-x"></i></button>
+                `;
+                membersEl.appendChild(row);
+            });
+
+            groupEl.appendChild(membersEl);
+            ranksContainer.appendChild(groupEl);
+        });
+        syncHiddenInput();
+    }
+
+    function syncHiddenInput() {
+        const groups = Array.from(ranksContainer.querySelectorAll('.staff-rank-group')).map(groupEl => {
+            const rank = groupEl.querySelector('.rank-title-input').value.trim();
+            const members = Array.from(groupEl.querySelectorAll('.member-name-input'))
+                .map(inp => inp.value.trim())
+                .filter(v => v.length > 0);
+            return { rank, members };
+        }).filter(g => g.rank.length > 0);
+        staffListInput.value = JSON.stringify(groups);
+    }
+
+    function escapeHtml(str) { return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s])); }
+
+    // Event delegation
+    ranksContainer.addEventListener('input', function(e) {
+        // Sync JSON
+        syncHiddenInput();
+        // Aggiorna avatar se cambia il nickname
+        if (e.target && e.target.classList.contains('member-name-input')) {
+            const row = e.target.closest('div');
+            const img = row ? row.querySelector('.member-avatar') : null;
+            if (img) {
+                const nick = e.target.value.trim() || 'MHF_Steve';
+                img.src = AVATAR_API + '/' + encodeURIComponent(nick);
+            }
+        }
+    });
+    ranksContainer.addEventListener('click', function(e) {
+        const target = e.target.closest('button');
+        if (!target) return;
+        if (target.classList.contains('add-member-btn')) {
+            const groupEl = target.closest('.staff-rank-group');
+            const membersEl = groupEl.querySelector('.rank-members');
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex; gap:8px; align-items:center;';
+            row.innerHTML = `
+                <img class="member-avatar" src="${AVATAR_API}/MHF_Steve" alt="Avatar" width="24" height="24" style="border-radius:50%;">
+                <input type="text" class="member-name-input" placeholder="Nickname staffer" style="background: var(--card-bg); color:white; border:1px solid var(--border-color); padding:6px 8px; border-radius:6px; min-width:240px;">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-member-btn"><i class="bi bi-x"></i></button>
+            `;
+            membersEl.appendChild(row);
+            syncHiddenInput();
+        } else if (target.classList.contains('remove-member-btn')) {
+            const row = target.closest('div');
+            row.remove();
+            syncHiddenInput();
+        } else if (target.classList.contains('remove-rank-btn')) {
+            const groupEl = target.closest('.staff-rank-group');
+            groupEl.remove();
+            syncHiddenInput();
+        }
+    });
+
+    addRankBtn.addEventListener('click', function() {
+        const group = { rank: '', members: [] };
+        initialStaff.push(group);
+        renderRanks(initialStaff);
+    });
+
+    // Inizializza
+    const initData = Array.isArray(initialStaff) && initialStaff.length ? initialStaff : [];
+    renderRanks(initData);
 });
 </script>
 

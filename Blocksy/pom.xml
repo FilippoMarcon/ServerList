@@ -6,7 +6,7 @@
 
     <groupId>me.ph1llyon</groupId>
     <artifactId>Blocksy</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>2.3</version>
     <packaging>jar</packaging>
 
     <name>Blocksy</name>
