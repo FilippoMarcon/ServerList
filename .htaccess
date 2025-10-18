@@ -33,6 +33,9 @@ RewriteRule ^server/([A-Za-z0-9_-]+)/?$ server.php?slug=$1 [QSA,L]
 # Redirect /ServerList to index.php
 RewriteRule ^ServerList/?$ index.php [L]
 
+# Verifica Nickname clean URL
+RewriteRule ^verifica-nickname/?$ verifica-nickname.php [L,QSA]
+
 # Optional: Remove .php extension from URLs (but not for files with query parameters)
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f

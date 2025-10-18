@@ -764,7 +764,7 @@ include 'header.php';
                                                     <?php endforeach; ?>
                                                 </div>
                                             <?php else: ?>
-                                                <div class="text-muted" style="font-size:0.9rem;">Nessuno staffer indicato.</div>
+                                                <div class="text--secondary" style="font-size:0.9rem;">Nessuno staffer indicato.</div>
                                             <?php endif; ?>
                                         </div>
                                     <?php endforeach; ?>

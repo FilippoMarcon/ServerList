@@ -21,17 +21,14 @@
                                 Connetti, gioca, vota e diventa parte della community!
                             </p>
                             <div class="social-links">
-                                <a href="#" class="social-link discord">
+                                <a href="https://discord.blocksy.it" class="social-link discord" target="_blank" rel="noopener">
                                     <i class="bi bi-discord"></i>
                                 </a>
-                                <a href="#" class="social-link youtube">
-                                    <i class="bi bi-youtube"></i>
+                                <a href="https://telegram.blocksy.it" class="social-link telegram" target="_blank" rel="noopener">
+                                    <i class="bi bi-telegram"></i>
                                 </a>
-                                <a href="#" class="social-link twitter">
-                                    <i class="bi bi-twitter"></i>
-                                </a>
-                                <a href="#" class="social-link github">
-                                    <i class="bi bi-github"></i>
+                                <a href="https://instagram.blocksy.it" class="social-link instagram" target="_blank" rel="noopener">
+                                    <i class="bi bi-instagram"></i>
                                 </a>
                             </div>
                         </div>
@@ -44,6 +41,7 @@
                                 <li><a href="/">Lista Server</a></li>
                                 <li><a href="/login">Accedi</a></li>
                                 <li><a href="/register">Registrati</a></li>
+                                <li><a href="/verifica-nickname">Verifica Nickname</a></li>
                                 <?php if (isLoggedIn() && isAdmin()): ?>
                                 <li><a href="/admin">Admin Panel</a></li>
                                 <?php endif; ?>
@@ -54,12 +52,34 @@
                     <div class="col-lg-3 col-md-6 mb-4">
                         <div class="footer-section">
                             <h5 class="section-title">Modalità Popolari</h5>
+                            <?php
+                                $popular_modes = [];
+                                try {
+                                    global $pdo;
+                                    $stmt = $pdo->query("SELECT modalita FROM sl_servers WHERE is_active = 1");
+                                    $counts = [];
+                                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                                        if (!empty($row['modalita'])) {
+                                            $arr = json_decode($row['modalita'], true);
+                                            if (is_array($arr)) {
+                                                foreach ($arr as $mode) {
+                                                    $key = strtolower(trim($mode));
+                                                    if ($key === '') continue;
+                                                    $counts[$key] = ($counts[$key] ?? 0) + 1;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    arsort($counts);
+                                    $popular_modes = array_slice(array_keys($counts), 0, 5);
+                                } catch (Exception $e) {
+                                    $popular_modes = ['survival','roleplay','pvp','minigames','skyblock'];
+                                }
+                            ?>
                             <ul class="footer-links">
-                                <li><a href="/?filter=survival">Survival</a></li>
-                                <li><a href="/?filter=roleplay">RolePlay</a></li>
-                                <li><a href="/?filter=pvp">PvP</a></li>
-                                <li><a href="?filter=minigames">MiniGames</a></li>
-                                <li><a href="?filter=skyblock">SkyBlock</a></li>
+                                <?php foreach ($popular_modes as $mode): ?>
+                                <li><a href="/?filter=<?php echo urlencode($mode); ?>"><?php echo htmlspecialchars(ucfirst($mode)); ?></a></li>
+                                <?php endforeach; ?>
                             </ul>
                         </div>
                     </div>

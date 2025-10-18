@@ -162,14 +162,9 @@ include 'header.php';
                     
                     <div class="auth-footer">
                         <p class="auth-switch-text">Non hai un account?</p>
-<a href="/register" class="auth-switch-link">
+                        <a href="/register" class="auth-switch-link">
                             <i class="bi bi-person-plus"></i> Registrati ora
                         </a>
-                        
-                        <div class="auth-demo-info">
-                            <i class="bi bi-info-circle"></i>
-                            <span>Demo: admin / admin123</span>
-                        </div>
                     </div>
                 </div>
             </div>

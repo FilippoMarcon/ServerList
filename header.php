@@ -1266,6 +1266,14 @@
             background: linear-gradient(135deg, #333 0%, #555 100%);
         }
         
+        .social-link.telegram {
+            background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+        }
+        
+        .social-link.instagram {
+            background: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 75%, #515bd4 100%);
+        }
+        
         .social-link:hover {
             transform: translateY(-4px);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);

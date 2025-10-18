@@ -95,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 $user_id = (int)$_POST['user_id'];
                 $minecraft_nick = trim($_POST['minecraft_nick']);
                 $password = trim($_POST['password']);
+                $email = trim($_POST['email'] ?? '');
                 
                 // Validazione
                 if (empty($minecraft_nick)) {
@@ -110,9 +111,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                     exit;
                 }
                 
+                // Verifica email se fornita
+                if (!empty($email)) {
+                    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        echo json_encode(['success' => false, 'message' => 'Email non valida']);
+                        exit;
+                    }
+                    $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE email = ? AND id != ?");
+                    $stmt->execute([$email, $user_id]);
+                    if ($stmt->fetch()) {
+                        echo json_encode(['success' => false, 'message' => 'Email già in uso']);
+                        exit;
+                    }
+                }
+                
                 // Aggiorna nome Minecraft
                 $stmt = $pdo->prepare("UPDATE sl_users SET minecraft_nick = ? WHERE id = ?");
                 $stmt->execute([$minecraft_nick, $user_id]);
+                
+                // Aggiorna email se fornita
+                if (!empty($email)) {
+                    $stmt = $pdo->prepare("UPDATE sl_users SET email = ? WHERE id = ?");
+                    $stmt->execute([$email, $user_id]);
+                }
                 
                 // Aggiorna password se fornita
                 if (!empty($password)) {
@@ -871,7 +892,7 @@ include 'header.php';
 }
 
 .metric-meta {
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 0.85rem;
 }
 
@@ -942,6 +963,9 @@ include 'header.php';
                             break;
                         case 'servers':
                             include_servers();
+                            break;
+                        case 'edit_server':
+                            include __DIR__ . '/admin_edit_server.php';
                             break;
                         case 'sponsors':
                             include_sponsors();
@@ -1404,6 +1428,7 @@ function include_users() {
                     <tr>
                         <th>ID</th>
                         <th>Minecraft Nick</th>
+                        <th>Email</th>
                         <th>Ruolo</th>
                         <th>Registrazione</th>
                         <th>Ultimo Voto</th>
@@ -1420,6 +1445,7 @@ function include_users() {
                                 <span class="badge bg-warning ms-1">Admin</span>
                             <?php endif; ?>
                         </td>
+                        <td><?= htmlspecialchars($user['email'] ?? '') ?></td>
                         <td>
                             <?php if ($user['is_admin']): ?>
                                 <span class="badge bg-warning">Amministratore</span>
@@ -1442,7 +1468,7 @@ function include_users() {
                         </td>
                         <td>
                             <button class="btn btn-sm btn-outline-primary btn-admin me-1" 
-                                    onclick="editUser(<?= $user['id'] ?>, '<?= htmlspecialchars($user['minecraft_nick']) ?>')">
+                                    onclick="editUser(<?= $user['id'] ?>, '<?= htmlspecialchars($user['minecraft_nick']) ?>', '<?= htmlspecialchars($user['email'] ?? '') ?>')">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn btn-sm btn-outline-warning btn-admin me-1" 
@@ -1721,6 +1747,11 @@ function include_servers() {
                                         title="Toggle Sponsorship">
                                     <i class="bi bi-star"></i>
                                 </button>
+                                <a class="btn btn-sm btn-outline-primary btn-admin" 
+                                   href="?action=edit_server&id=<?= $server['id'] ?>" 
+                                   title="Modifica">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
                                 <button class="btn btn-sm btn-outline-danger btn-admin" 
                                         onclick="deleteServer(<?= $server['id'] ?>)"
                                         title="Elimina">
@@ -3363,6 +3394,10 @@ function include_annunci() {
                         <input type="text" class="form-control" id="editMinecraftNick" name="minecraft_nick" required>
                     </div>
                     <div class="mb-3">
+                        <label for="editEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="editEmail" name="email">
+                    </div>
+                    <div class="mb-3">
                         <label for="editPassword" class="form-label">Nuova Password (lascia vuoto per non modificare)</label>
                         <input type="password" class="form-control" id="editPassword" name="password">
                     </div>
@@ -3414,9 +3449,10 @@ function include_annunci() {
 </div>
 
 <script>
-function editUser(userId, currentNick) {
+function editUser(userId, currentNick, currentEmail) {
     document.getElementById('editUserId').value = userId;
     document.getElementById('editMinecraftNick').value = currentNick;
+    document.getElementById('editEmail').value = currentEmail || '';
     document.getElementById('editPassword').value = '';
     
     var modal = new bootstrap.Modal(document.getElementById('editUserModal'));

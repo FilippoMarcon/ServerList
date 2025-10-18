@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $success = 'Registrazione completata con successo! Ora puoi effettuare il login.';
                     
                     // Reindirizza al login dopo 3 secondi
-                    echo '<meta http-equiv="refresh" content="3;url=login.php">';
+                    echo '<meta http-equiv="refresh" content="3;url=/login">';
                 }
             } catch (PDOException $e) {
                 $error = 'Errore durante la registrazione. Riprova più tardi.';

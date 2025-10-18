@@ -31,7 +31,7 @@ if (preg_match('#^/forum/category/([0-9]+)-[A-Za-z0-9_-]+/?$#', $request_path, $
 }
 
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
-if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset)/?$#', $request_path, $m)) {
+if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout)/?$#', $request_path, $m)) {
     $map = [
         'forum' => 'forum.php',
         'annunci' => 'annunci.php',
@@ -41,6 +41,8 @@ if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset)/?$#
         'admin' => 'admin.php',
         'forgot' => 'forgot.php',
         'reset' => 'reset.php',
+        'verifica-nickname' => 'verifica-nickname.php',
+        'logout' => 'logout.php',
     ];
     $target = $map[$m[1]] ?? null;
     if ($target) {
