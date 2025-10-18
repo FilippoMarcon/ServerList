@@ -87,14 +87,14 @@ include 'header.php';
                         </div>
                         <div class="carousel-inner" style="border-radius:12px; overflow:hidden;">
                             <div class="carousel-item active">
-                                <img src="add-server.png" class="d-block w-100" alt="Dimostrazione: Aggiungere il server alla lista">
+                                <img src="add_server.png" class="d-block w-100" alt="Dimostrazione: Aggiungere il server alla lista">
                                 <div class="carousel-caption d-none d-md-block">
                                     <h5>Come aggiungere il server</h5>
                                     <p>Clicca su Aggiungi Server e compila i campi richiesti.</p>
                                 </div>
                             </div>
                             <div class="carousel-item">
-                                <img src="direct-access.png" class="d-block w-100" alt="Dimostrazione: Entrare nel server">
+                                <img src="direct_access.png" class="d-block w-100" alt="Dimostrazione: Entrare nel server">
                                 <div class="carousel-caption d-none d-md-block">
                                     <h5>Come entrare velocemente nel server</h5>
                                     <p>Collegati a <strong>verifica.blocksy.it</strong> e segui le istruzioni.</p>
