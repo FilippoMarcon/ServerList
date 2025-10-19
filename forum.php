@@ -56,6 +56,8 @@ try {
 
 // Prova ad aggiungere colonna slug se tabella già esistente
 try { $pdo->exec("ALTER TABLE sl_forum_threads ADD COLUMN slug VARCHAR(220) NULL"); } catch (Exception $e) {}
+// Prova ad aggiungere colonna permesso in categorie
+try { $pdo->exec("ALTER TABLE sl_forum_categories ADD COLUMN allow_user_threads TINYINT(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
 
 // Seed categorie di default
 try {
@@ -102,11 +104,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Compila tutti i campi.';
             } else {
                 try {
-                    // Verifica categoria
-                    $stmt = $pdo->prepare("SELECT id FROM sl_forum_categories WHERE id = ?");
+                    // Verifica categoria e permessi
+                    $stmt = $pdo->prepare("SELECT id, allow_user_threads FROM sl_forum_categories WHERE id = ?");
                     $stmt->execute([$cat_id]);
-                    if (!$stmt->fetchColumn()) {
+                    $catRow = $stmt->fetch();
+                    if (!$catRow) {
                         $error = 'Categoria non valida.';
+                    } elseif (!isAdmin() && isset($catRow['allow_user_threads']) && (int)$catRow['allow_user_threads'] === 0) {
+                        $error = 'Solo gli amministratori possono creare thread in questa categoria.';
                     } else {
                         $slug = slugify($title);
                         $stmt = $pdo->prepare("INSERT INTO sl_forum_threads (category_id, author_id, title, body, slug) VALUES (?, ?, ?, ?, ?)");
@@ -211,7 +216,11 @@ include 'header.php';
                     <p class="hero-subtitle">Discorsi della community e supporto.</p>
                 </div>
                 <?php if (isLoggedIn()): ?>
-                <a href="/forum" class="btn btn-hero"><i class="bi bi-plus-circle"></i> Nuovo Thread</a>
+                <?php if ($view === 'category'): ?>
+                <button class="btn btn-hero" type="button" data-bs-toggle="collapse" data-bs-target="#newThreadForm"><i class="bi bi-plus-circle"></i> Nuovo Thread</button>
+                <?php elseif ($view === ''): ?>
+                <button class="btn btn-hero" type="button" data-bs-toggle="collapse" data-bs-target="#newThreadGlobal"><i class="bi bi-plus-circle"></i> Nuovo Thread</button>
+                <?php endif; ?>
                 <?php endif; ?>
             </div>
 
@@ -247,7 +256,7 @@ include 'header.php';
                                         <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($thread['category_name']) ?></span>
                                         <a class="meta-item" href="/utente/<?= (int)$thread['author_id'] ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($thread['minecraft_nick']) ?></a>
                                         <?php if (!empty($thread['verified_nick'])): ?>
-                                            <a class="meta-item" href="/utente/<?= (int)$thread['author_id'] ?>"><i class="bi bi-check2-circle"></i> Verificato come <?= htmlspecialchars($thread['verified_nick']) ?></a>
+                                            <a class="meta-item" href="/utente/<?= (int)$thread['author_id'] ?>"><i class="bi bi-check2-circle"></i> <?= htmlspecialchars($thread['verified_nick']) ?></a>
                                         <?php endif; ?>
                                         <?php 
                                         if ((int)($thread['is_admin'] ?? 0) === 1): ?>
@@ -320,7 +329,7 @@ include 'header.php';
                                         <img src="<?= !empty($p['verified_nick']) ? htmlspecialchars(getMinecraftAvatar($p['verified_nick'], 28)) : '/logo.png' ?>" alt="Avatar" width="28" height="28" class="rounded-circle post-avatar">
                                         <a class="post-nick" href="/utente/<?= (int)$p['author_id'] ?>"><?= htmlspecialchars($p['minecraft_nick']) ?></a>
                                         <?php if (!empty($p['verified_nick'])): ?>
-                                            <a class="admin-badge user-role" href="/utente/<?= (int)$p['author_id'] ?>"><i class="bi bi-check2-circle"></i> Verificato come <?= htmlspecialchars($p['verified_nick']) ?></a>
+                                            <a class="admin-badge user-role" href="/utente/<?= (int)$p['author_id'] ?>"><i class="bi bi-check2-circle"></i> <?= htmlspecialchars($p['verified_nick']) ?></a>
                                         <?php endif; ?>
                                     </div>
                                     <span class="post-date">
@@ -385,12 +394,12 @@ include 'header.php';
                 <?php else: ?>
                     <div class="category-header d-flex align-items-center justify-content-between">
                         <h2 class="hero-title"><?= htmlspecialchars($category['name']) ?></h2>
-                        <?php if (isLoggedIn()): ?>
+                        <?php if (isLoggedIn() && (isAdmin() || (int)($category['allow_user_threads'] ?? 1) === 1)): ?>
                             <button class="btn btn-hero" data-bs-toggle="collapse" data-bs-target="#newThreadForm"><i class="bi bi-plus-circle"></i> Nuovo Thread</button>
                         <?php endif; ?>
                     </div>
 
-                    <?php if (isLoggedIn()): ?>
+                    <?php if (isLoggedIn() && (isAdmin() || (int)($category['allow_user_threads'] ?? 1) === 1)): ?>
                     <div class="collapse mt-3" id="newThreadForm">
                         <div class="card card-body" style="background: var(--card-bg); border:1px solid var(--border-color);">
                             <form method="POST" action="/forum?view=category&category=<?= (int)$category_id ?>">
@@ -429,7 +438,7 @@ include 'header.php';
                                         <div class="thread-small thread-meta">
                                             <a class="meta-item" href="/utente/<?= (int)$t['author_id'] ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></a>
                                             <?php if (!empty($t['verified_nick'])): ?>
-                                                <a class="meta-item" href="/utente/<?= (int)$t['author_id'] ?>"><i class="bi bi-check2-circle"></i> Verificato come <?= htmlspecialchars($t['verified_nick']) ?></a>
+                                                <a class="meta-item" href="/utente/<?= (int)$t['author_id'] ?>"><i class="bi bi-check2-circle"></i> <?= htmlspecialchars($t['verified_nick']) ?></a>
                                             <?php endif; ?>
                                             <span class="meta-item"><i class="bi bi-clock"></i> <?php 
                                                 $dtl = new DateTime($t['created_at'], new DateTimeZone('UTC'));
@@ -466,28 +475,142 @@ include 'header.php';
             <?php else: ?>
                 <?php
                 // Home forum: elenco categorie e ultimi thread
+                $sections = [];
                 $categories = [];
+                $latest_by_cat = [];
+                try { $sections = $pdo->query("SELECT * FROM sl_forum_sections ORDER BY sort_order ASC, name ASC")->fetchAll(); } catch (Exception $e) {}
                 try {
-                    $categories = $pdo->query("SELECT c.*, COALESCE(t.cnt,0) AS threads_count FROM sl_forum_categories c LEFT JOIN (SELECT category_id, COUNT(*) AS cnt FROM sl_forum_threads GROUP BY category_id) t ON t.category_id = c.id ORDER BY c.sort_order ASC, c.name ASC")->fetchAll();
+                    $categories = $pdo->query("SELECT c.*, COALESCE(t.cnt,0) AS threads_count, COALESCE(m.posts_count,0) AS posts_count FROM sl_forum_categories c LEFT JOIN (SELECT category_id, COUNT(*) AS cnt FROM sl_forum_threads GROUP BY category_id) t ON t.category_id = c.id LEFT JOIN (SELECT category_id, SUM(replies_count) + COUNT(*) AS posts_count FROM sl_forum_threads GROUP BY category_id) m ON m.category_id = c.id ORDER BY c.sort_order ASC, c.name ASC")->fetchAll();
                 } catch (Exception $e) {}
+                try {
+                    $rows = $pdo->query("SELECT tt.category_id, tt.id, tt.title, tt.slug, COALESCE(tt.updated_at, tt.created_at) AS latest_date, u.minecraft_nick, ml.minecraft_nick AS verified_nick FROM sl_forum_threads tt JOIN sl_users u ON u.id = tt.author_id LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id JOIN (SELECT category_id, MAX(COALESCE(updated_at, created_at)) AS mx FROM sl_forum_threads GROUP BY category_id) x ON x.category_id = tt.category_id AND COALESCE(tt.updated_at, tt.created_at) = x.mx")->fetchAll();
+                    foreach ($rows as $r) { $latest_by_cat[(int)$r['category_id']] = $r; }
+                } catch (Exception $e) { $latest_by_cat = []; }
                 $latest = [];
                 try {
-                    $latest = $pdo->query("SELECT t.id, t.title, t.slug, t.created_at, t.replies_count, t.views, u.minecraft_nick, ml.minecraft_nick AS verified_nick, c.name AS category_name, c.slug AS category_slug, c.id AS category_id FROM sl_forum_threads t JOIN sl_users u ON u.id = t.author_id LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id JOIN sl_forum_categories c ON c.id = t.category_id ORDER BY t.created_at DESC LIMIT 10")->fetchAll();
+                    $latest = $pdo->query("SELECT t.id, t.title, t.slug, t.created_at, t.replies_count, t.views, u.minecraft_nick, ml.minecraft_nick AS verified_nick, c.name AS category_name, c.slug AS category_slug, c.id AS category_id FROM sl_forum_threads t JOIN sl_users u ON u.id = t.author_id LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id LEFT JOIN sl_forum_categories c ON c.id = t.category_id ORDER BY COALESCE(t.updated_at, t.created_at) DESC LIMIT 12")->fetchAll();
                 } catch (Exception $e) {}
                 ?>
+
+                <?php if (isLoggedIn()): ?>
+                <div class="collapse" id="newThreadGlobal">
+                    <div class="card card-body" style="background: var(--card-bg); border:1px solid var(--border-color);">
+                        <form method="POST" action="/forum">
+                            <?= csrfInput(); ?>
+                            <input type="hidden" name="action" value="new_thread">
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <select name="category_id" class="form-select" required>
+                                        <option value="">Seleziona categoria</option>
+                                        <?php foreach ($categories as $c): ?>
+                                            <?php if (!isAdmin() && isset($c['allow_user_threads']) && (int)$c['allow_user_threads'] === 0) continue; ?>
+                                            <option value="<?= (int)$c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-8">
+                                    <input type="text" name="title" class="form-control" placeholder="Titolo" required>
+                                </div>
+                                <div class="col-12">
+                                    <textarea name="body" class="form-control" rows="5" placeholder="Contenuto" required></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <button class="btn btn-hero" type="submit"><i class="bi bi-send"></i> Pubblica</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="forum-card forum-card--categories">
-                            <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-folder2"></i> Categorie</h6></div>
-                            <ul class="list-group list-group-flush">
-                                <?php foreach ($categories as $c): ?>
-                                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
-                                        <a href="/forum/category/<?= (int)$c['id'] ?>-<?= urlencode($c['slug'] ?? 'categoria') ?>" class="forum-link"><?= htmlspecialchars($c['name']) ?></a>
-                                        <span class="badge bg-secondary rounded-pill"><?= (int)$c['threads_count'] ?></span>
-                                    </li>
+                            <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-collection"></i> Sezioni</h6></div>
+                            <div class="sections-wrap">
+                                <?php foreach ($sections as $s): ?>
+                                    <div class="section-block mb-3">
+                                        <div class="section-header">
+                                            <div class="d-flex align-items-center justify-content-between">
+                                                <h6 class="mb-1" style="font-weight:700;">
+                                                    <i class="bi bi-folder2"></i> <?= htmlspecialchars($s['name']) ?>
+                                                </h6>
+                                            </div>
+                                            <?php if (!empty($s['description'])): ?>
+                                                <div class="text-secondary" style="font-size:0.9rem;">
+                                                    <?= htmlspecialchars($s['description']) ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <ul class="list-group list-group-flush">
+                                            <?php foreach ($categories as $c): if ((int)($c['section_id'] ?? 0) !== (int)$s['id']) continue; ?>
+                                                <li class="list-group-item bg-transparent text-white">
+                                                    <div class="d-flex justify-content-between align-items-start">
+                                                        <div>
+                                                            <a href="/forum/category/<?= (int)$c['id'] ?>-<?= urlencode($c['slug'] ?? 'categoria') ?>" class="forum-link" style="font-weight:600;">
+                                                                <?= htmlspecialchars($c['name']) ?>
+                                                            </a>
+                                                            <div class="text-secondary" style="font-size:0.85rem;">
+                                                                Discussioni <?= (int)$c['threads_count'] ?> • Messaggi <?= (int)$c['posts_count'] ?>
+                                                            </div>
+                                                            <?php if (isset($latest_by_cat[(int)$c['id']])): $lt = $latest_by_cat[(int)$c['id']]; ?>
+                                                                <div class="text-secondary" style="font-size:0.85rem;">
+                                                                    <span class="me-1"><?= htmlspecialchars($lt['minecraft_nick'] ?: ($lt['verified_nick'] ?? '')) ?></span>
+                                                                    <a href="/forum/<?= (int)$lt['id'] ?>-<?= urlencode($lt['slug'] ?? 'thread') ?>" class="forum-link">
+                                                                        <?= htmlspecialchars($lt['title']) ?>
+                                                                    </a>
+                                                                    <span>• <?= htmlspecialchars(date('d/m/Y', strtotime($lt['latest_date']))) ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                        <span class="badge bg-secondary rounded-pill"><?= (int)$c['threads_count'] ?></span>
+                                                    </div>
+                                                </li>
+                                            <?php endforeach; ?>
+                                            <?php
+                                            $hasCat = false; foreach ($categories as $c) { if ((int)($c['section_id'] ?? 0) === (int)$s['id']) { $hasCat = true; break; } }
+                                            if (!$hasCat): ?>
+                                                <li class="list-group-item bg-transparent text-secondary">Nessuna categoria in questa sezione.</li>
+                                            <?php endif; ?>
+                                        </ul>
+                                    </div>
                                 <?php endforeach; ?>
-                            </ul>
+                                <?php
+                                // Categorie senza sezione
+                                $unassigned = array_filter($categories, function($c){ return empty($c['section_id']); });
+                                if (!empty($unassigned)): ?>
+                                    <div class="section-block mb-3">
+                                        <div class="section-header">
+                                            <h6 class="mb-1" style="font-weight:700;"><i class="bi bi-folder2"></i> Varie</h6>
+                                            <div class="text-secondary" style="font-size:0.9rem;">Categorie non assegnate a nessuna sezione.</div>
+                                        </div>
+                                        <ul class="list-group list-group-flush">
+                                            <?php foreach ($unassigned as $c): ?>
+                                                <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <a href="/forum/category/<?= (int)$c['id'] ?>-<?= urlencode($c['slug'] ?? 'categoria') ?>" class="forum-link" style="font-weight:600;">
+                                                            <?= htmlspecialchars($c['name']) ?>
+                                                        </a>
+                                                        <div class="text-secondary" style="font-size:0.85rem;">
+                                                            Discussioni <?= (int)$c['threads_count'] ?> • Messaggi <?= (int)$c['posts_count'] ?>
+                                                        </div>
+                                                        <?php if (isset($latest_by_cat[(int)$c['id']])): $lt = $latest_by_cat[(int)$c['id']]; ?>
+                                                            <div class="text-secondary" style="font-size:0.85rem;">
+                                                                <span class="me-1"><?= htmlspecialchars($lt['minecraft_nick'] ?: ($lt['verified_nick'] ?? '')) ?></span>
+                                                                <a href="/forum/<?= (int)$lt['id'] ?>-<?= urlencode($lt['slug'] ?? 'thread') ?>" class="forum-link">
+                                                                    <?= htmlspecialchars($lt['title']) ?>
+                                                                </a>
+                                                                <span>• <?= htmlspecialchars(date('d/m/Y', strtotime($lt['latest_date']))) ?></span>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <span class="badge bg-secondary rounded-pill"><?= (int)$c['threads_count'] ?></span>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-8">
@@ -505,7 +628,7 @@ include 'header.php';
                                                         <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($t['category_name']) ?></span>
                                                         <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></span>
                                                         <?php if (!empty($t['verified_nick'])): ?>
-                                                            <span class="meta-item"><i class="bi bi-check2-circle"></i> Verificato come <?= htmlspecialchars($t['verified_nick']) ?></span>
+                                                            <span class="meta-item"><i class="bi bi-check2-circle"></i> <?= htmlspecialchars($t['verified_nick']) ?></span>
                                                         <?php endif; ?>
                                                     </div>
                                                 </div>
@@ -569,14 +692,17 @@ include 'header.php';
  .forum-card--categories .list-group-item:hover { background: rgba(124,58,237,0.08); transform: translateX(2px); }
  .forum-card--categories .badge { background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.3); }
  .forum-card--categories .forum-link { font-weight:600; }
+ .forum-card--categories .section-header { padding: 0.75rem 1rem; }
+ .forum-card--categories .section-block { border-radius: 10px; }
+ .forum-card--categories .section-block .list-group-item:hover { background: rgba(124,58,237,0.08); transform: translateX(2px); }
 
  .forum-card--latest { background: linear-gradient(180deg, rgba(56,189,248,0.12), rgba(56,189,248,0.06)), var(--card-bg); border-color: rgba(56,189,248,0.35); }
  .forum-card--latest .forum-latest-item { position: relative; padding-left: 1.1rem; }
  .forum-card--latest .forum-latest-item::before { content:''; position:absolute; left:0.5rem; top:0.6rem; bottom:0.6rem; width:3px; border-radius:2px; background: linear-gradient(180deg, rgba(56,189,248,0.7), rgba(124,58,237,0.7)); opacity:0.6; transition: opacity 0.2s ease, transform 0.2s ease; }
  .forum-card--latest .forum-latest-item:hover::before { opacity:1; transform: scaleX(1.05); }
  .forum-card--latest .forum-avatar { box-shadow: 0 0 0 2px rgba(56,189,248,0.4), 0 2px 8px rgba(0,0,0,0.25); }
- .forum-card--latest .thread-stats .stat-chip { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.3); }
-/* Global link normalization in forum contexts */
+ .forum-card--latest .thread-stats .stat-chip { background: transparent; border-color: rgba(56,189,248,0.3); }
+ /* Global link normalization in forum contexts */
  .forum-card a, .thread-card a, .thread-row a, .post-card a, .thread-meta a, .post-header a {
    text-decoration: none;
    color: inherit;
@@ -584,6 +710,8 @@ include 'header.php';
  .forum-card a:hover, .thread-card a:hover, .thread-row a:hover, .post-card a:hover, .thread-meta a:hover, .post-header a:hover {
    color: var(--accent-purple);
  }
+ /* Thread list item styling */
+ .thread-row { background: var(--card-bg); border:1px solid var(--border-color); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.6rem; }
  </style>
 
 <?php include 'footer.php'; ?>

@@ -3,12 +3,21 @@ package me.ph1llyon.verificaBlocksy.listener;
 import me.ph1llyon.verificaBlocksy.VerificaBlocksy;
 import me.ph1llyon.verificaBlocksy.http.WebApiClient;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
+import com.google.common.io.ByteStreams;
+
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -50,41 +59,72 @@ public class PlayerJoinListener implements Listener {
                 }
             }
 
-            final String msg;
+            final Component kickMsg;
+            final String msgPlain;
             if (!isPremium) {
-                // SP/cracked: kick con istruzioni
-                String tmplSp = plugin.getConfig().getString("sp_kick_message_template",
-                        "Questo account non è Premium.\n- Acquista un account su https://www.minecraft.net/\n- Oppure apri un ticket: {ticket_url}\nScrivi che vuoi verificarti e che possiedi un account non comprato (SP).");
-                msg = tmplSp.replace("{ticket_url}", ticketUrl);
+                // SP/cracked: messaggio pulito e stilizzato con link cliccabili
+                kickMsg = buildSpKickMessage(ticketUrl);
+                msgPlain = "Questo account non è Premium.\n- Acquista un account su https://www.minecraft.net/\n- Oppure apri un ticket: " + ticketUrl + "\nScrivi nel ticket che NON sei Premium e vuoi verificarti come SP.";
             } else {
-                // 2) Premium: flusso normale verifica
+                // Premium: flusso normale verifica
                 boolean alreadyVerified = apiClient.isPlayerVerified(player.getName());
                 if (alreadyVerified) {
-                    String tmpl = plugin.getConfig().getString("already_verified_kick_message_template",
-                            "Questo account è già verificato.\nVisita: {url}\nPer scollegare l'account.");
-                    msg = tmpl.replace("{url}", url);
+                    kickMsg = buildAlreadyVerifiedMessage(url);
+                    msgPlain = "Questo account è già verificato.\nVisita: " + url + "\nPer scollegare l'account, segui le istruzioni sul sito.";
                 } else {
-                    // Genera il codice (lunghezza da config)
-                    int len = plugin.getConfig().getInt("code_length", 6);
-                    final String code = generateNumericCode(len);
+                    // Nuovo controllo: troppi codici non usati
+                    int threshold = plugin.getConfig().getInt("max_unconsumed_codes_per_player", 5);
+                    int unusedCount = apiClient.countUnusedCodes(player.getName());
+                    plugin.getLogger().info("[VerificaBlocksy] unused_codes=" + unusedCount + " threshold=" + threshold + " for " + player.getName());
 
-                    // Registra il codice
-                    boolean ok = apiClient.registerVerificationCode(player.getName(), code);
+                    if (unusedCount >= threshold) {
+                        // Non generare nuovo codice: kick con messaggio specifico
+                        kickMsg = buildTooManyCodesMessage();
+                        msgPlain = "Ci sono già troppi codici generati per questo account, riprova tra 5 minuti.";
+                    } else {
+                        // Genera il codice (lunghezza da config)
+                        int len = plugin.getConfig().getInt("code_length", 6);
+                        final String code = generateNumericCode(len);
 
-                    String tmpl = plugin.getConfig().getString("kick_message_template",
-                            "Collega il tuo account sul sito:\n{url}\nCodice: {code}\nValido 5 minuti.");
-                    msg = tmpl.replace("{code}", code).replace("{url}", url);
+                        // Registra il codice
+                        boolean ok = apiClient.registerVerificationCode(player.getName(), code);
+
+                        kickMsg = buildVerificationMessage(url, code);
+                        msgPlain = "Collega il tuo account sul sito:\n" + url + "\nCodice: " + code + "\nValido 5 minuti.";
+                    }
                 }
             }
 
-            // Kick sul main thread
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                try {
-                    player.kick(Component.text(msg));
-                } catch (Throwable t) {
-                    player.kickPlayer(msg);
-                }
-            });
+            boolean kickViaProxy = plugin.getConfig().getBoolean("kick_via_proxy", false);
+            plugin.getLogger().info("[VerificaBlocksy] kick_via_proxy=" + kickViaProxy + " for " + player.getName());
+
+            if (kickViaProxy) {
+                // Invia motivo al proxy via Plugin Messaging e fallback se necessario
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    sendKickViaProxy(player, kickMsg);
+                    plugin.getLogger().info("[VerificaBlocksy] Sent proxy disconnect for " + player.getName());
+                });
+                // Fallback dopo breve tempo se il proxy non ha disconnesso
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (player.isOnline()) {
+                        plugin.getLogger().warning("[VerificaBlocksy] Proxy did not disconnect, applying backend kick for " + player.getName());
+                        try {
+                            player.kick(kickMsg);
+                        } catch (Throwable t) {
+                            player.kickPlayer(msgPlain);
+                        }
+                    }
+                }, 20L);
+            } else {
+                // Kick sul main thread (leggera attesa per proxy)
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    try {
+                        player.kick(kickMsg);
+                    } catch (Throwable t) {
+                        player.kickPlayer(msgPlain);
+                    }
+                }, 2L);
+            }
         });
     }
 
@@ -95,5 +135,79 @@ public class PlayerJoinListener implements Listener {
             sb.append(digits.charAt(random.nextInt(digits.length())));
         }
         return sb.toString();
+    }
+
+    private Component boldCode(String code) {
+        return Component.text(code)
+                .color(NamedTextColor.GOLD)
+                .decorate(TextDecoration.BOLD);
+    }
+
+    private Component buildSpKickMessage(String ticketUrl) {
+        return Component.text("Questo account non è Premium.", NamedTextColor.RED)
+                .append(Component.newline())
+                .append(Component.text("Acquista un account su ", NamedTextColor.WHITE))
+                .append(link("https://www.minecraft.net"))
+                .append(Component.newline())
+                .append(Component.text("Oppure apri un ticket: ", NamedTextColor.WHITE))
+                .append(link(ticketUrl))
+                .append(Component.newline())
+                .append(Component.text("Scrivi nel ticket che NON sei Premium e vuoi verificarti come SP.", NamedTextColor.GRAY));
+    }
+
+    private Component buildAlreadyVerifiedMessage(String url) {
+        return Component.text("Questo account è già verificato.", NamedTextColor.GREEN)
+                .append(Component.newline())
+                .append(Component.text("Visita: ", NamedTextColor.WHITE))
+                .append(link(url))
+                .append(Component.newline())
+                .append(Component.text("Per scollegare l'account, segui le istruzioni sul sito.", NamedTextColor.GRAY));
+    }
+
+    private Component buildVerificationMessage(String url, String code) {
+        return Component.text("Collega il tuo account sul sito:", NamedTextColor.WHITE)
+                .append(Component.newline())
+                .append(link(url))
+                .append(Component.newline())
+                .append(Component.text("Codice: ", NamedTextColor.WHITE))
+                .append(boldCode(code))
+                .append(Component.newline())
+                .append(Component.text("Valido 5 minuti.", NamedTextColor.GRAY));
+    }
+
+    private Component buildTooManyCodesMessage() {
+        return Component.text("Ci sono già troppi codici generati per questo account.", NamedTextColor.RED)
+                .append(Component.newline())
+                .append(Component.text("Riprova tra 5 minuti.", NamedTextColor.GRAY));
+    }
+
+    private Component link(String url) {
+        return Component.text(url, NamedTextColor.AQUA)
+                .decorate(TextDecoration.UNDERLINED)
+                .clickEvent(ClickEvent.openUrl(url))
+                .hoverEvent(HoverEvent.showText(Component.text("Apri " + url, NamedTextColor.GRAY)));
+    }
+
+    private void sendKickViaProxy(Player player, Component kickMsg) {
+        try {
+            String json = GsonComponentSerializer.gson().serialize(kickMsg);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            DataOutputStream dos = new DataOutputStream(baos);
+            dos.writeUTF(json);
+            dos.flush();
+            player.sendPluginMessage(plugin, "verificablocksy:kick", baos.toByteArray());
+        } catch (Exception e) {
+            plugin.getLogger().warning("[VerificaBlocksy] Error sending proxy kick: " + e.getMessage());
+            // Se qualcosa va storto, esegue fallback kick standard
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    try {
+                        player.kick(kickMsg);
+                    } catch (Throwable t) {
+                        player.kickPlayer("Disconnessione richiesta");
+                    }
+                }
+            });
+        }
     }
 }

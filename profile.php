@@ -29,6 +29,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Modifica nickname pubblico (non Minecraft)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_public_nick'])) {
+    if (!empty($error)) {
+        // CSRF non valido, evita elaborazione
+    } else {
+        $new_nick = trim($_POST['public_nick'] ?? '');
+        // Validazione base: 3-20 caratteri, alfanumerico + underscore e trattino
+        if ($new_nick === '' || strlen($new_nick) < 3 || strlen($new_nick) > 20 || !preg_match('/^[A-Za-z0-9_\-]+$/', $new_nick)) {
+            $error = 'Il nickname deve essere 3-20 caratteri e può contenere lettere, numeri, _ o -.';
+        } else {
+            try {
+                // Aggiorna direttamente senza controllo di univocità (nickname pubblico può essere duplicato)
+                $stmt = $pdo->prepare('UPDATE sl_users SET minecraft_nick = ? WHERE id = ?');
+                $stmt->execute([$new_nick, $user_id]);
+                $_SESSION['minecraft_nick'] = $new_nick;
+                $message = 'Nickname aggiornato con successo.';
+            } catch (Exception $e) {
+                $error = 'Errore durante l\'aggiornamento del nickname.';
+            }
+        }
+    }
+}
 // Gestione form di richiesta nuovo server
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_server'])) {
     $nome = sanitize($_POST['nome'] ?? '');
@@ -279,7 +301,51 @@ include 'header.php';
                 <img src="<?php echo !empty($verified_nick) ? getMinecraftAvatar($verified_nick) : '/logo.png'; ?>" alt="Avatar" class="avatar-img">
             </div>
             <div class="profile-info">
-                <h1 class="profile-nickname"><?php echo htmlspecialchars($user['minecraft_nick'] ?: 'Utente'); ?></h1>
+                <h1 class="profile-nickname" style="display:flex; align-items:center; gap:8px;">
+                    <span><?php echo htmlspecialchars($user['minecraft_nick'] ?: 'Utente'); ?></span>
+                    <button type="button" id="editNickBtn" class="edit-nick-btn" title="Modifica nickname pubblico" style="border:none;background:transparent;color:#b8c1d9;padding:4px;cursor:pointer;outline:none;box-shadow:none;"><i class="bi bi-pencil-square"></i></button>
+                </h1>
+                <div id="editNickForm" class="edit-nick-inline" style="display:none; margin-top:8px;">
+                    <form method="POST" class="d-flex align-items-center" style="gap:8px;">
+                        <?php echo csrfInput(); ?>
+                        <input type="hidden" name="update_public_nick" value="1">
+                        <input type="text" name="public_nick" class="form-control" value="<?php echo htmlspecialchars($user['minecraft_nick'] ?: ''); ?>" placeholder="Nuovo nickname pubblico" style="max-width:260px;">
+                        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check"></i> Salva</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="cancelEditNick"><i class="bi bi-x"></i> Annulla</button>
+                    </form>
+                </div>
+                <style>
+                /* Rimuove effetti hover/focus bianchi sull'icona modifica */
+                #editNickBtn, #editNickBtn:hover, #editNickBtn:focus {
+                    color: #b8c1d9 !important;
+                    background: transparent !important;
+                    border: none !important;
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+                </style>
+                <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const btn = document.getElementById('editNickBtn');
+                    const formWrap = document.getElementById('editNickForm');
+                    const cancelBtn = document.getElementById('cancelEditNick');
+                    if (btn && formWrap) {
+                        btn.addEventListener('click', function () {
+                            const isHidden = formWrap.style.display === '' || formWrap.style.display === 'none';
+                            formWrap.style.display = isHidden ? 'block' : 'none';
+                            if (isHidden) {
+                                const input = formWrap.querySelector('input[name="public_nick"]');
+                                if (input) { input.focus(); input.select(); }
+                            }
+                        });
+                    }
+                    if (cancelBtn && formWrap) {
+                        cancelBtn.addEventListener('click', function () {
+                            formWrap.style.display = 'none';
+                        });
+                    }
+                });
+                </script>
                 <p class="profile-join-date">
                     <i class="bi bi-calendar"></i> 
                     Membro dal <?php echo date('d/m/Y', strtotime($user_stats['join_date'])); ?>
@@ -584,7 +650,7 @@ include 'header.php';
                                     'Survival Games', 'Hunger Games', 'Pixelmon', 'Prison'
                                 ];
                                 
-                                foreach ($modalita_disponibili as $modalita): 
+                                foreach ($modalita_disponibili as $modalita):
                                     $is_selected = in_array($modalita, $server_to_edit['modalita_array']);
                                 ?>
                                     <label class="modalita-checkbox">

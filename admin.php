@@ -996,6 +996,9 @@ include 'header.php';
                     <a href="?action=votes" class="admin-nav-item <?= $action === 'votes' ? 'active' : '' ?>">
                         <i class="bi bi-hand-thumbs-up"></i> Gestione Voti
                     </a>
+                    <a href="?action=forum" class="admin-nav-item <?= $action === 'forum' ? 'active' : '' ?>">
+                        <i class="bi bi-chat-dots"></i> Gestore Forum
+                    </a>
                     <a href="?action=rewards" class="admin-nav-item <?= $action === 'rewards' ? 'active' : '' ?>">
                         <i class="bi bi-gift"></i> Gestione Reward
                     </a>
@@ -1060,6 +1063,9 @@ include 'header.php';
                             break;
                         case 'verify_minecraft':
                             include_verify_minecraft();
+                            break;
+                        case 'forum':
+                            include_forum_manager();
                             break;
                         default:
                             include_dashboard();
@@ -3676,6 +3682,242 @@ function include_verify_minecraft() {
         });
     }
     </script>
+    <?php
+}
+
+function include_forum_manager() {
+    global $pdo;
+    $error = '';
+    $message = '';
+    try { $pdo->exec("ALTER TABLE sl_forum_categories ADD COLUMN allow_user_threads TINYINT(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
+    try { $pdo->exec("CREATE TABLE IF NOT EXISTS sl_forum_sections ( id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(120) NOT NULL, slug VARCHAR(160) NOT NULL UNIQUE, description VARCHAR(255) NULL, sort_order INT DEFAULT 0 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_forum_categories ADD COLUMN section_id INT NULL"); } catch (Exception $e) {}
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $action = $_POST['action'] ?? '';
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+            $error = 'Sessione scaduta o token CSRF non valido.';
+        } else {
+            if ($action === 'create_category') {
+                $name = trim($_POST['name'] ?? '');
+                $sort = (int)($_POST['sort_order'] ?? 0);
+                $allow = isset($_POST['allow_user_threads']) ? 1 : 0;
+                $section_id = isset($_POST['section_id']) && $_POST['section_id'] !== '' ? (int)$_POST['section_id'] : null;
+                if ($name === '') { $error = 'Nome categoria obbligatorio.'; }
+                else {
+                    try {
+                        $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i','-', $name), '-'));
+                        $stmt = $pdo->prepare("INSERT INTO sl_forum_categories (name, slug, sort_order, allow_user_threads, section_id) VALUES (?, ?, ?, ?, ?)");
+                        $stmt->execute([$name, $slug, $sort, $allow, $section_id]);
+                        $message = 'Categoria creata.';
+                    } catch (Exception $e) { $error = 'Errore creazione categoria.'; }
+                }
+            } elseif ($action === 'update_category') {
+                $id = (int)($_POST['id'] ?? 0);
+                $name = trim($_POST['name'] ?? '');
+                $sort = (int)($_POST['sort_order'] ?? 0);
+                $allow = isset($_POST['allow_user_threads']) ? 1 : 0;
+                $section_id = isset($_POST['section_id']) && $_POST['section_id'] !== '' ? (int)$_POST['section_id'] : null;
+                if ($id <= 0 || $name === '') { $error = 'Dati non validi.'; }
+                else {
+                    try {
+                        $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i','-', $name), '-'));
+                        $pdo->prepare("UPDATE sl_forum_categories SET name = ?, slug = ?, sort_order = ?, allow_user_threads = ?, section_id = ? WHERE id = ?")->execute([$name, $slug, $sort, $allow, $section_id, $id]);
+                        $message = 'Categoria aggiornata.';
+                    } catch (Exception $e) { $error = 'Errore aggiornamento categoria.'; }
+                }
+            } elseif ($action === 'delete_category') {
+                $id = (int)($_POST['id'] ?? 0);
+                if ($id <= 0) { $error = 'ID non valido.'; }
+                else {
+                    try {
+                        $pdo->prepare("DELETE FROM sl_forum_categories WHERE id = ?")->execute([$id]);
+                        $message = 'Categoria eliminata.';
+                    } catch (Exception $e) { $error = 'Errore eliminazione categoria.'; }
+                }
+            } elseif ($action === 'create_section') {
+                $name = trim($_POST['name'] ?? '');
+                $sort = (int)($_POST['sort_order'] ?? 0);
+                $description = trim($_POST['description'] ?? '');
+                if ($name === '') { $error = 'Nome sezione obbligatorio.'; }
+                else {
+                    try {
+                        $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i','-', $name), '-'));
+                        $stmt = $pdo->prepare("INSERT INTO sl_forum_sections (name, slug, description, sort_order) VALUES (?, ?, ?, ?)");
+                        $stmt->execute([$name, $slug, $description, $sort]);
+                        $message = 'Sezione creata.';
+                    } catch (Exception $e) { $error = 'Errore creazione sezione.'; }
+                }
+            } elseif ($action === 'update_section') {
+                $id = (int)($_POST['id'] ?? 0);
+                $name = trim($_POST['name'] ?? '');
+                $sort = (int)($_POST['sort_order'] ?? 0);
+                $description = trim($_POST['description'] ?? '');
+                if ($id <= 0 || $name === '') { $error = 'Dati sezione non validi.'; }
+                else {
+                    try {
+                        $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i','-', $name), '-'));
+                        $pdo->prepare("UPDATE sl_forum_sections SET name = ?, slug = ?, description = ?, sort_order = ? WHERE id = ?")->execute([$name, $slug, $description, $sort, $id]);
+                        $message = 'Sezione aggiornata.';
+                    } catch (Exception $e) { $error = 'Errore aggiornamento sezione.'; }
+                }
+            } elseif ($action === 'delete_section') {
+                $id = (int)($_POST['id'] ?? 0);
+                if ($id <= 0) { $error = 'ID sezione non valido.'; }
+                else {
+                    try {
+                        $pdo->prepare("DELETE FROM sl_forum_sections WHERE id = ?")->execute([$id]);
+                        $message = 'Sezione eliminata.';
+                    } catch (Exception $e) { $error = 'Errore eliminazione sezione.'; }
+                }
+            }
+        }
+    }
+    try {
+        $categories = $pdo->query("SELECT * FROM sl_forum_categories ORDER BY sort_order ASC, name ASC")->fetchAll();
+    } catch (Exception $e) { $categories = []; }
+    try {
+        $sections = $pdo->query("SELECT * FROM sl_forum_sections ORDER BY sort_order ASC, name ASC")->fetchAll();
+    } catch (Exception $e) { $sections = []; }
+    ?>
+    <div class="admin-hero mb-3">
+        <div>
+            <h2 class="hero-title"><i class="bi bi-chat-dots"></i> Gestore Forum</h2>
+            <p class="hero-subtitle">Crea e gestisci le categorie del forum.</p>
+        </div>
+    </div>
+
+    <?php if (!empty($message)): ?><div class="alert alert-success alert-admin"><?= htmlspecialchars($message) ?></div><?php endif; ?>
+    <?php if (!empty($error)): ?><div class="alert alert-danger alert-admin"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-collection"></i> Nuova Sezione</h6></div>
+        <div class="card-body">
+            <form method="POST" action="?action=forum" class="row g-2">
+                <?= csrfInput(); ?>
+                <input type="hidden" name="action" value="create_section">
+                <div class="col-md-5"><input type="text" name="name" class="form-control" placeholder="Nome sezione" required></div>
+                <div class="col-md-2"><input type="number" name="sort_order" class="form-control" placeholder="Ordine" value="0"></div>
+                <div class="col-md-5"><input type="text" name="description" class="form-control" placeholder="Descrizione (opzionale)"></div>
+                <div class="col-12"><button class="btn btn-primary btn-admin w-100" type="submit"><i class="bi bi-plus-circle"></i> Aggiungi Sezione</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="data-table">
+        <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-list-nested"></i> Sezioni</h6></div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead><tr><th>ID</th><th>Nome</th><th>Slug</th><th>Ordine</th><th>Azioni</th></tr></thead>
+                <tbody>
+                    <?php foreach ($sections as $s): ?>
+                    <tr>
+                        <td><?= (int)$s['id'] ?></td>
+                        <td>
+                            <form method="POST" action="?action=forum" class="d-flex align-items-center" style="gap:0.5rem;">
+                                <?= csrfInput(); ?>
+                                <input type="hidden" name="action" value="update_section">
+                                <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
+                                <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($s['name']) ?>" style="max-width:260px;" required>
+                                <input type="number" name="sort_order" class="form-control" value="<?= (int)$s['sort_order'] ?>" style="max-width:120px;">
+                                <input type="text" name="description" class="form-control" value="<?= htmlspecialchars($s['description'] ?? '') ?>" style="max-width:260px;" placeholder="Descrizione">
+                                <button class="btn btn-sm btn-success btn-admin" type="submit"><i class="bi bi-save"></i> Salva</button>
+                            </form>
+                        </td>
+                        <td><code><?= htmlspecialchars($s['slug']) ?></code></td>
+                        <td><?= (int)$s['sort_order'] ?></td>
+                        <td>
+                            <form method="POST" action="?action=forum" onsubmit="return confirm('Eliminare la sezione?');" class="d-inline">
+                                <?= csrfInput(); ?>
+                                <input type="hidden" name="action" value="delete_section">
+                                <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
+                                <button class="btn btn-sm btn-outline-danger btn-admin" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($sections)): ?>
+                    <tr><td colspan="5" class="text-secondary">Nessuna sezione trovata.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-folder2"></i> Nuova Categoria</h6></div>
+        <div class="card-body">
+            <form method="POST" action="?action=forum" class="row g-2">
+                <?= csrfInput(); ?>
+                <input type="hidden" name="action" value="create_category">
+                <div class="col-md-4"><input type="text" name="name" class="form-control" placeholder="Nome" required></div>
+                <div class="col-md-2"><input type="number" name="sort_order" class="form-control" placeholder="Ordine" value="0"></div>
+                <div class="col-md-4">
+                    <select name="section_id" class="form-select">
+                        <option value="">Nessuna sezione</option>
+                        <?php foreach ($sections as $s): ?>
+                        <option value="<?= (int)$s['id'] ?>"><?= htmlspecialchars($s['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check form-switch mt-1">
+                        <input class="form-check-input" type="checkbox" id="allowUserThreadsNew" name="allow_user_threads" value="1" checked>
+                        <label class="form-check-label" for="allowUserThreadsNew">Consenti thread agli utenti</label>
+                    </div>
+                </div>
+                <div class="col-12"><button class="btn btn-primary btn-admin w-100" type="submit"><i class="bi bi-plus-circle"></i> Aggiungi</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="data-table">
+        <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-list-ol"></i> Categorie</h6></div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead><tr><th>ID</th><th>Nome</th><th>Slug</th><th>Ordine</th><th>Azioni</th></tr></thead>
+                <tbody>
+                    <?php foreach ($categories as $c): ?>
+                    <tr>
+                        <td><?= (int)$c['id'] ?></td>
+                        <td>
+                            <form method="POST" action="?action=forum" class="d-flex align-items-center" style="gap:0.5rem;">
+                                <?= csrfInput(); ?>
+                                <input type="hidden" name="action" value="update_category">
+                                <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+                                <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($c['name']) ?>" style="max-width:260px;" required>
+                                <input type="number" name="sort_order" class="form-control" value="<?= (int)$c['sort_order'] ?>" style="max-width:120px;">
+                                <select name="section_id" class="form-select" style="max-width:220px;">
+                                    <option value="">Nessuna sezione</option>
+                                    <?php foreach ($sections as $s): ?>
+                                    <option value="<?= (int)$s['id'] ?>" <?= isset($c['section_id']) && (int)$c['section_id'] === (int)$s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-check form-switch text-nowrap">
+                                    <input class="form-check-input" type="checkbox" id="allowUserThreads<?= (int)$c['id'] ?>" name="allow_user_threads" value="1" <?= isset($c['allow_user_threads']) && (int)$c['allow_user_threads'] === 1 ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="allowUserThreads<?= (int)$c['id'] ?>">Utenti possono creare</label>
+                                </div>
+                                <button class="btn btn-sm btn-success btn-admin" type="submit"><i class="bi bi-save"></i> Salva</button>
+                            </form>
+                        </td>
+                        <td><code><?= htmlspecialchars($c['slug']) ?></code></td>
+                        <td><?= (int)$c['sort_order'] ?></td>
+                        <td>
+                            <form method="POST" action="?action=forum" onsubmit="return confirm('Eliminare la categoria?');" class="d-inline">
+                                <?= csrfInput(); ?>
+                                <input type="hidden" name="action" value="delete_category">
+                                <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+                                <button class="btn btn-sm btn-outline-danger btn-admin" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($categories)): ?>
+                    <tr><td colspan="5" class="text-secondary">Nessuna categoria trovata.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
     <?php
 }
 ?>

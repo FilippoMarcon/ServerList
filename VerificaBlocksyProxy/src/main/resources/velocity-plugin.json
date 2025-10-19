@@ -1,0 +1,7 @@
+{
+  "id": "verificablocksyproxy",
+  "name": "VerificaBlocksyProxy",
+  "version": "1.0",
+  "main": "me.ph1llyon.verificaBlocksy.proxy.VerificaBlocksyProxy",
+  "authors": ["Ph1llyOn_"]
+}

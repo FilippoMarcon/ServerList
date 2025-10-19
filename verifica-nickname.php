@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+$page_title = "Verifica nickname";
 
 $verify_error = '';
 $verify_success = '';

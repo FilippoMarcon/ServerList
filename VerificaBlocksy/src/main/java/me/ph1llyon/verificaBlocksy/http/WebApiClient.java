@@ -11,13 +11,15 @@ public class WebApiClient {
     private final String baseUrl;
     private final String endpointPath;
     private final String checkPath;
+    private final String countPath;
     private final boolean mojangStrict;
     private final Logger logger;
 
-    public WebApiClient(String baseUrl, String endpointPath, String checkEndpointPath, boolean mojangStrict, Logger logger) {
+    public WebApiClient(String baseUrl, String endpointPath, String checkEndpointPath, String countEndpointPath, boolean mojangStrict, Logger logger) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.endpointPath = endpointPath.startsWith("/") ? endpointPath : ("/" + endpointPath);
         this.checkPath = checkEndpointPath.startsWith("/") ? checkEndpointPath : ("/" + checkEndpointPath);
+        this.countPath = countEndpointPath.startsWith("/") ? countEndpointPath : ("/" + countEndpointPath);
         this.mojangStrict = mojangStrict;
         this.logger = logger;
     }
@@ -78,6 +80,50 @@ public class WebApiClient {
         } catch (Exception e) {
             logger.warning("VerificaBlocksy: Error checking verification: " + e.getMessage());
             return false;
+        }
+    }
+
+    public int countUnusedCodes(String playerName) {
+        try {
+            URL url = new URL(baseUrl + countPath);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(4000);
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+
+            String body = "player_name=" + URLEncoder.encode(playerName, "UTF-8");
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(body.getBytes(StandardCharsets.UTF_8));
+            }
+
+            int status = conn.getResponseCode();
+            if (status >= 200 && status < 300) {
+                String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                // Risposta: { ok: true, count: N }
+                int idx = response.indexOf("\"count\":");
+                if (idx >= 0) {
+                    String tail = response.substring(idx + 8).trim();
+                    // estrai numero fino alla prima non cifra
+                    StringBuilder num = new StringBuilder();
+                    for (int i = 0; i < tail.length(); i++) {
+                        char c = tail.charAt(i);
+                        if (Character.isDigit(c)) num.append(c);
+                        else break;
+                    }
+                    if (num.length() > 0) {
+                        return Integer.parseInt(num.toString());
+                    }
+                }
+                return 0;
+            } else {
+                logger.warning("VerificaBlocksy: HTTP " + status + " counting codes for " + playerName);
+                return 0;
+            }
+        } catch (Exception e) {
+            logger.warning("VerificaBlocksy: Error counting codes: " + e.getMessage());
+            return 0;
         }
     }
 

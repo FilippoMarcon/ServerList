@@ -142,33 +142,35 @@ try {
                           FROM sl_votes v 
                           JOIN sl_servers s ON v.server_id = s.id 
                           WHERE v.user_id = ? 
-                          AND DATE(v.data_voto) = CURDATE() 
                           ORDER BY v.data_voto DESC 
                           LIMIT 1");
     $stmt->execute([$user_id]);
     $today_vote = $stmt->fetch();
     
     if ($today_vote) {
-        // L'utente ha già votato oggi
-        $voted_server_name = $today_vote['nome'];
-        // Converte dal timestamp UTC del DB al fuso locale configurato
+        // Converte dal timestamp UTC del DB al fuso locale configurato e verifica se è ancora 'oggi' locale
         $vote_dt = new DateTime($today_vote['data_voto'], new DateTimeZone('UTC'));
         $vote_dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
-        $vote_time = $vote_dt->format('H:i');
+        $is_today_local = ($vote_dt->format('Y-m-d') === (new DateTime())->format('Y-m-d'));
         
-        // Calcola il tempo fino a mezzanotte
-        $now = new DateTime();
-        $midnight = new DateTime('tomorrow midnight');
-        $time_until_midnight = $midnight->diff($now);
-        
-        $hours = $time_until_midnight->h;
-        $minutes = $time_until_midnight->i;
-        
-        throw new Exception("Hai già votato oggi per '{$voted_server_name}' alle {$vote_time}. Potrai votare di nuovo tra {$hours}h {$minutes}m (a mezzanotte).");
+        if ($is_today_local) {
+            $voted_server_name = $today_vote['nome'];
+            $vote_time = $vote_dt->format('H:i');
+            
+            // Calcola il tempo fino a mezzanotte locale
+            $now_dt = new DateTime();
+            $midnight = new DateTime('tomorrow midnight');
+            $time_until_midnight = $midnight->diff($now_dt);
+            
+            $hours = $time_until_midnight->h;
+            $minutes = $time_until_midnight->i;
+            
+            throw new Exception("Hai già votato oggi per '{$voted_server_name}' alle {$vote_time}. Potrai votare di nuovo tra {$hours}h {$minutes}m (a mezzanotte).");
+        }
     }
     
-    // Inserisci il voto
-    $stmt = $pdo->prepare("INSERT INTO sl_votes (server_id, user_id, data_voto) VALUES (?, ?, NOW())");
+    // Inserisci il voto (UTC)
+    $stmt = $pdo->prepare("INSERT INTO sl_votes (server_id, user_id, data_voto) VALUES (?, ?, UTC_TIMESTAMP())");
     $stmt->execute([$server_id, $user_id]);
 
     // Ottieni l'ID del voto appena inserito

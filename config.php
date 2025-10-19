@@ -201,13 +201,16 @@ function getMinecraftAvatar($nickname, $size = 64) {
  * Controllo voto giornaliero - NUOVO SISTEMA: un voto al giorno per utente
  */
 function canVote($user_id, $server_id, $pdo) {
-    // Controlla se l'utente ha già votato oggi (qualsiasi server)
-    $stmt = $pdo->prepare("SELECT data_voto FROM sl_votes WHERE user_id = ? AND DATE(data_voto) = CURDATE() LIMIT 1");
+    // Ottiene l'ultimo voto dell'utente e verifica se è nello stesso giorno locale
+    $stmt = $pdo->prepare("SELECT data_voto FROM sl_votes WHERE user_id = ? ORDER BY data_voto DESC LIMIT 1");
     $stmt->execute([$user_id]);
-    $today_vote = $stmt->fetch();
+    $last = $stmt->fetch();
+    if (!$last) return true;
     
-    // Se ha già votato oggi, non può votare
-    return !$today_vote;
+    // Converte timestamp DB (assunto UTC) in timezone locale e confronta con oggi locale
+    $dt = new DateTime($last['data_voto'], new DateTimeZone('UTC'));
+    $dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+    return ($dt->format('Y-m-d') !== (new DateTime())->format('Y-m-d'));
 }
 
 /**
@@ -218,11 +221,19 @@ function getUserDailyVoteInfo($user_id, $pdo) {
                           FROM sl_votes v 
                           JOIN sl_servers s ON v.server_id = s.id 
                           WHERE v.user_id = ? 
-                          AND DATE(v.data_voto) = CURDATE() 
                           ORDER BY v.data_voto DESC 
                           LIMIT 1");
     $stmt->execute([$user_id]);
-    return $stmt->fetch();
+    $row = $stmt->fetch();
+    if (!$row) return false;
+    
+    // Converte su fuso locale e restituisce solo se è 'oggi' locale
+    $dt = new DateTime($row['data_voto'], new DateTimeZone('UTC'));
+    $dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+    if ($dt->format('Y-m-d') === (new DateTime())->format('Y-m-d')) {
+        return $row;
+    }
+    return false;
 }
 
 /**
