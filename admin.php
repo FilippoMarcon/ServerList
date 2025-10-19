@@ -487,6 +487,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 echo json_encode(['success' => true, 'servers' => $servers]);
                 break;
 
+            // Verifica Minecraft Manuale (Cracked/SP)
+            case 'manual_link_minecraft':
+                $user_id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
+                $minecraft_nick = isset($_POST['minecraft_nick']) ? trim($_POST['minecraft_nick']) : '';
+                if ($user_id <= 0 || $minecraft_nick === '') {
+                    echo json_encode(['success' => false, 'message' => 'ID utente e nickname Minecraft sono obbligatori']);
+                    break;
+                }
+                if (!preg_match('/^[a-zA-Z0-9_]{3,16}$/', $minecraft_nick)) {
+                    echo json_encode(['success' => false, 'message' => 'Nickname non valido: 3-16 caratteri, solo lettere/numeri/underscore']);
+                    break;
+                }
+                // Verifica esistenza utente
+                $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE id = ?");
+                $stmt->execute([$user_id]);
+                if (!$stmt->fetchColumn()) {
+                    echo json_encode(['success' => false, 'message' => 'Utente non trovato']);
+                    break;
+                }
+                // Controlla se utente ha già un link
+                $stmt = $pdo->prepare("SELECT id, minecraft_nick FROM sl_minecraft_links WHERE user_id = ?");
+                $stmt->execute([$user_id]);
+                $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($existing) {
+                    echo json_encode(['success' => false, 'message' => 'Utente già verificato come "' . htmlspecialchars($existing['minecraft_nick']) . '"']);
+                    break;
+                }
+                // Controlla se il nick è già collegato ad un altro utente
+                $stmt = $pdo->prepare("SELECT user_id FROM sl_minecraft_links WHERE minecraft_nick = ?");
+                $stmt->execute([$minecraft_nick]);
+                $nickOwner = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($nickOwner) {
+                    echo json_encode(['success' => false, 'message' => 'Questo nickname è già collegato ad un altro account']);
+                    break;
+                }
+                // Inserisci collegamento
+                $now = date('Y-m-d H:i:s');
+                $stmt = $pdo->prepare("INSERT INTO sl_minecraft_links (user_id, minecraft_nick, verified_at) VALUES (?, ?, ?)");
+                $stmt->execute([$user_id, $minecraft_nick, $now]);
+                echo json_encode(['success' => true, 'message' => 'Account verificato manualmente come ' . htmlspecialchars($minecraft_nick)]);
+                break;
+
+            case 'unlink_minecraft':
+                $user_id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
+                if ($user_id <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'ID utente non valido']);
+                    break;
+                }
+                $stmt = $pdo->prepare("DELETE FROM sl_minecraft_links WHERE user_id = ?");
+                $stmt->execute([$user_id]);
+                echo json_encode(['success' => true, 'message' => 'Collegamento rimosso']);
+                break;
+
+            case 'search_users':
+                $search = isset($_POST['search']) ? trim($_POST['search']) : '';
+                if (strlen($search) < 1) {
+                    echo json_encode(['success' => true, 'users' => []]);
+                    break;
+                }
+                $term = '%' . $search . '%';
+                $stmt = $pdo->prepare("
+                    SELECT u.id, u.minecraft_nick, u.email, ml.minecraft_nick AS verified_nick
+                    FROM sl_users u
+                    LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id
+                    WHERE u.minecraft_nick LIKE ? OR u.email LIKE ?
+                    ORDER BY u.minecraft_nick ASC
+                    LIMIT 10
+                ");
+                $stmt->execute([$term, $term]);
+                $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode(['success' => true, 'users' => $users]);
+                break;
+
             // Annunci Management
             case 'create_annuncio':
                 $title = trim($_POST['title'] ?? '');
@@ -929,6 +1002,9 @@ include 'header.php';
                     <a href="?action=licenses" class="admin-nav-item <?= $action === 'licenses' ? 'active' : '' ?>">
                         <i class="bi bi-key"></i> Gestione Licenze
                     </a>
+                    <a href="?action=verify_minecraft" class="admin-nav-item <?= $action === 'verify_minecraft' ? 'active' : '' ?>">
+                        <i class="bi bi-check2-circle"></i> Verifica Minecraft (SP)
+                    </a>
                     <a href="?action=annunci" class="admin-nav-item <?= $action === 'annunci' ? 'active' : '' ?>">
                         <i class="bi bi-megaphone"></i> Gestione Annunci
                     </a>
@@ -981,6 +1057,9 @@ include 'header.php';
                             break;
                         case 'annunci':
                             include_annunci();
+                            break;
+                        case 'verify_minecraft':
+                            include_verify_minecraft();
                             break;
                         default:
                             include_dashboard();
@@ -3155,10 +3234,11 @@ function include_annunci() {
         $params = ['%'.$search.'%', '%'.$search.'%', '%'.$search.'%'];
     }
     $sql = "
-        SELECT a.*, u.minecraft_nick,
+        SELECT a.*, u.minecraft_nick, ml.minecraft_nick AS verified_nick,
                COALESCE(l.cnt, 0) as likes
         FROM sl_annunci a
         JOIN sl_users u ON u.id = a.author_id
+        LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id
         LEFT JOIN (
             SELECT annuncio_id, COUNT(*) AS cnt
             FROM sl_annunci_likes
@@ -3211,7 +3291,7 @@ function include_annunci() {
                 </thead>
                 <tbody>
                     <?php foreach ($annunci as $a): 
-                        $avatar = getMinecraftAvatar($a['minecraft_nick'], 24);
+                        $avatar = !empty($a['verified_nick']) ? getMinecraftAvatar($a['verified_nick'], 24) : '/logo.png';
                         $createdVal = date('Y-m-d\TH:i', strtotime($a['created_at']));
                     ?>
                         <tr>
@@ -3410,6 +3490,195 @@ function include_annunci() {
         </div>
     </div>
 </div>
+
+<?php
+function include_verify_minecraft() {
+    global $pdo;
+    $search = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $params = [];
+    $where = '';
+    if ($search !== '') {
+        $where = "WHERE (u.minecraft_nick LIKE ? OR u.email LIKE ? OR ml.minecraft_nick LIKE ?)";
+        $term = '%' . $search . '%';
+        $params = [$term, $term, $term];
+    }
+    try {
+        $stmt = $pdo->prepare("
+            SELECT ml.user_id, ml.minecraft_nick AS verified_nick, ml.verified_at,
+                   u.minecraft_nick AS username, u.email
+            FROM sl_minecraft_links ml
+            JOIN sl_users u ON u.id = ml.user_id
+            $where
+            ORDER BY ml.verified_at DESC
+            LIMIT 30
+        ");
+        $stmt->execute($params);
+        $links = $stmt->fetchAll();
+    } catch (Exception $e) {
+        $links = [];
+    }
+    ?>
+    <div class="admin-hero mb-3">
+        <div>
+            <h2 class="hero-title"><i class="bi bi-check2-circle"></i> Verifica Minecraft (Cracked/SP)</h2>
+            <p class="hero-subtitle">Collega manualmente un nickname Minecraft al profilo utente.</p>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Cerca utente</label>
+                    <div class="position-relative">
+                        <input type="text" class="form-control" id="userSearchInput" placeholder="Digita username o email..." autocomplete="off">
+                        <input type="hidden" id="selectedUserId">
+                        <div id="userSearchDropdown" class="dropdown-menu w-100" style="max-height: 200px; overflow-y: auto; display: none;"></div>
+                    </div>
+                    <div class="form-text">Seleziona un utente dai risultati per compilare l'ID.</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">ID Utente</label>
+                    <input type="number" class="form-control" id="userIdInput" placeholder="es. 123">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Minecraft Nick da collegare</label>
+                    <input type="text" class="form-control" id="minecraftNickInput" placeholder="es. Player_SP">
+                </div>
+                <div class="col-12 text-end">
+                    <button class="btn btn-primary btn-admin" onclick="manualLinkMinecraft()">
+                        <i class="bi bi-check2-circle"></i> Collega manualmente
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="data-table">
+        <div class="card-header bg-transparent border-bottom">
+            <h6 class="mb-0"><i class="bi bi-person-check"></i> Account verificati manualmente</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Utente (sito)</th>
+                        <th>Email</th>
+                        <th>Minecraft Nick</th>
+                        <th>Verificato il</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($links as $l): ?>
+                    <tr>
+                        <td><?= (int)$l['user_id'] ?></td>
+                        <td><?= htmlspecialchars($l['username']) ?></td>
+                        <td><?= htmlspecialchars($l['email'] ?? '') ?></td>
+                        <td>
+                            <img src="<?= htmlspecialchars(getMinecraftAvatar($l['verified_nick'], 24)) ?>" alt="" width="24" height="24" class="rounded-circle me-1">
+                            <?= htmlspecialchars($l['verified_nick']) ?>
+                        </td>
+                        <td><?= date('d/m/Y H:i', strtotime($l['verified_at'])) ?></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger btn-admin" onclick="unlinkMinecraft(<?= (int)$l['user_id'] ?>)">
+                                <i class="bi bi-x-circle"></i> Scollega
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($links)): ?>
+                    <tr><td colspan="6" class="text-secondary">Nessun account verificato trovato.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+    // Ricerca utente live
+    const userInput = document.getElementById('userSearchInput');
+    const userDropdown = document.getElementById('userSearchDropdown');
+    const selectedUserId = document.getElementById('selectedUserId');
+    const userIdInput = document.getElementById('userIdInput');
+
+    userInput.addEventListener('input', function() {
+        const q = this.value.trim();
+        if (q.length < 1) {
+            userDropdown.style.display = 'none';
+            userDropdown.innerHTML = '';
+            return;
+        }
+        makeAjaxRequest('search_users', { search: q }, (response) => {
+            if (response.success) {
+                const items = response.users || [];
+                if (items.length === 0) {
+                    userDropdown.innerHTML = '<div class="dropdown-item text-secondary">Nessun risultato</div>';
+                    userDropdown.style.display = 'block';
+                    return;
+                }
+                userDropdown.innerHTML = items.map(u => {
+                    const verifiedBadge = u.verified_nick ? '<span class="badge bg-success ms-2">Verificato</span>' : '';
+                    return `<button type="button" class="dropdown-item d-flex align-items-center" data-id="${u.id}" data-nick="${u.minecraft_nick}">
+                                <img src="${u.verified_nick ? '<?= AVATAR_API ?>/' + encodeURIComponent(u.verified_nick) : '/logo.png'}" class="rounded me-2" width="20" height="20" />
+                                <span>${u.minecraft_nick} <small class="text-secondary ms-2">${u.email || ''}</small>${verifiedBadge}</span>
+                            </button>`;
+                }).join('');
+                userDropdown.style.display = 'block';
+                [...userDropdown.querySelectorAll('.dropdown-item')].forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.dataset.id;
+                        const nick = btn.dataset.nick;
+                        selectedUserId.value = id;
+                        userIdInput.value = id;
+                        userInput.value = nick;
+                        userDropdown.style.display = 'none';
+                    });
+                });
+            } else {
+                showAlert(response.message || 'Errore ricerca utenti', 'danger');
+            }
+        });
+    });
+
+    function manualLinkMinecraft() {
+        const userId = parseInt(document.getElementById('userIdInput').value || selectedUserId.value || '0', 10);
+        const mcNick = document.getElementById('minecraftNickInput').value.trim();
+        if (!userId || !mcNick) {
+            showAlert('Inserisci ID utente e nickname Minecraft', 'warning');
+            return;
+        }
+        if (!/^[a-zA-Z0-9_]{3,16}$/.test(mcNick)) {
+            showAlert('Il nickname Minecraft deve essere 3-16 caratteri, solo lettere, numeri e underscore', 'warning');
+            return;
+        }
+        makeAjaxRequest('manual_link_minecraft', { user_id: userId, minecraft_nick: mcNick }, (response) => {
+            if (response.success) {
+                showAlert(response.message || 'Verifica completata', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(response.message || 'Errore durante la verifica', 'danger');
+            }
+        });
+    }
+
+    function unlinkMinecraft(userId) {
+        confirmAction('Scollegare il nickname da questo account?', () => {
+            makeAjaxRequest('unlink_minecraft', { user_id: userId }, (response) => {
+                if (response.success) {
+                    showAlert(response.message || 'Scollegato', 'success');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showAlert(response.message || 'Errore', 'danger');
+                }
+            });
+        });
+    }
+    </script>
+    <?php
+}
+?>
 
 <!-- Modal per generare licenza -->
 <div class="modal fade" id="generateLicenseModal" tabindex="-1" aria-labelledby="generateLicenseModalLabel" aria-hidden="true">

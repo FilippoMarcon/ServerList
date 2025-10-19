@@ -1,0 +1,6 @@
+name: VerificaBlocksy
+version: '1.0'
+main: me.ph1llyon.verificaBlocksy.VerificaBlocksy
+api-version: '1.21'
+authors: [ Ph1llyOn_ ]
+description: Blocksy Vote Plugin

@@ -16,12 +16,12 @@ $success = '';
 
 // Gestione del form di login
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $minecraft_nick = sanitize($_POST['minecraft_nick'] ?? '');
+    $identifier = sanitize($_POST['minecraft_nick'] ?? '');
     $password = $_POST['password'] ?? '';
     $captcha_response = $_POST['g-recaptcha-response'] ?? '';
     
     // Validazione input
-    if (empty($minecraft_nick) || empty($password)) {
+    if (empty($identifier) || empty($password)) {
         $error = 'Per favore, compila tutti i campi.';
     } else {
         // Verifica CAPTCHA (usa reCAPTCHA di Google, opzionale)
@@ -38,24 +38,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (empty($error)) {
             try {
-                // Cerca l'utente nel database
-                $stmt = $pdo->prepare("SELECT id, minecraft_nick, password_hash, is_admin FROM sl_users WHERE minecraft_nick = ?");
-                $stmt->execute([$minecraft_nick]);
-                $user = $stmt->fetch();
+                // Supporta login tramite email o nickname Minecraft (nickname non univoci)
+                $is_email = strpos($identifier, '@') !== false;
+                $user = null;
+                if ($is_email) {
+                    try { $pdo->exec("ALTER TABLE sl_users ADD COLUMN email VARCHAR(255) NULL"); } catch (Exception $e) {}
+                    $stmt = $pdo->prepare("SELECT id, minecraft_nick, password_hash, is_admin FROM sl_users WHERE email = ?");
+                    $stmt->execute([$identifier]);
+                    $user = $stmt->fetch();
+                } else {
+                    // Login via nickname Minecraft solo se collegato all'account
+                    $stmtL = $pdo->prepare("SELECT user_id FROM sl_minecraft_links WHERE minecraft_nick = ? LIMIT 1");
+                    $stmtL->execute([$identifier]);
+                    $link_user_id = $stmtL->fetchColumn();
+                    if ($link_user_id) {
+                        $stmt = $pdo->prepare("SELECT id, minecraft_nick, password_hash, is_admin FROM sl_users WHERE id = ? LIMIT 1");
+                        $stmt->execute([$link_user_id]);
+                        $u = $stmt->fetch();
+                        if ($u && password_verify($password, $u['password_hash'])) {
+                            $user = $u;
+                        }
+                    }
+                }
                 
-                if ($user && password_verify($password, $user['password_hash'])) {
+                if ($user) {
                     // Login riuscito
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['minecraft_nick'] = $user['minecraft_nick'];
                     $_SESSION['is_admin'] = $user['is_admin'];
 
-                    
                     $success = 'Login effettuato con successo! Reindirizzamento...';
                     
                     // Reindirizza dopo 2 secondi
                     echo '<meta http-equiv="refresh" content="2;url=index.php">';
                 } else {
-                    $error = 'Nome utente o password non validi.';
+                    $error = 'Nome utente/email o password non validi.';
                 }
             } catch (PDOException $e) {
                 $error = 'Errore durante il login. Riprova più tardi.';
@@ -131,11 +148,11 @@ include 'header.php';
                         <form method="POST" action="/login" id="loginForm" class="auth-form">
                             <div class="form-group">
                                 <label for="minecraft_nick" class="form-label">
-                                    <i class="bi bi-person"></i> Nickname Minecraft
+                                    <i class="bi bi-person"></i> Email o Nick Minecraft (se collegato)
                                 </label>
                                 <input type="text" class="form-input" id="minecraft_nick" name="minecraft_nick" 
                                        value="<?php echo htmlspecialchars($_POST['minecraft_nick'] ?? ''); ?>" required
-                                       placeholder="Il tuo nickname Minecraft">
+                                       placeholder="Il tuo nickname o email">
                             </div>
                             
                             <div class="form-group">
@@ -191,10 +208,16 @@ document.getElementById('togglePassword').addEventListener('click', function() {
 
 // Form validation
 document.getElementById('loginForm').addEventListener('submit', function(e) {
-    const minecraftNick = document.getElementById('minecraft_nick').value.trim();
+    const identifier = document.getElementById('minecraft_nick').value.trim();
     const password = document.getElementById('password').value;
     
-    if (minecraftNick.length < 3) {
+    if (identifier.length === 0) {
+        e.preventDefault();
+        showAuthToast('Inserisci nickname o email.', 'error');
+        return false;
+    }
+    // Se non è email, applica regola minima lunghezza nickname
+    if (!identifier.includes('@') && identifier.length < 3) {
         e.preventDefault();
         showAuthToast('Il nickname deve essere di almeno 3 caratteri.', 'error');
         return false;
@@ -206,80 +229,6 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         return false;
     }
 });
-
-// Enhanced toast for auth pages
-function showAuthToast(message, type = 'success') {
-    // Remove existing toasts
-    const existingToasts = document.querySelectorAll('.auth-toast');
-    existingToasts.forEach(toast => toast.remove());
-    
-    const toast = document.createElement('div');
-    toast.className = 'auth-toast';
-    
-    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
-    const bgColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6';
-    
-    toast.innerHTML = `
-        <div style="
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${bgColor};
-            color: white;
-            padding: 16px 24px;
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            z-index: 99999;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            animation: authToastSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            backdrop-filter: blur(20px);
-            max-width: 300px;
-        ">
-            <span style="font-size: 18px;">${icon}</span>
-            <span>${message}</span>
-        </div>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    // Remove after 4 seconds
-    setTimeout(() => {
-        toast.style.animation = 'authToastSlideOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards';
-        setTimeout(() => toast.remove(), 400);
-    }, 4000);
-}
-
-// Add CSS animations for toast
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes authToastSlideIn {
-        from {
-            opacity: 0;
-            transform: translateX(100%) scale(0.9);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-        }
-    }
-    
-    @keyframes authToastSlideOut {
-        from {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-        }
-        to {
-            opacity: 0;
-            transform: translateX(100%) scale(0.9);
-        }
-    }
-`;
-document.head.appendChild(style);
 </script>
 
 <?php include 'footer.php'; ?>

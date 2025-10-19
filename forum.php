@@ -227,14 +227,7 @@ include 'header.php';
                 // Vista thread
                 $thread = null;
                 try {
-                    $stmt = $pdo->prepare("SELECT t.*, 
-                            u.minecraft_nick, u.is_admin,
-                            (SELECT GROUP_CONCAT(nome SEPARATOR ' / ') FROM sl_servers WHERE owner_id = u.id) AS owned_servers,
-                            c.name AS category_name, c.slug AS category_slug 
-                        FROM sl_forum_threads t 
-                        JOIN sl_users u ON u.id = t.author_id 
-                        JOIN sl_forum_categories c ON c.id = t.category_id 
-                        WHERE t.id = ?");
+                    $stmt = $pdo->prepare("SELECT t.*, \n                            u.minecraft_nick, u.is_admin,\n                            ml.minecraft_nick AS verified_nick,\n                            (SELECT GROUP_CONCAT(nome SEPARATOR ' / ') FROM sl_servers WHERE owner_id = u.id) AS owned_servers,\n                            c.name AS category_name, c.slug AS category_slug \n                        FROM sl_forum_threads t \n                        JOIN sl_users u ON u.id = t.author_id \n                        LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id\n                        JOIN sl_forum_categories c ON c.id = t.category_id \n                        WHERE t.id = ?");
                     $stmt->execute([$thread_id]);
                     $thread = $stmt->fetch();
                     if ($thread) {
@@ -247,12 +240,15 @@ include 'header.php';
                     <article class="thread-card">
                         <header class="thread-header d-flex align-items-center justify-content-between">
                             <div class="d-flex align-items-center author" style="gap: 0.6rem;">
-                                <img src="<?= htmlspecialchars(getMinecraftAvatar($thread['minecraft_nick'], 32)) ?>" alt="Avatar" width="32" height="32" class="rounded-circle">
+                                <img src="<?= !empty($thread['verified_nick']) ? htmlspecialchars(getMinecraftAvatar($thread['verified_nick'], 32)) : '/logo.png' ?>" alt="Avatar" width="32" height="32" class="rounded-circle">
                                 <div>
                                     <strong class="thread-title"><?= htmlspecialchars($thread['title']) ?></strong>
                                     <div class="thread-meta">
                                         <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($thread['category_name']) ?></span>
-                                        <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($thread['minecraft_nick']) ?></span>
+                                        <a class="meta-item" href="/utente/<?= (int)$thread['author_id'] ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($thread['minecraft_nick']) ?></a>
+                                        <?php if (!empty($thread['verified_nick'])): ?>
+                                            <a class="meta-item" href="/utente/<?= (int)$thread['author_id'] ?>"><i class="bi bi-check2-circle"></i> Verificato come <?= htmlspecialchars($thread['verified_nick']) ?></a>
+                                        <?php endif; ?>
                                         <?php 
                                         if ((int)($thread['is_admin'] ?? 0) === 1): ?>
                                             <span class="admin-badge admin-role"><i class="bi bi-shield-check"></i> Amministratore</span>
@@ -310,13 +306,7 @@ include 'header.php';
                         $stmt = $pdo->prepare("SELECT COUNT(*) FROM sl_forum_posts WHERE thread_id = ?");
                         $stmt->execute([$thread_id]);
                         $total_posts = (int)$stmt->fetchColumn();
-                        $stmt = $pdo->prepare("SELECT p.*, u.minecraft_nick, u.is_admin,
-                                (SELECT GROUP_CONCAT(nome SEPARATOR ' / ') FROM sl_servers WHERE owner_id = u.id) AS owned_servers
-                            FROM sl_forum_posts p 
-                            JOIN sl_users u ON u.id = p.author_id 
-                            WHERE p.thread_id = ? 
-                            ORDER BY p.created_at ASC 
-                            LIMIT $posts_limit OFFSET $posts_offset");
+                        $stmt = $pdo->prepare("SELECT p.*, u.minecraft_nick, u.is_admin, ml.minecraft_nick AS verified_nick,\n                                (SELECT GROUP_CONCAT(nome SEPARATOR ' / ') FROM sl_servers WHERE owner_id = u.id) AS owned_servers\n                            FROM sl_forum_posts p \n                            JOIN sl_users u ON u.id = p.author_id \n                            LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id\n                            WHERE p.thread_id = ? \n                            ORDER BY p.created_at ASC \n                            LIMIT $posts_limit OFFSET $posts_offset");
                         $stmt->execute([$thread_id]);
                         $posts = $stmt->fetchAll();
                     } catch (Exception $e) {}
@@ -327,15 +317,10 @@ include 'header.php';
                             <div class="post-card">
                                 <div class="post-header">
                                     <div class="post-author d-flex align-items-center" style="gap:0.6rem;">
-                                        <img src="<?= htmlspecialchars(getMinecraftAvatar($p['minecraft_nick'], 28)) ?>" alt="Avatar" width="28" height="28" class="rounded-circle post-avatar">
-                                        <strong class="post-nick"><?= htmlspecialchars($p['minecraft_nick']) ?></strong>
-                                        <?php 
-                                        if ((int)($p['is_admin'] ?? 0) === 1): ?>
-                                            <span class="admin-badge admin-role"><i class="bi bi-shield-check"></i> Amministratore</span>
-                                        <?php elseif (!empty($p['owned_servers'])): ?>
-                                            <span class="admin-badge owner-role"><i class="bi bi-server"></i> Owner di <?= htmlspecialchars($p['owned_servers']) ?></span>
-                                        <?php else: ?>
-                                            <span class="admin-badge user-role"><i class="bi bi-person"></i> Utente</span>
+                                        <img src="<?= !empty($p['verified_nick']) ? htmlspecialchars(getMinecraftAvatar($p['verified_nick'], 28)) : '/logo.png' ?>" alt="Avatar" width="28" height="28" class="rounded-circle post-avatar">
+                                        <a class="post-nick" href="/utente/<?= (int)$p['author_id'] ?>"><?= htmlspecialchars($p['minecraft_nick']) ?></a>
+                                        <?php if (!empty($p['verified_nick'])): ?>
+                                            <a class="admin-badge user-role" href="/utente/<?= (int)$p['author_id'] ?>"><i class="bi bi-check2-circle"></i> Verificato come <?= htmlspecialchars($p['verified_nick']) ?></a>
                                         <?php endif; ?>
                                     </div>
                                     <span class="post-date">
@@ -428,7 +413,7 @@ include 'header.php';
                         $stmt = $pdo->prepare("SELECT COUNT(*) FROM sl_forum_threads WHERE category_id = ?");
                         $stmt->execute([$category_id]);
                         $total_threads = (int)$stmt->fetchColumn();
-                        $stmt = $pdo->prepare("SELECT t.id, t.title, t.slug, t.created_at, t.updated_at, t.replies_count, t.views, u.minecraft_nick FROM sl_forum_threads t JOIN sl_users u ON u.id = t.author_id WHERE t.category_id = ? ORDER BY t.updated_at DESC, t.created_at DESC LIMIT $limit OFFSET $offset");
+                        $stmt = $pdo->prepare("SELECT t.id, t.author_id, t.title, t.slug, t.created_at, t.updated_at, t.replies_count, t.views, u.minecraft_nick, ml.minecraft_nick AS verified_nick FROM sl_forum_threads t JOIN sl_users u ON u.id = t.author_id LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id WHERE t.category_id = ? ORDER BY t.updated_at DESC, t.created_at DESC LIMIT $limit OFFSET $offset");
                         $stmt->execute([$category_id]);
                         $threads = $stmt->fetchAll();
                     } catch (Exception $e) {}
@@ -438,11 +423,14 @@ include 'header.php';
                         <?php foreach ($threads as $t): ?>
                             <div class="thread-row d-flex align-items-center justify-content-between">
                                 <div class="d-flex align-items-center" style="gap:0.5rem;">
-                                    <img src="<?= htmlspecialchars(getMinecraftAvatar($t['minecraft_nick'], 24)) ?>" alt="Avatar" width="24" height="24" class="rounded-circle">
+                                    <img src="<?= !empty($t['verified_nick']) ? htmlspecialchars(getMinecraftAvatar($t['verified_nick'], 24)) : '/logo.png' ?>" alt="Avatar" width="24" height="24" class="rounded-circle">
                                     <div>
                                         <a class="thread-link" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>"><?= htmlspecialchars($t['title']) ?></a>
                                         <div class="thread-small thread-meta">
-                                            <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></span>
+                                            <a class="meta-item" href="/utente/<?= (int)$t['author_id'] ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></a>
+                                            <?php if (!empty($t['verified_nick'])): ?>
+                                                <a class="meta-item" href="/utente/<?= (int)$t['author_id'] ?>"><i class="bi bi-check2-circle"></i> Verificato come <?= htmlspecialchars($t['verified_nick']) ?></a>
+                                            <?php endif; ?>
                                             <span class="meta-item"><i class="bi bi-clock"></i> <?php 
                                                 $dtl = new DateTime($t['created_at'], new DateTimeZone('UTC'));
                                                 $dtl->setTimezone(new DateTimeZone(date_default_timezone_get()));
@@ -484,7 +472,7 @@ include 'header.php';
                 } catch (Exception $e) {}
                 $latest = [];
                 try {
-                    $latest = $pdo->query("SELECT t.id, t.title, t.slug, t.created_at, t.replies_count, t.views, u.minecraft_nick, c.name AS category_name, c.slug AS category_slug, c.id AS category_id FROM sl_forum_threads t JOIN sl_users u ON u.id = t.author_id JOIN sl_forum_categories c ON c.id = t.category_id ORDER BY t.created_at DESC LIMIT 10")->fetchAll();
+                    $latest = $pdo->query("SELECT t.id, t.title, t.slug, t.created_at, t.replies_count, t.views, u.minecraft_nick, ml.minecraft_nick AS verified_nick, c.name AS category_name, c.slug AS category_slug, c.id AS category_id FROM sl_forum_threads t JOIN sl_users u ON u.id = t.author_id LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id JOIN sl_forum_categories c ON c.id = t.category_id ORDER BY t.created_at DESC LIMIT 10")->fetchAll();
                 } catch (Exception $e) {}
                 ?>
 
@@ -510,12 +498,15 @@ include 'header.php';
                                     <a class="list-group-item list-group-item-action bg-transparent text-white forum-latest-item" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>">
                                         <div class="d-flex w-100 align-items-center justify-content-between">
                                             <div class="d-flex align-items-center" style="gap:0.6rem;">
-                                                <img src="<?= htmlspecialchars(getMinecraftAvatar($t['minecraft_nick'], 24)) ?>" alt="Avatar" width="24" height="24" class="rounded-circle forum-avatar">
+                                                <img src="<?= !empty($t['verified_nick']) ? htmlspecialchars(getMinecraftAvatar($t['verified_nick'], 24)) : '/logo.png' ?>" alt="Avatar" width="24" height="24" class="rounded-circle forum-avatar">
                                                 <div>
                                                     <h6 class="mb-1 thread-link" style="margin:0;"><?= htmlspecialchars($t['title']) ?></h6>
                                                     <div class="thread-small thread-meta">
                                                         <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($t['category_name']) ?></span>
                                                         <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></span>
+                                                        <?php if (!empty($t['verified_nick'])): ?>
+                                                            <span class="meta-item"><i class="bi bi-check2-circle"></i> Verificato come <?= htmlspecialchars($t['verified_nick']) ?></span>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </div>
                                             </div>
@@ -555,31 +546,10 @@ include 'header.php';
 .forum-link:hover { color: var(--accent-purple); }
 
 .thread-card { background: var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:1rem; box-shadow: 0 8px 22px rgba(0,0,0,0.25); }
-.thread-header .thread-title { color: var(--text-primary); font-weight:700; }
-.thread-header .thread-meta { font-size:0.85rem; color: var(--text-muted); }
-
-.thread-row { background: var(--secondary-bg); border:1px solid var(--border-color); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.5rem; }
- /* Thread list base */
- .threads-list { display: flex; flex-direction: column; gap: 0.5rem; }
- .thread-row { background: var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:0.75rem 1rem; transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease; }
- .thread-row .thread-link { color: var(--text-primary); text-decoration:none; font-weight:600; }
- .thread-row .thread-link:hover { color: var(--accent-purple); }
- .thread-row .thread-small { font-size:0.85rem; color: var(--text-muted); }
- .thread-stats { color: var(--text-secondary); }
-
-/* Migliorie stile ultimi thread */
-.forum-latest-item { padding: 0.75rem 1rem; transition: background 0.2s ease, transform 0.2s ease; }
-.forum-latest-item:hover { background: var(--secondary-bg); transform: translateY(-1px); }
-.forum-avatar { box-shadow: 0 2px 8px rgba(0,0,0,0.35); border: 1px solid var(--border-color); }
- .stat-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.6rem; border-radius: 999px; background: rgba(124,58,237,0.12); color: var(--text-secondary); border: 1px solid rgba(124,58,237,0.25); font-size: 0.82rem; }
- .thread-row:hover { background: var(--secondary-bg); transform: translateY(-1px); border-color: rgba(124,58,237,0.35); }
-
- /* Thread detail card */
- .thread-card { background: var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:1rem; }
- .thread-header .thread-title { font-size:1.1rem; }
- .thread-meta { display:flex; flex-wrap:wrap; align-items:center; gap: 0.25rem 0.6rem; color: var(--text-muted); font-size:0.9rem; }
- .thread-meta .meta-item { display:inline-flex; align-items:center; gap:0.35rem; padding: 0.15rem 0.5rem; border-radius:999px; border:1px solid var(--border-color); background: rgba(255,255,255,0.04); }
- .admin-badge { display:inline-flex; align-items:center; gap:0.35rem; padding: 0.15rem 0.5rem; border-radius:999px; border:1px solid var(--border-color); background: rgba(255,255,255,0.04); font-size:0.85rem; }
+.thread-header .thread-title { font-size:1.1rem; }
+.thread-meta { display:flex; flex-wrap:wrap; align-items:center; gap: 0.25rem 0.6rem; color: var(--text-muted); font-size:0.9rem; }
+.thread-meta .meta-item { display:inline-flex; align-items:center; gap:0.35rem; padding: 0.15rem 0.5rem; border-radius:999px; border:1px solid var(--border-color); background: rgba(255,255,255,0.04); }
+.admin-badge { display:inline-flex; align-items:center; gap:0.35rem; padding: 0.15rem 0.5rem; border-radius:999px; border:1px solid var(--border-color); background: rgba(255,255,255,0.04); font-size:0.85rem; }
 
 .post-card { background: var(--secondary-bg); border:1px solid var(--border-color); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.75rem; }
 .post-header { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; padding-bottom:0.35rem; border-bottom: 1px dashed rgba(255,255,255,0.08); }
@@ -606,6 +576,14 @@ include 'header.php';
  .forum-card--latest .forum-latest-item:hover::before { opacity:1; transform: scaleX(1.05); }
  .forum-card--latest .forum-avatar { box-shadow: 0 0 0 2px rgba(56,189,248,0.4), 0 2px 8px rgba(0,0,0,0.25); }
  .forum-card--latest .thread-stats .stat-chip { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.3); }
-</style>
+/* Global link normalization in forum contexts */
+ .forum-card a, .thread-card a, .thread-row a, .post-card a, .thread-meta a, .post-header a {
+   text-decoration: none;
+   color: inherit;
+ }
+ .forum-card a:hover, .thread-card a:hover, .thread-row a:hover, .post-card a:hover, .thread-meta a:hover, .post-header a:hover {
+   color: var(--accent-purple);
+ }
+ </style>
 
 <?php include 'footer.php'; ?>

@@ -257,6 +257,14 @@ try {
     error_log("Errore nel recupero licenze server: " . $e->getMessage());
 }
 
+// Nickname Minecraft collegato (verificato)
+$verified_nick = null;
+try {
+    $stmt = $pdo->prepare("SELECT minecraft_nick FROM sl_minecraft_links WHERE user_id = ? LIMIT 1");
+    $stmt->execute([$user_id]);
+    $verified_nick = $stmt->fetchColumn();
+} catch (Exception $e) {}
+
 $page_title = "Profilo - " . htmlspecialchars($user['minecraft_nick'] ?? 'Utente');
 $include_rich_editor = true; // Abilita Quill.js per l'editor rich text
 include 'header.php';
@@ -268,8 +276,7 @@ include 'header.php';
         <!-- Header del Profilo -->
         <div class="profile-header">
             <div class="profile-avatar">
-                <img src="<?php echo getMinecraftAvatar($user['minecraft_nick'] ?: 'MHF_Steve'); ?>" 
-                     alt="Avatar" class="avatar-img">
+                <img src="<?php echo !empty($verified_nick) ? getMinecraftAvatar($verified_nick) : '/logo.png'; ?>" alt="Avatar" class="avatar-img">
             </div>
             <div class="profile-info">
                 <h1 class="profile-nickname"><?php echo htmlspecialchars($user['minecraft_nick'] ?: 'Utente'); ?></h1>
@@ -277,6 +284,20 @@ include 'header.php';
                     <i class="bi bi-calendar"></i> 
                     Membro dal <?php echo date('d/m/Y', strtotime($user_stats['join_date'])); ?>
                 </p>
+                <?php if (!empty($verified_nick)): ?>
+                <p class="profile-join-date">
+                    <i class="bi bi-box-seam"></i>
+                    Minecraft: <a href="https://namemc.com/profile/<?= urlencode($verified_nick) ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($verified_nick); ?></a>
+                </p>
+                <?php else: ?>
+                <p class="profile-join-date">
+                    <i class="bi bi-box-seam"></i>
+                    Minecraft:
+                    <a href="/verifica-nickname" class="btn btn-primary btn-sm" style="margin-left: 6px;">
+                        <i class="bi bi-link-45deg"></i> Collega account Minecraft
+                    </a>
+                </p>
+                <?php endif; ?>
                 <?php 
                 // Determina il ruolo dell'utente e il badge da mostrare
                 if ($user['is_admin']): ?>

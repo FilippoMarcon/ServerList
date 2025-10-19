@@ -29,6 +29,12 @@ if (preg_match('#^/forum/category/([0-9]+)-[A-Za-z0-9_-]+/?$#', $request_path, $
     include __DIR__ . '/forum.php';
     exit();
 }
+// ADD: Public profile SEO route /utente/<id> or /utente/<id>-<slug>
+if (preg_match('#^/utente/([0-9]+)(?:-[A-Za-z0-9_-]+)?/?$#', $request_path, $m)) {
+    $_GET['id'] = (int)$m[1];
+    include __DIR__ . '/user.php';
+    exit();
+}
 
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
 if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout)/?$#', $request_path, $m)) {

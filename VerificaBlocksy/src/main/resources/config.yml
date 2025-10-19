@@ -1,0 +1,23 @@
+api_base_url: "http://blocksylist.site.namedhosting.com"
+registration_endpoint_path: "/register_verification_code.php"
+check_verification_endpoint_path: "/check_minecraft_link.php"
+site_verification_url: "http://blocksylist.site.namedhosting.com/verifica-nickname"
+code_length: 7
+kick_message_template: |
+  Collega il tuo account sul sito:
+  {url}
+  Codice: {code}
+  Valido solo per te, scade in 5 minuti.
+already_verified_kick_message_template: |
+  Questo account è già verificato.
+  Visita: {url}
+  Per scollegare l'account, segui le istruzioni sul sito.
+support_ticket_url: "https://discord.blocksy.it"
+sp_kick_message_template: |
+  Questo account non è Premium.
+  - Acquista un account su https://www.minecraft.net/
+  - Oppure apri un ticket: {ticket_url}
+  Scrivi che vuoi verificarti e che possiedi un account non comprato (SP).
+mojang_check_strict: false
+use_server_online_mode_gate: true
+trust_proxy_forwarding: true

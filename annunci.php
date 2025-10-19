@@ -117,10 +117,11 @@ try {
     }
 
     $query = "
-        SELECT a.id, a.title, a.body, a.author_id, a.created_at, a.updated_at, u.minecraft_nick,
+        SELECT a.id, a.title, a.body, a.author_id, a.created_at, a.updated_at, u.minecraft_nick, ml.minecraft_nick AS verified_nick,
                COALESCE(l.cnt, 0) AS likes
         FROM sl_annunci a
         JOIN sl_users u ON u.id = a.author_id
+        LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id
         LEFT JOIN (
             SELECT annuncio_id, COUNT(*) AS cnt
             FROM sl_annunci_likes
@@ -281,8 +282,8 @@ function applyInlineDiscord($text) {
                 <div class="annunci-list">
                     <?php foreach ($annunci as $ann): 
                         $liked = userLiked($ann['id'], $pdo);
-                        $authorNick = $ann['minecraft_nick'];
-                        $avatar = getMinecraftAvatar($authorNick, 32);
+                        $authorNick = !empty($ann['verified_nick']) ? $ann['verified_nick'] : null;
+                        $avatar = !empty($authorNick) ? getMinecraftAvatar($authorNick, 32) : '/logo.png';
                     ?>
                         <article class="annuncio-card" data-id="<?= (int)$ann['id'] ?>">
                             <header class="annuncio-header d-flex align-items-center justify-content-between">

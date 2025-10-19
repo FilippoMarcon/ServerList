@@ -1,5 +1,92 @@
 <?php
 require_once 'config.php';
+
+$verify_error = '';
+$verify_success = '';
+$current_link = null;
+
+if (isLoggedIn()) {
+    $stmt = $pdo->prepare("SELECT minecraft_nick FROM sl_minecraft_links WHERE user_id = ? LIMIT 1");
+    $stmt->execute([$_SESSION['user_id']]);
+    $current_link = $stmt->fetchColumn();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isLoggedIn()) {
+        redirect('/login?next=/verifica-nickname');
+    }
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $verify_error = 'Sessione scaduta o token CSRF non valido. Ricarica la pagina e riprova.';
+    } else {
+        // Gestione scollegamento account, altrimenti verifica con codice
+        if (isset($_POST['unlink_minecraft'])) {
+            try {
+                $stmtDel = $pdo->prepare("DELETE FROM sl_minecraft_links WHERE user_id = ?");
+                $stmtDel->execute([$_SESSION['user_id']]);
+                $verify_success = 'Account Minecraft scollegato. Puoi collegarne uno nuovo.';
+                $current_link = null;
+            } catch (Exception $e) {
+                $verify_error = 'Errore durante lo scollegamento dell\'account. Riprova.';
+            }
+        } else {
+            // Pulizia codici scaduti
+            try {
+                $now = date('Y-m-d H:i:s');
+                $stmtDel = $pdo->prepare("DELETE FROM sl_verification_codes WHERE expires_at < ?");
+                $stmtDel->execute([$now]);
+            } catch (Exception $e) {}
+
+            $code = sanitize($_POST['verification_code'] ?? '');
+            if ($code === '') {
+                $verify_error = 'Inserisci il codice di verifica.';
+            } else {
+                $stmtC = $pdo->prepare("SELECT id, player_nick, expires_at, consumed_at FROM sl_verification_codes WHERE code = ? LIMIT 1");
+                $stmtC->execute([$code]);
+                $row = $stmtC->fetch();
+                if (!$row) {
+                    $verify_error = 'Codice non valido.';
+                } elseif (!empty($row['consumed_at'])) {
+                    $verify_error = 'Questo codice è già stato utilizzato.';
+                } elseif (strtotime($row['expires_at']) < time()) {
+                    $verify_error = 'Il codice è scaduto. Generane uno nuovo collegandoti al server.';
+                } else {
+                    $mcNick = $row['player_nick'];
+                    // Il nickname Minecraft non può già essere collegato a un altro account
+                    $stmtChk = $pdo->prepare("SELECT user_id FROM sl_minecraft_links WHERE minecraft_nick = ? LIMIT 1");
+                    $stmtChk->execute([$mcNick]);
+                    $existing = $stmtChk->fetchColumn();
+                    if ($existing && (int)$existing !== (int)$_SESSION['user_id']) {
+                        $verify_error = 'Questo nickname Minecraft è già collegato ad un altro account.';
+                    } else {
+                        // Un solo collegamento per utente
+                        $stmtUsr = $pdo->prepare("SELECT id FROM sl_minecraft_links WHERE user_id = ? LIMIT 1");
+                        $stmtUsr->execute([$_SESSION['user_id']]);
+                        $hasLink = $stmtUsr->fetchColumn();
+                        if ($hasLink) {
+                            $verify_error = 'Hai già collegato un account Minecraft.';
+                        } else {
+                            // Collega e consuma il codice
+                            $pdo->beginTransaction();
+                            try {
+                                $stmtIns = $pdo->prepare("INSERT INTO sl_minecraft_links (user_id, minecraft_nick) VALUES (?, ?)");
+                                $stmtIns->execute([$_SESSION['user_id'], $mcNick]);
+                                $stmtUpd = $pdo->prepare("UPDATE sl_verification_codes SET consumed_at = NOW() WHERE id = ?");
+                                $stmtUpd->execute([$row['id']]);
+                                $pdo->commit();
+                                $current_link = $mcNick;
+                                $verify_success = 'Verifica completata! Account collegato come ' . htmlspecialchars($mcNick) . '.';
+                            } catch (Exception $e) {
+                                $pdo->rollBack();
+                                $verify_error = 'Errore durante il collegamento. Riprova.';
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 include 'header.php';
 ?>
 
@@ -17,6 +104,18 @@ include 'header.php';
         border-color: var(--border-color);
         color: var(--text-secondary);
     }
+    .verify-status {
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        border: 1px solid #f39c12;
+        background: rgba(243, 156, 18, 0.1);
+    }
+
+    .verify-status i{
+        color: #f39c12;
+    }
+    .verify-alert-success { color: #0f5132; background: #d1e7dd; border-color: #badbcc; }
+    .verify-alert-error { color: #842029; background: #f8d7da; border-color: #f5c2c7; }
 </style>
 
 <div class="container py-5">
@@ -29,6 +128,32 @@ include 'header.php';
                     </h2>
                 </div>
                 <div class="card-body" style="color: var(--text-secondary);">
+                    <?php if (!isLoggedIn()): ?>
+                        <div class="verify-status mb-3">
+                            <i class="bi bi-info-circle"></i> Devi effettuare il <a href="/login?next=/verifica-nickname">login</a> per collegare l'account.
+                        </div>
+                    <?php else: ?>
+                        <div class="verify-status mb-3">
+                            <?php if ($current_link): ?>
+                                <i class="bi bi-patch-check" style="color: var(--accent-blue);"></i>
+                                Attualmente verificato come <strong><?php echo htmlspecialchars($current_link); ?></strong>.
+                            <?php else: ?>
+                                <i class="bi bi-dash-circle"></i> Nessun account Minecraft collegato.
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($verify_error)): ?>
+                        <div class="verify-alert-error p-3 mb-3" style="border-radius:10px;">
+                            <i class="bi bi-exclamation-triangle"></i> <?php echo $verify_error; ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if (!empty($verify_success)): ?>
+                        <div class="verify-alert-success p-3 mb-3" style="border-radius:10px;">
+                            <i class="bi bi-check-circle"></i> <?php echo $verify_success; ?>
+                        </div>
+                    <?php endif; ?>
+
                     <p style="font-size: 1rem;">Per verificare il tuo nickname, entra in Minecraft Java Edition e collegati all'indirizzo <strong>verifica.blocksy.it</strong>. Segui le istruzioni in gioco per completare la verifica.</p>
 
                     <div class="row g-3 my-3">
@@ -69,6 +194,41 @@ include 'header.php';
                         </div>
                         <small class="text-secondary d-block mt-2">Collegati al server e segui le istruzioni per completare la verifica.</small>
                     </div>
+
+                    <?php if (isLoggedIn()): ?>
+                    <hr class="my-4" />
+                    <div class="mt-2">
+                        <?php if (!empty($current_link)): ?>
+                            <div class="pending-server-info">
+                                <p class="pending-message">
+                                    <i class="bi bi-info-circle"></i>
+                                    Il tuo profilo è già collegato come <strong><?= htmlspecialchars($current_link) ?></strong>.
+                                </p>
+                                <form method="POST" action="/verifica-nickname" class="mt-2">
+                                    <?= csrfInput(); ?>
+                                    <button type="submit" name="unlink_minecraft" class="btn btn-outline-danger btn-sm">
+                                        <i class="bi bi-x-circle"></i> Scollega account
+                                    </button>
+                                </form>
+                            </div>
+                        <?php else: ?>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-key" style="color: var(--accent-blue);"></i>
+                                <strong>Inserisci il codice qui</strong>
+                            </div>
+                            <form method="POST" action="/verifica-nickname" class="mt-2">
+                                <?= csrfInput(); ?>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" name="verification_code" placeholder="XXXX-XXXX-XXXX" maxlength="32" required>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-check2-circle"></i> Verifica
+                                    </button>
+                                </div>
+                                <small class="text-secondary d-block mt-2">Il codice scade dopo 5 minuti dalla generazione.</small>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
 
                     <div class="mt-4">
                         <a class="btn btn-primary" href="https://discord.blocksy.it" target="_blank" rel="noopener">

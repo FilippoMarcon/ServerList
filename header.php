@@ -5556,6 +5556,18 @@
     // Pagine di autenticazione
     $is_login   = (bool)preg_match('#^/(login|login\.php)/?$#i', $request_path);
     $is_register= (bool)preg_match('#^/(register|register\.php)/?$#i', $request_path);
+
+    // Nickname Minecraft verificato per l'avatar in navbar
+    $header_verified_nick = null;
+    if (isLoggedIn()) {
+        try {
+            $stmt = $pdo->prepare("SELECT minecraft_nick FROM sl_minecraft_links WHERE user_id = ? LIMIT 1");
+            $stmt->execute([$_SESSION['user_id']]);
+            $header_verified_nick = $stmt->fetchColumn() ?: null;
+        } catch (Exception $e) {
+            $header_verified_nick = null;
+        }
+    }
     ?>
     <nav class="navbar navbar-expand-lg navbar-mc">
         <div class="container">
@@ -5597,13 +5609,16 @@
                     <?php if (isLoggedIn()): ?>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
-                            <img src="<?php echo getMinecraftAvatar($_SESSION['minecraft_nick'], 32); ?>" 
+                            <img src="<?php echo !empty($header_verified_nick) ? getMinecraftAvatar($header_verified_nick, 32) : '/logo.png'; ?>" 
                                  alt="Avatar" class="rounded-circle me-2" width="32" height="32">
                             <?php echo htmlspecialchars($_SESSION['minecraft_nick']); ?>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="/profile">
                                 <i class="bi bi-person"></i> Profilo
+                            </a></li>
+                            <li><a class="dropdown-item" href="/utente/<?php echo (int)$_SESSION['user_id']; ?>">
+                                <i class="bi bi-person-badge"></i> Profilo Pubblico
                             </a></li>
                             <?php if (isAdmin()): ?>
                         <li><a class="dropdown-item" href="/admin">

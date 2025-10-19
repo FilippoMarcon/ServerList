@@ -28,6 +28,26 @@ if (!isLoggedIn()) {
     exit;
 }
 
+// Richiede account Minecraft verificato collegato al profilo
+try {
+    $stmt = $pdo->prepare("SELECT minecraft_nick FROM sl_minecraft_links WHERE user_id = ? LIMIT 1");
+    $stmt->execute([$_SESSION['user_id']]);
+    $linked_nick = $stmt->fetchColumn();
+    if (!$linked_nick) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Per votare devi prima collegare il tuo account Minecraft su /verifica-nickname.'
+        ]);
+        exit;
+    }
+} catch (Exception $e) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Errore nel controllo verifica account. Riprova.'
+    ]);
+    exit;
+}
+
 // Throttling anti-abuso (per sessione e IP)
 // - Max 1 richiesta ogni 5 secondi
 // - Max 30 richieste al minuto (endpoint vote.php)
@@ -150,33 +170,30 @@ try {
     // Inserisci il voto
     $stmt = $pdo->prepare("INSERT INTO sl_votes (server_id, user_id, data_voto) VALUES (?, ?, NOW())");
     $stmt->execute([$server_id, $user_id]);
-    
+
     // Ottieni l'ID del voto appena inserito
     $vote_id = $pdo->lastInsertId();
-    
+
     // Genera un codice univoco per il voto
     $vote_code = generateUniqueVoteCode($server_id, $user_id);
-    
-    // Inserisci il codice di voto
-    $expires_at = date('Y-m-d H:i:s', strtotime('+7 days')); // Codice valido per 7 giorni
+
+    // Inserisci il codice di voto usando il nickname Minecraft verificato
+    $expires_at = date('Y-m-d H:i:s', strtotime('+7 days'));
     $stmt = $pdo->prepare("INSERT INTO sl_vote_codes (vote_id, server_id, user_id, player_name, code, expires_at) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$vote_id, $server_id, $user_id, $_SESSION['minecraft_nick'], $vote_code, $expires_at]);
-    
-    // Aggiorna il contatore voti nella vista (opzionale, la vista si aggiorna automaticamente)
-    // Ma possiamo anche aggiornare una cache se necessario
-    
+    $stmt->execute([$vote_id, $server_id, $user_id, $linked_nick, $vote_code, $expires_at]);
+
     // Commit della transazione
     $pdo->commit();
-    
-    // Invia webhook se configurato
-    sendVoteWebhook($server_id, $_SESSION['minecraft_nick'], $pdo->lastInsertId());
-    
+
+    // Invia webhook con nickname Minecraft verificato
+    sendVoteWebhook($server_id, $linked_nick, $pdo->lastInsertId());
+
     // Prepara la risposta di successo
     $response = [
         'success' => true,
         'message' => 'Voto registrato con successo!',
         'vote_time' => date('Y-m-d H:i:s'),
-        'user_nick' => $_SESSION['minecraft_nick'],
+        'user_nick' => $linked_nick,
         'vote_code' => $vote_code,
         'code_expires' => $expires_at
     ];

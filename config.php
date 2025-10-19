@@ -1,4 +1,21 @@
 <?php
+// Avvio sessione e configurazione database
+session_start();
+
+$servername = "phpmyadmin.namedhosting.com";
+$username = "user_5907";
+$password = "JyLYLLB3D0Bvh68MaYgn0RYS3RDMtIkpA0o7fPOOEzg";
+$dbname = "site_5907";
+
+try {
+    $pdo = new PDO("mysql:host=$servername;dbname=$dbname;charset=utf8mb4", $username, $password, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+} catch (PDOException $e) {
+    die("Connessione fallita: " . $e->getMessage());
+}
+
 /**
  * Configurazione database e impostazioni generali
  * Database configuration and general settings
@@ -20,6 +37,18 @@ $options = [
 try {
     // Creazione connessione PDO
     $pdo = new PDO("mysql:host=$servername;dbname=$dbname;charset=utf8mb4", $username, $password, $options);
+    // Allinea timezone della sessione MySQL con quella PHP (Europe/Rome)
+    try {
+        $tz = new DateTimeZone('Europe/Rome');
+        $dt = new DateTime('now', $tz);
+        $offsetSeconds = $tz->getOffset($dt);
+        $hours = intdiv($offsetSeconds, 3600);
+        $mins = intdiv($offsetSeconds % 3600, 60);
+        $offsetStr = sprintf('%+03d:%02d', $hours, $mins);
+        $pdo->exec("SET time_zone = '{$offsetStr}'");
+    } catch (Exception $e) {
+        // Ignora eventuali errori di impostazione timezone
+    }
 } catch (PDOException $e) {
     // Gestione errore di connessione
     die("Connessione al database fallita: " . $e->getMessage());
@@ -211,7 +240,53 @@ function ensurePasswordResetTable($pdo) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 }
 
+/**
+ * Assicura tabelle per verifica Minecraft
+ */
+function ensureVerificationTables($pdo) {
+    // Codici di verifica generati dal plugin, validi 5 minuti
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_verification_codes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        server_id INT NULL,
+        license_key VARCHAR(64) NULL,
+        player_nick VARCHAR(32) NOT NULL,
+        code VARCHAR(32) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME NOT NULL,
+        consumed_at DATETIME NULL,
+        UNIQUE KEY uniq_code (code),
+        INDEX idx_player (player_nick),
+        INDEX idx_exp (expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    // Collegamento univoco tra utente del sito e nickname Minecraft
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_minecraft_links (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        minecraft_nick VARCHAR(32) NOT NULL,
+        verified_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_user (user_id),
+        UNIQUE KEY uniq_mcnick (minecraft_nick),
+        INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    // Assicura che sl_users permetta duplicati sul campo minecraft_nick
+    try {
+        // Rimuovi UNIQUE se presente
+        $pdo->exec("ALTER TABLE sl_users DROP INDEX minecraft_nick");
+    } catch (Exception $e) {
+        // Ignora se l'indice non esiste o non è rimovibile
+    }
+    try {
+        // Aggiungi un indice non univoco per performance
+        $pdo->exec("CREATE INDEX idx_sl_users_mcnick ON sl_users(minecraft_nick)");
+    } catch (Exception $e) {
+        // Ignora se già esiste
+    }
+}
+
 // Inizializza risorsa necessaria
 ensurePasswordResetTable($pdo);
+ensureVerificationTables($pdo);
 
 ?>

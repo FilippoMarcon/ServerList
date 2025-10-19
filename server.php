@@ -190,6 +190,8 @@ redirect('/');
     $user_has_voted_today = false;
     $voted_server_name = '';
     $time_until_next_vote = '';
+    $needs_link = false;
+    $verified_nick = null;
     
     if (isLoggedIn()) {
         $user_id = $_SESSION['user_id'];
@@ -211,6 +213,21 @@ redirect('/');
             $time_until_next_vote = "{$hours}h {$minutes}m";
         } else {
             $can_vote = true;
+        }
+
+        // Richiede account Minecraft collegato per poter votare
+        try {
+            $stmt = $pdo->prepare("SELECT minecraft_nick FROM sl_minecraft_links WHERE user_id = ? LIMIT 1");
+            $stmt->execute([$user_id]);
+            $verified_nick = $stmt->fetchColumn();
+            if (!$verified_nick) {
+                $can_vote = false;
+                $needs_link = true;
+            }
+        } catch (PDOException $e) {
+            // Fail-closed: se c'è errore, non permettere il voto
+            $can_vote = false;
+            $needs_link = true;
         }
     }
     
@@ -672,10 +689,20 @@ include 'header.php';
                                 <i class="bi bi-check-circle"></i> 
                                 <?php if ($user_has_voted_today): ?>
                                     Hai già votato oggi
+                                <?php elseif (isLoggedIn() && $needs_link): ?>
+                                    Collega l'account Minecraft per votare
                                 <?php else: ?>
                                     Accedi per votare
                                 <?php endif; ?>
                             </button>
+                            <?php if (isLoggedIn() && $needs_link && !$user_has_voted_today): ?>
+                                <div class="vote-link-tip" style="margin-top:8px;">
+                                    <small>
+                                        <i class="bi bi-link-45deg"></i>
+                                        <a href="/verifica-nickname" class="text-decoration-underline">Collega il tuo account Minecraft</a> per poter votare.
+                                    </small>
+                                </div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                     <div class="vote-count">
