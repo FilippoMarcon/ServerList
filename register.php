@@ -50,61 +50,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     if (empty($error)) {
-        // Verifica reCAPTCHA di Google
-        $secret_key = RECAPTCHA_SECRET_KEY;
-        
-        if (!empty($captcha_response)) {
-            $verify_url = "https://www.google.com/recaptcha/api/siteverify";
-            $verify_data = [
-                'secret' => $secret_key,
-                'response' => $captcha_response,
-                'remoteip' => $_SERVER['REMOTE_ADDR']
-            ];
+        try {
+            // Assicura colonna email (se già esiste, ignora errore)
+            try { $pdo->exec("ALTER TABLE sl_users ADD COLUMN email VARCHAR(255) NULL"); } catch (Exception $e) {}
             
-            $verify_request = curl_init();
-            curl_setopt($verify_request, CURLOPT_URL, $verify_url);
-            curl_setopt($verify_request, CURLOPT_POST, true);
-            curl_setopt($verify_request, CURLOPT_POSTFIELDS, http_build_query($verify_data));
-            curl_setopt($verify_request, CURLOPT_RETURNTRANSFER, true);
-            
-            $verify_response = curl_exec($verify_request);
-            curl_close($verify_request);
-            
-            $captcha_result = json_decode($verify_response, true);
-            
-            if (!$captcha_result['success']) {
-                $error = 'Verifica reCAPTCHA fallita. Riprova.';
-            }
-        } else {
-            $error = 'Completa la verifica reCAPTCHA.';
-        }
-        
-        if (empty($error)) {
-            try {
-                // Assicura colonna email (se già esiste, ignora errore)
-                try { $pdo->exec("ALTER TABLE sl_users ADD COLUMN email VARCHAR(255) NULL"); } catch (Exception $e) {}
+            // Verifica unicità email
+            $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE email = ? LIMIT 1");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                $error = 'Email già in uso.';
+            } else {
+                // Consenti nickname duplicati: niente controllo di unicità
+                $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                $data_registrazione = date('Y-m-d H:i:s');
                 
-                // Verifica unicità email
-                $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE email = ? LIMIT 1");
-                $stmt->execute([$email]);
-                if ($stmt->fetch()) {
-                    $error = 'Email già in uso.';
-                } else {
-                    // Consenti nickname duplicati: niente controllo di unicità
-                    $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                    $data_registrazione = date('Y-m-d H:i:s');
-                    
-                    $stmt = $pdo->prepare("INSERT INTO sl_users (minecraft_nick, email, password_hash, data_registrazione) VALUES (?, ?, ?, ?)");
-                    $stmt->execute([$minecraft_nick, $email, $password_hash, $data_registrazione]);
-                    
-                    $success = 'Registrazione completata! Username del sito creato. Collega Minecraft dal profilo.';
-                    
-                    // Reindirizza al login dopo 3 secondi
-                    echo '<meta http-equiv="refresh" content="3;url=/login">';
-                }
-            } catch (PDOException $e) {
-                $error = 'Errore durante la registrazione. Riprova più tardi.';
+                $stmt = $pdo->prepare("INSERT INTO sl_users (minecraft_nick, email, password_hash, data_registrazione) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$minecraft_nick, $email, $password_hash, $data_registrazione]);
+                
+                $success = 'Registrazione completata! Username del sito creato. Collega Minecraft dal profilo.';
+                
+                // Reindirizza al login dopo 3 secondi
+                echo '<meta http-equiv="refresh" content="3;url=/login">';
             }
+        } catch (PDOException $e) {
+            $error = 'Errore durante la registrazione. Riprova più tardi.';
         }
     }
 }
@@ -116,7 +85,7 @@ include 'header.php';
 ?>
 
 
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
 <style>
 /* Force center alignment - Override any conflicting styles */
 .auth-header {
@@ -234,10 +203,7 @@ include 'header.php';
                                 </div>
                             </div>
 
-                            <!-- reCAPTCHA -->
-                            <div class="form-group">
-                                <div class="g-recaptcha" data-sitekey="<?php echo RECAPTCHA_SITE_KEY; ?>"></div>
-                            </div>
+
 
                             <button type="submit" class="auth-button">
                                 <i class="bi bi-person-plus"></i>
@@ -296,7 +262,7 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
     const passwordConfirm = document.getElementById('password_confirm').value;
-    const recaptchaResponse = grecaptcha.getResponse();
+    
     
     if (minecraftNick.length < 3 || minecraftNick.length > 16) {
         e.preventDefault();
@@ -328,11 +294,7 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
         return false;
     }
     
-    if (!recaptchaResponse) {
-        e.preventDefault();
-        showAuthToast('Completa la verifica reCAPTCHA.', 'error');
-        return false;
-    }
+    
 });
 
 // Enhanced toast for auth pages

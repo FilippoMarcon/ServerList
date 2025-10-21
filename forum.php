@@ -625,7 +625,7 @@ include 'header.php';
                                                 <div>
                                                     <h6 class="mb-1 thread-link" style="margin:0;"><?= htmlspecialchars($t['title']) ?></h6>
                                                     <div class="thread-small thread-meta">
-                                                        <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($t['category_name']) ?></span>
+                                                        <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($t['category_name'] ?? '') ?></span>
                                                         <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></span>
                                                         <?php if (!empty($t['verified_nick'])): ?>
                                                             <span class="meta-item"><i class="bi bi-check2-circle"></i> <?= htmlspecialchars($t['verified_nick']) ?></span>
