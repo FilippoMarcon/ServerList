@@ -1,0 +1,354 @@
+<?php
+/**
+ * Pagina Sponsorizzazione Server
+ * Server Sponsorship Page
+ */
+
+require_once 'config.php';
+
+$page_title = "Sponsorizza il tuo Server";
+$page_description = "Sponsorizza il tuo server Minecraft e ottieni maggiore visibilità nella lista server";
+
+$message = '';
+$error = '';
+
+// Gestione invio richiesta sponsorizzazione
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'request_sponsorship') {
+    if (!isLoggedIn()) {
+        $error = 'Devi essere loggato per richiedere una sponsorizzazione.';
+    } elseif (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $error = 'Sessione scaduta o token CSRF non valido.';
+    } else {
+        $server_id = (int)($_POST['server_id'] ?? 0);
+        $duration = (int)($_POST['duration'] ?? 30);
+        $notes = trim($_POST['notes'] ?? '');
+        
+        if ($server_id <= 0) {
+            $error = 'Seleziona un server valido.';
+        } else {
+            try {
+                // Verifica che il server appartenga all'utente
+                $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE id = ? AND owner_id = ? AND is_active = 1");
+                $stmt->execute([$server_id, $_SESSION['user_id']]);
+                $server = $stmt->fetch();
+                
+                if (!$server) {
+                    $error = 'Server non trovato o non hai i permessi per sponsorizzarlo.';
+                } else {
+                    // Verifica se esiste già una richiesta pendente
+                    $stmt = $pdo->prepare("SELECT id FROM sl_sponsorship_requests WHERE server_id = ? AND status = 'pending'");
+                    $stmt->execute([$server_id]);
+                    if ($stmt->fetch()) {
+                        $error = 'Esiste già una richiesta di sponsorizzazione pendente per questo server.';
+                    } else {
+                        // Crea la richiesta
+                        $stmt = $pdo->prepare("INSERT INTO sl_sponsorship_requests (server_id, user_id, duration_days, notes, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
+                        $stmt->execute([$server_id, $_SESSION['user_id'], $duration, $notes]);
+                        $message = 'Richiesta di sponsorizzazione inviata con successo! Un amministratore la esaminerà a breve.';
+                    }
+                }
+            } catch (PDOException $e) {
+                $error = 'Errore durante l\'invio della richiesta. Riprova più tardi.';
+            }
+        }
+    }
+}
+
+// Crea tabella richieste sponsorizzazione se non esiste
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_sponsorship_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        server_id INT NOT NULL,
+        user_id INT NOT NULL,
+        duration_days INT DEFAULT 30,
+        notes TEXT,
+        status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        processed_at TIMESTAMP NULL,
+        processed_by INT NULL,
+        admin_notes TEXT,
+        FOREIGN KEY (server_id) REFERENCES sl_servers(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES sl_users(id) ON DELETE CASCADE,
+        INDEX(status),
+        INDEX(server_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+} catch (PDOException $e) {
+    // Tabella già esistente
+}
+
+// Ottieni i server dell'utente
+$user_servers = [];
+if (isLoggedIn()) {
+    try {
+        $stmt = $pdo->prepare("SELECT id, nome, ip FROM sl_servers WHERE owner_id = ? AND is_active = 1 ORDER BY nome ASC");
+        $stmt->execute([$_SESSION['user_id']]);
+        $user_servers = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        // Errore nel caricamento server
+    }
+}
+
+include 'header.php';
+?>
+
+<div class="container" style="margin-top: 2rem; margin-bottom: 3rem;">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="sponsorship-page">
+                <div class="page-header text-center mb-4">
+                    <h1 class="page-title">
+                        <i class="bi bi-star-fill" style="color: #FFD700;"></i>
+                        Sponsorizza il tuo Server
+                    </h1>
+                    <p class="page-subtitle">Ottieni maggiore visibilità e raggiungi più giocatori</p>
+                </div>
+
+                <?php if (!empty($message)): ?>
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> <?php echo htmlspecialchars($message); ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!empty($error)): ?>
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> <?php echo htmlspecialchars($error); ?>
+                    </div>
+                <?php endif; ?>
+
+                <div class="benefits-section mb-4">
+                    <h3 class="section-title">Vantaggi della Sponsorizzazione</h3>
+                    <div class="benefits-grid">
+                        <div class="benefit-card">
+                            <i class="bi bi-eye-fill benefit-icon"></i>
+                            <h4>Maggiore Visibilità</h4>
+                            <p>Il tuo server apparirà in evidenza nella homepage</p>
+                        </div>
+                        <div class="benefit-card">
+                            <i class="bi bi-graph-up-arrow benefit-icon"></i>
+                            <h4>Più Giocatori</h4>
+                            <p>Attira nuovi giocatori e fai crescere la tua community</p>
+                        </div>
+                        <div class="benefit-card">
+                            <i class="bi bi-star-fill benefit-icon"></i>
+                            <h4>Badge Sponsor</h4>
+                            <p>Badge distintivo che evidenzia il tuo server</p>
+                        </div>
+                        <div class="benefit-card">
+                            <i class="bi bi-lightning-fill benefit-icon"></i>
+                            <h4>Priorità</h4>
+                            <p>Posizione prioritaria nei risultati di ricerca</p>
+                        </div>
+                    </div>
+                </div>
+
+                <?php if (!isLoggedIn()): ?>
+                    <div class="login-prompt text-center">
+                        <i class="bi bi-lock-fill" style="font-size: 3rem; color: var(--accent-purple); margin-bottom: 1rem;"></i>
+                        <h3>Accedi per Continuare</h3>
+                        <p>Devi essere loggato per richiedere una sponsorizzazione</p>
+                        <a href="/login" class="btn btn-hero">
+                            <i class="bi bi-box-arrow-in-right"></i> Accedi
+                        </a>
+                    </div>
+                <?php elseif (empty($user_servers)): ?>
+                    <div class="no-servers-prompt text-center">
+                        <i class="bi bi-server" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+                        <h3>Nessun Server Disponibile</h3>
+                        <p>Non hai ancora aggiunto un server. Aggiungi il tuo server per poterlo sponsorizzare.</p>
+                        <a href="/profile" class="btn btn-hero">
+                            <i class="bi bi-plus-circle"></i> Aggiungi Server
+                        </a>
+                    </div>
+                <?php else: ?>
+                    <div class="request-form-section">
+                        <h3 class="section-title">Richiedi Sponsorizzazione</h3>
+                        <form method="POST" action="/sponsorizza-il-tuo-server" class="sponsorship-form">
+                            <?php echo csrfInput(); ?>
+                            <input type="hidden" name="action" value="request_sponsorship">
+                            
+                            <div class="form-group mb-3">
+                                <label for="server_id" class="form-label">Seleziona Server</label>
+                                <select name="server_id" id="server_id" class="form-control" required>
+                                    <option value="">-- Seleziona un server --</option>
+                                    <?php foreach ($user_servers as $srv): ?>
+                                        <option value="<?php echo $srv['id']; ?>">
+                                            <?php echo htmlspecialchars($srv['nome']); ?> (<?php echo htmlspecialchars($srv['ip']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="duration" class="form-label">Durata Sponsorizzazione</label>
+                                <select name="duration" id="duration" class="form-control" required>
+                                    <option value="30">30 giorni</option>
+                                    <option value="60">60 giorni</option>
+                                    <option value="90">90 giorni</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="notes" class="form-label">Note Aggiuntive (opzionale)</label>
+                                <textarea name="notes" id="notes" class="form-control" rows="4" placeholder="Aggiungi eventuali note o richieste speciali..."></textarea>
+                            </div>
+
+                            <div class="info-box mb-3">
+                                <i class="bi bi-info-circle"></i>
+                                <div>
+                                    <strong>Nota:</strong> Dopo l'invio della richiesta, un amministratore la esaminerà e ti contatterà per i dettagli del pagamento e l'attivazione della sponsorizzazione.
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-hero w-100">
+                                <i class="bi bi-send"></i> Invia Richiesta
+                            </button>
+                        </form>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.sponsorship-page {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 2rem;
+    border: 1px solid var(--border-color);
+}
+
+.page-header {
+    margin-bottom: 2rem;
+}
+
+.page-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+}
+
+.benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.benefit-card {
+    background: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.benefit-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    border-color: var(--accent-purple);
+}
+
+.benefit-icon {
+    font-size: 2.5rem;
+    color: var(--accent-purple);
+    margin-bottom: 1rem;
+}
+
+.benefit-card h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.benefit-card p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.sponsorship-form .form-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.sponsorship-form .form-control {
+    background: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+
+.sponsorship-form .form-control:focus {
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    outline: none;
+}
+
+.info-box {
+    background: rgba(124, 58, 237, 0.1);
+    border: 1px solid var(--accent-purple);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.info-box i {
+    font-size: 1.5rem;
+    color: var(--accent-purple);
+    flex-shrink: 0;
+}
+
+.info-box div {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.login-prompt, .no-servers-prompt {
+    padding: 3rem 2rem;
+    background: var(--primary-bg);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.login-prompt h3, .no-servers-prompt h3 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.login-prompt p, .no-servers-prompt p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .benefits-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-title {
+        font-size: 2rem;
+    }
+}
+</style>
+
+<?php include 'footer.php'; ?>

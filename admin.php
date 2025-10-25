@@ -560,6 +560,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 echo json_encode(['success' => true, 'users' => $users]);
                 break;
 
+            case 'update_sponsor_request_status':
+                $request_id = (int)($_POST['request_id'] ?? 0);
+                $status = $_POST['status'] ?? '';
+                
+                if ($request_id <= 0 || !in_array($status, ['approved', 'rejected'])) {
+                    echo json_encode(['success' => false, 'message' => 'Parametri non validi']);
+                    break;
+                }
+                
+                $stmt = $pdo->prepare("UPDATE sl_sponsorship_requests SET status = ?, processed_at = NOW(), processed_by = ? WHERE id = ?");
+                $stmt->execute([$status, $_SESSION['user_id'], $request_id]);
+                
+                echo json_encode(['success' => true, 'message' => 'Stato richiesta aggiornato']);
+                break;
+
             // Annunci Management
             case 'create_annuncio':
                 $title = trim($_POST['title'] ?? '');
@@ -1963,36 +1978,48 @@ function include_sponsors() {
     $where_clause = $where_conditions ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
 
     // Query sponsorships
-    $query = "
-        SELECT ss.*, s.nome, s.ip, s.is_active AS server_status
-        FROM sl_sponsored_servers ss
-        JOIN sl_servers s ON s.id = ss.server_id
-        $where_clause
-        ORDER BY ss.priority ASC, ss.created_at DESC
-        LIMIT $limit OFFSET $offset
-    ";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $sponsors = $stmt->fetchAll();
+    try {
+        $query = "
+            SELECT ss.*, s.nome, s.ip, s.is_active AS server_status
+            FROM sl_sponsored_servers ss
+            JOIN sl_servers s ON s.id = ss.server_id
+            $where_clause
+            ORDER BY ss.priority ASC, ss.created_at DESC
+            LIMIT $limit OFFSET $offset
+        ";
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $sponsors = $stmt->fetchAll();
 
-    // Conteggio totale per paginazione
-    $count_query = "
-        SELECT COUNT(*)
-        FROM sl_sponsored_servers ss
-        JOIN sl_servers s ON s.id = ss.server_id
-        $where_clause
-    ";
-    $stmt = $pdo->prepare($count_query);
-    $stmt->execute($params);
-    $total_sponsors = (int)$stmt->fetchColumn();
-    $total_pages = ceil($total_sponsors / $limit);
+        // Conteggio totale per paginazione
+        $count_query = "
+            SELECT COUNT(*)
+            FROM sl_sponsored_servers ss
+            JOIN sl_servers s ON s.id = ss.server_id
+            $where_clause
+        ";
+        $stmt = $pdo->prepare($count_query);
+        $stmt->execute($params);
+        $total_sponsors = (int)$stmt->fetchColumn();
+        $total_pages = ceil($total_sponsors / $limit);
+    } catch (PDOException $e) {
+        $sponsors = [];
+        $total_sponsors = 0;
+        $total_pages = 1;
+        error_log("Errore query sponsor: " . $e->getMessage());
+    }
 
     // Statistiche
-    $stats = [
-        'total' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers")->fetchColumn(),
-        'active' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1")->fetchColumn(),
-        'expired' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE expires_at IS NOT NULL AND expires_at <= NOW() ")->fetchColumn(),
-    ];
+    try {
+        $stats = [
+            'total' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers")->fetchColumn(),
+            'active' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1")->fetchColumn(),
+            'expired' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE expires_at IS NOT NULL AND expires_at <= NOW() ")->fetchColumn(),
+        ];
+    } catch (PDOException $e) {
+        $stats = ['total' => 0, 'active' => 0, 'expired' => 0];
+        error_log("Errore statistiche sponsor: " . $e->getMessage());
+    }
     ?>
 
     <div class="admin-hero mb-3">
@@ -2007,263 +2034,447 @@ function include_sponsors() {
         </div>
     </div>
 
-    <div class="admin-stats-grid mb-4">
-        <div class="metric-card">
-            <div class="metric-icon"><i class="bi bi-collection"></i></div>
-            <div class="metric-content">
-                <p class="metric-label">Sponsor Totali</p>
-                <h3 class="metric-value"><?= (int)$stats['total'] ?></h3>
-                <span class="metric-meta">Filtrati: <?= (int)$total_sponsors ?></span>
+    <!-- Sezione Sponsor Attivi -->
+            <div class="admin-stats-grid mb-4">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="bi bi-collection"></i></div>
+                    <div class="metric-content">
+                        <p class="metric-label">Sponsor Totali</p>
+                        <h3 class="metric-value"><?= (int)$stats['total'] ?></h3>
+                        <span class="metric-meta">Filtrati: <?= (int)$total_sponsors ?></span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="bi bi-check-circle"></i></div>
+                    <div class="metric-content">
+                        <p class="metric-label">Attivi</p>
+                        <h3 class="metric-value"><?= (int)$stats['active'] ?></h3>
+                        <span class="metric-meta">Online</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="bi bi-clock-history"></i></div>
+                    <div class="metric-content">
+                        <p class="metric-label">Scaduti</p>
+                        <h3 class="metric-value"><?= (int)$stats['expired'] ?></h3>
+                        <span class="metric-meta">Expired</span>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-icon"><i class="bi bi-check-circle"></i></div>
-            <div class="metric-content">
-                <p class="metric-label">Attivi</p>
-                <h3 class="metric-value"><?= (int)$stats['active'] ?></h3>
-                <span class="metric-meta">Online</span>
-            </div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-icon"><i class="bi bi-clock-history"></i></div>
-            <div class="metric-content">
-                <p class="metric-label">Scaduti</p>
-                <h3 class="metric-value"><?= (int)$stats['expired'] ?></h3>
-                <span class="metric-meta">Expired</span>
-            </div>
-        </div>
-    </div>
 
-    <div class="card bg-dark border-secondary mb-4">
-        <div class="card-body">
-            <div class="row g-2 align-items-center">
-                <div class="col-md-6">
-                    <form method="GET" class="d-flex">
-                        <input type="hidden" name="action" value="sponsors">
-                        <input type="text" name="search" class="form-control me-2" placeholder="Cerca per nome o IP..." value="<?= htmlspecialchars($search) ?>">
-                        <button type="submit" class="btn btn-primary btn-admin">Cerca</button>
-                    </form>
-                </div>
-                <div class="col-md-3">
-                    <form method="GET">
-                        <input type="hidden" name="action" value="sponsors">
-                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
-                        <select name="status_filter" class="form-select" onchange="this.form.submit()">
-                            <option value="">Tutti gli stati</option>
-                            <option value="1" <?= $status_filter === '1' ? 'selected' : '' ?>>Attivi</option>
-                            <option value="0" <?= $status_filter === '0' ? 'selected' : '' ?>>Disattivati</option>
-                        </select>
-                    </form>
-                </div>
-                <div class="col-md-3">
-                    <form method="GET">
-                        <input type="hidden" name="action" value="sponsors">
-                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
-                        <input type="hidden" name="status_filter" value="<?= htmlspecialchars($status_filter) ?>">
-                        <select name="expiry_filter" class="form-select" onchange="this.form.submit()">
-                            <option value="">Valide e scadute</option>
-                            <option value="valid" <?= $expiry_filter === 'valid' ? 'selected' : '' ?>>Solo valide</option>
-                            <option value="expired" <?= $expiry_filter === 'expired' ? 'selected' : '' ?>>Solo scadute</option>
-                        </select>
-                    </form>
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-body">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-6">
+                            <form method="GET" class="d-flex">
+                                <input type="hidden" name="action" value="sponsors">
+                                <input type="text" name="search" class="form-control me-2" placeholder="Cerca per nome o IP..." value="<?= htmlspecialchars($search) ?>">
+                                <button type="submit" class="btn btn-primary btn-admin">Cerca</button>
+                            </form>
+                        </div>
+                        <div class="col-md-3">
+                            <form method="GET">
+                                <input type="hidden" name="action" value="sponsors">
+                                <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                                <select name="status_filter" class="form-select" onchange="this.form.submit()">
+                                    <option value="">Tutti gli stati</option>
+                                    <option value="1" <?= $status_filter === '1' ? 'selected' : '' ?>>Attivi</option>
+                                    <option value="0" <?= $status_filter === '0' ? 'selected' : '' ?>>Disattivati</option>
+                                </select>
+                            </form>
+                        </div>
+                        <div class="col-md-3">
+                            <form method="GET">
+                                <input type="hidden" name="action" value="sponsors">
+                                <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                                <input type="hidden" name="status_filter" value="<?= htmlspecialchars($status_filter) ?>">
+                                <select name="expiry_filter" class="form-select" onchange="this.form.submit()">
+                                    <option value="">Valide e scadute</option>
+                                    <option value="valid" <?= $expiry_filter === 'valid' ? 'selected' : '' ?>>Solo valide</option>
+                                    <option value="expired" <?= $expiry_filter === 'expired' ? 'selected' : '' ?>>Solo scadute</option>
+                                </select>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="data-table">
-        <div class="card-header bg-transparent border-bottom">
-            <h6 class="mb-0"><i class="bi bi-star"></i> Sponsorizzazioni</h6>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-dark table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Server</th>
-                        <th>Priorità</th>
-                        <th>Stato Sponsor</th>
-                        <th>Scadenza</th>
-                        <th>Creato</th>
-                        <th>Azioni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($sponsors as $sp): ?>
-                    <tr>
-                        <td><?= (int)$sp['id'] ?></td>
-                        <td>
-                            <strong><?= htmlspecialchars($sp['nome']) ?></strong>
-                            <div><code><?= htmlspecialchars($sp['ip']) ?></code></div>
-                            <small class="text-secondary">Server <?= (int)$sp['server_status'] === 1 ? 'attivo' : 'non attivo' ?></small>
-                        </td>
-                        <td style="max-width:120px;">
-                            <input type="number" class="form-control form-control-sm" id="priority-<?= (int)$sp['id'] ?>" value="<?= (int)$sp['priority'] ?>" min="1">
-                        </td>
-                        <td>
-                            <?php if ((int)$sp['is_active'] === 1): ?>
-                                <span class="badge bg-success">Attivo</span>
+            <div class="data-table">
+                <div class="card-header bg-transparent border-bottom">
+                    <h6 class="mb-0"><i class="bi bi-star"></i> Sponsorizzazioni</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Server</th>
+                                <th>Priorità</th>
+                                <th>Stato Sponsor</th>
+                                <th>Scadenza</th>
+                                <th>Creato</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($sponsors)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center text-secondary py-4">
+                                    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                                    <p class="mt-2">Nessun server sponsorizzato al momento</p>
+                                </td>
+                            </tr>
                             <?php else: ?>
-                                <span class="badge bg-danger">Disattivato</span>
+                            <?php foreach ($sponsors as $sp): ?>
+                            <tr>
+                                <td><?= (int)$sp['id'] ?></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($sp['nome']) ?></strong>
+                                    <div><code><?= htmlspecialchars($sp['ip']) ?></code></div>
+                                    <small class="text-secondary">Server <?= (int)$sp['server_status'] === 1 ? 'attivo' : 'non attivo' ?></small>
+                                </td>
+                                <td style="max-width:120px;">
+                                    <input type="number" class="form-control form-control-sm" id="priority-<?= (int)$sp['id'] ?>" value="<?= (int)$sp['priority'] ?>" min="1">
+                                </td>
+                                <td>
+                                    <?php if ((int)$sp['is_active'] === 1): ?>
+                                        <span class="badge bg-success">Attivo</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-danger">Disattivato</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="max-width:180px;">
+                                    <input type="date" class="form-control form-control-sm" id="expires-<?= (int)$sp['id'] ?>" value="<?= !empty($sp['expires_at']) ? date('Y-m-d', strtotime($sp['expires_at'])) : '' ?>">
+                                    <small class="text-secondary">Vuoto = senza scadenza</small>
+                                </td>
+                                <td><small><?= htmlspecialchars(date('Y-m-d H:i', strtotime($sp['created_at']))) ?></small></td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-primary btn-admin" onclick="updateSponsorship(<?= (int)$sp['id'] ?>)"><i class="bi bi-save"></i></button>
+                                        <button class="btn btn-sm btn-warning btn-admin" onclick="toggleSponsorById(<?= (int)$sp['id'] ?>)"><i class="bi bi-toggle2-on"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger btn-admin" onclick="deleteSponsorship(<?= (int)$sp['id'] ?>)"><i class="bi bi-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
                             <?php endif; ?>
-                        </td>
-                        <td style="max-width:180px;">
-                            <input type="date" class="form-control form-control-sm" id="expires-<?= (int)$sp['id'] ?>" value="<?= !empty($sp['expires_at']) ? date('Y-m-d', strtotime($sp['expires_at'])) : '' ?>">
-                            <small class="text-secondary">Vuoto = senza scadenza</small>
-                        </td>
-                        <td><small><?= htmlspecialchars(date('Y-m-d H:i', strtotime($sp['created_at']))) ?></small></td>
-                        <td>
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-primary btn-admin" onclick="updateSponsorship(<?= (int)$sp['id'] ?>)"><i class="bi bi-save"></i></button>
-                                <button class="btn btn-sm btn-warning btn-admin" onclick="toggleSponsorById(<?= (int)$sp['id'] ?>)"><i class="bi bi-toggle2-on"></i></button>
-                                <button class="btn btn-sm btn-outline-danger btn-admin" onclick="deleteSponsorship(<?= (int)$sp['id'] ?>)"><i class="bi bi-trash"></i></button>
-                            </div>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <?php if ($total_pages > 1): ?>
-    <nav class="mt-4">
-        <ul class="pagination justify-content-center">
-            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                <li class="page-item <?= $i === $page ? 'active' : '' ?>">
-                    <a class="page-link" href="?action=sponsors&page=<?= $i ?>&search=<?= urlencode($search) ?>&status_filter=<?= urlencode($status_filter) ?>&expiry_filter=<?= urlencode($expiry_filter) ?>">
-                        <?= $i ?>
-                    </a>
-                </li>
-            <?php endfor; ?>
-        </ul>
-    </nav>
-    <?php endif; ?>
-
-    <!-- Modal Aggiungi Sponsor -->
-    <div class="modal fade" id="addSponsorModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content bg-dark text-light">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title"><i class="bi bi-star"></i> Aggiungi Sponsor</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </tbody>
+                    </table>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-3 position-relative">
-                        <label class="form-label">Server</label>
-                        <input type="text" id="sponsorServerInput" class="form-control" placeholder="Cerca server attivo per nome o ID...">
-                        <input type="hidden" id="selectedSponsorServerId" value="">
-                        <div id="sponsorServerDropdown" class="dropdown-menu show" style="display:none; position:absolute; width:100%; max-height:220px; overflow:auto;">
+            </div>
+
+            <?php if ($total_pages > 1): ?>
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                        <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                            <a class="page-link" href="?action=sponsors&page=<?= $i ?>&search=<?= urlencode($search) ?>&status_filter=<?= urlencode($status_filter) ?>&expiry_filter=<?= urlencode($expiry_filter) ?>">
+                                <?= $i ?>
+                            </a>
+                        </li>
+                    <?php endfor; ?>
+                </ul>
+            </nav>
+            <?php endif; ?>
+
+            <!-- Modal Aggiungi Sponsor -->
+            <div class="modal fade" id="addSponsorModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content bg-dark text-light">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title"><i class="bi bi-star"></i> Aggiungi Sponsor</h5>
+                            <button type="button"="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-md-4">
-                            <label class="form-label">Priorità</label>
-                            <input type="number" id="sponsorPriority" class="form-control" value="1" min="1">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Scadenza (opzionale)</label>
-                            <input type="date" id="sponsorExpires" class="form-control">
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button class="btn btn-warning btn-admin w-100" onclick="addSponsorship()"><i class="bi bi-plus-lg"></i> Crea Sponsor</button>
+                        <div class="modal-body">
+                            <div class="mb-3 position-relative">
+                                <label class="form-label">Server</label>
+                                <input type="text" id="sponsorServerInput" class="form-control" placeholder="Cerca server attivo per nome o ID...">
+                                <input type="hidden" id="selectedSponsorServerId" value="">
+                                <div id="sponsorServerDropdown" class="dropdown-menu show" style="display:none; position:absolute; width:100%; max-height:220px; overflow:auto;">
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label class="form-label">Priorità</label>
+                                    <input type="number" id="sponsorPriority" class="form-control" value="1" min="1">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Scadenza (opzionale)</label>
+                                    <input type="date" id="sponsorExpires" class="form-control">
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <button class="btn btn-warning btn-admin w-100" onclick="addSponsorship()"><i class="bi bi-plus-lg"></i> Crea Sponsor</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <script>
-    function initSponsorAutocomplete() {
-        const input = document.getElementById('sponsorServerInput');
-        const dropdown = document.getElementById('sponsorServerDropdown');
-        let timeout;
-        input.addEventListener('input', function() {
-            const q = this.value.trim();
-            document.getElementById('selectedSponsorServerId').value = '';
-            if (timeout) clearTimeout(timeout);
-            if (q.length < 1) { dropdown.style.display = 'none'; return; }
-            timeout = setTimeout(() => {
-                makeAjaxRequest('search_servers', { search: q }, (response) => {
-                    if (response.success) {
-                        if (!response.servers || response.servers.length === 0) {
-                            dropdown.innerHTML = '<div class="dropdown-item text-secondary">Nessun server trovato</div>';
-                            dropdown.style.display = 'block';
-                        } else {
-                            let html = '';
-                            response.servers.forEach(s => {
-                                html += `
-                                    <div class="dropdown-item sponsor-option" data-id="${s.id}" data-name="${s.nome}" style="cursor:pointer;">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span><strong>${s.nome}</strong></span>
-                                            <small class="text-secondary">ID: ${s.id}</small>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            dropdown.innerHTML = html;
-                            dropdown.style.display = 'block';
-                            dropdown.querySelectorAll('.sponsor-option').forEach(opt => {
-                                opt.addEventListener('click', function() {
-                                    document.getElementById('sponsorServerInput').value = this.dataset.name;
-                                    document.getElementById('selectedSponsorServerId').value = this.dataset.id;
-                                    dropdown.style.display = 'none';
-                                });
-                            });
-                        }
+            <script>
+            function initSponsorAutocomplete() {
+                const input = document.getElementById('sponsorServerInput');
+                const dropdown = document.getElementById('sponsorServerDropdown');
+                let timeout;
+                input.addEventListener('input', function() {
+                    const q = this.value.trim();
+                    document.getElementById('selectedSponsorServerId').value = '';
+                    if (timeout) clearTimeout(timeout);
+                    if (q.length < 1) { dropdown.style.display = 'none'; return; }
+                    timeout = setTimeout(() => {
+                        makeAjaxRequest('search_servers', { search: q }, (response) => {
+                            if (response.success) {
+                                if (!response.servers || response.servers.length === 0) {
+                                    dropdown.innerHTML = '<div class="dropdown-item text-secondary">Nessun server trovato</div>';
+                                    dropdown.style.display = 'block';
+                                } else {
+                                    let html = '';
+                                    response.servers.forEach(s => {
+                                        html += `
+                                            <div class="dropdown-item sponsor-option" data-id="${s.id}" data-name="${s.nome}" style="cursor:pointer;">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span><strong>${s.nome}</strong></span>
+                                                    <small class="text-secondary">ID: ${s.id}</small>
+                                                </div>
+                                            </div>
+                                        `;
+                                    });
+                                    dropdown.innerHTML = html;
+                                    dropdown.style.display = 'block';
+                                    dropdown.querySelectorAll('.sponsor-option').forEach(opt => {
+                                        opt.addEventListener('click', function() {
+                                            document.getElementById('sponsorServerInput').value = this.dataset.name;
+                                            document.getElementById('selectedSponsorServerId').value = this.dataset.id;
+                                            dropdown.style.display = 'none';
+                                        });
+                                    });
+                                }
+                            }
+                        });
+                    }, 300);
+                });
+                document.addEventListener('click', function(e) {
+                    if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                        dropdown.style.display = 'none';
                     }
                 });
-            }, 300);
-        });
-        document.addEventListener('click', function(e) {
-            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-                dropdown.style.display = 'none';
             }
-        });
-    }
 
-    document.getElementById('addSponsorModal').addEventListener('shown.bs.modal', function() {
-        initSponsorAutocomplete();
-        document.getElementById('sponsorServerInput').focus();
-    });
-    document.getElementById('addSponsorModal').addEventListener('hidden.bs.modal', function() {
-        document.getElementById('sponsorServerInput').value = '';
-        document.getElementById('selectedSponsorServerId').value = '';
-        document.getElementById('sponsorPriority').value = 1;
-        document.getElementById('sponsorExpires').value = '';
-        document.getElementById('sponsorServerDropdown').style.display = 'none';
-    });
+            document.getElementById('addSponsorModal').addEventListener('shown.bs.modal', function() {
+                initSponsorAutocomplete();
+                document.getElementById('sponsorServerInput').focus();
+            });
+            document.getElementById('addSponsorModal').addEventListener('hidden.bs.modal', function() {
+                document.getElementById('sponsorServerInput').value = '';
+                document.getElementById('selectedSponsorServerId').value = '';
+                document.getElementById('sponsorPriority').value = 1;
+                document.getElementById('sponsorExpires').value = '';
+                document.getElementById('sponsorServerDropdown').style.display = 'none';
+            });
 
-    function addSponsorship() {
-        const serverId = document.getElementById('selectedSponsorServerId').value;
-        const priority = parseInt(document.getElementById('sponsorPriority').value || '1', 10);
-        const expires = document.getElementById('sponsorExpires').value;
-        if (!serverId) { showAlert('Seleziona un server valido', 'warning'); return; }
-        makeAjaxRequest('add_sponsorship', { server_id: serverId, priority: priority, expires_at: expires }, (response) => {
-            if (response.success) {
-                showAlert(response.message, 'success');
-                setTimeout(() => location.reload(), 800);
-            } else {
-                showAlert(response.message || 'Errore durante la creazione sponsor', 'danger');
+            function addSponsorship() {
+                const serverId = document.getElementById('selectedSponsorServerId').value;
+                const priority = parseInt(document.getElementById('sponsorPriority').value || '1', 10);
+                const expires = document.getElementById('sponsorExpires').value;
+                if (!serverId) { showAlert('Seleziona un server valido', 'warning'); return; }
+                makeAjaxRequest('add_sponsorship', { server_id: serverId, priority: priority, expires_at: expires }, (response) => {
+                    if (response.success) {
+                        showAlert(response.message, 'success');
+                        setTimeout(() => location.reload(), 800);
+                    } else {
+                        showAlert(response.message || 'Errore durante la creazione sponsor', 'danger');
+                    }
+                });
             }
+
+            function updateSponsorship(id) {
+                const pr = parseInt(document.getElementById('priority-' + id).value || '1', 10);
+                const ex = document.getElementById('expires-' + id).value;
+                makeAjaxRequest('update_sponsorship', { id: id, priority: pr, expires_at: ex }, (response) => {
+                    if (response.success) { showAlert(response.message, 'success'); }
+                    else { showAlert(response.message || 'Errore aggiornamento sponsor', 'danger'); }
+                });
+            }
+
+            function deleteSponsorship(id) {
+                confirmAction('Eliminare questo sponsor?', () => {
+                    makeAjaxRequest('delete_sponsorship', { id: id }, (response) => {
+                        if (response.success) { showAlert(response.message, 'success'); setTimeout(() => location.reload(), 800); }
+                        else { showAlert(response.message || 'Errore eliminazione sponsor', 'danger'); }
+                    });
+                });
+            }
+            </script>
+
+        <!-- Sezione Richieste Sponsorizzazione -->
+        <div class="mt-5">
+            <h3 class="mb-3"><i class="bi bi-inbox"></i> Richieste di Sponsorizzazione
+            <?php
+            try {
+                $pending_count_display = $pdo->query("SELECT COUNT(*) FROM sl_sponsorship_requests WHERE status = 'pending'")->fetchColumn();
+                if ($pending_count_display > 0) {
+                    echo '<span class="badge bg-danger ms-2">' . $pending_count_display . '</span>';
+                }
+            } catch (PDOException $e) {}
+            ?>
+            </h3>
+        <?php
+        // Carica richieste di sponsorizzazione
+        try {
+            $stmt = $pdo->query("
+                SELECT sr.*, s.nome as server_name, s.ip as server_ip, u.minecraft_nick as user_nick
+                FROM sl_sponsorship_requests sr
+                JOIN sl_servers s ON sr.server_id = s.id
+                JOIN sl_users u ON sr.user_id = u.id
+                ORDER BY 
+                    CASE sr.status 
+                        WHEN 'pending' THEN 1 
+                        WHEN 'approved' THEN 2 
+                        WHEN 'rejected' THEN 3 
+                    END,
+                    sr.created_at DESC
+            ");
+            $requests = $stmt->fetchAll();
+        } catch (PDOException $e) {
+            $requests = [];
+        }
+        ?>
+
+        <div class="data-table">
+            <div class="card-header bg-transparent border-bottom">
+                <h6 class="mb-0"><i class="bi bi-inbox"></i> Richieste di Sponsorizzazione</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Server</th>
+                            <th>Utente</th>
+                            <th>Durata</th>
+                            <th>Note</th>
+                            <th>Stato</th>
+                            <th>Data Richiesta</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($requests)): ?>
+                            <tr>
+                                <td colspan="8" class="text-center text-secondary">Nessuna richiesta di sponsorizzazione</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($requests as $req): ?>
+                            <tr>
+                                <td><?= (int)$req['id'] ?></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($req['server_name']) ?></strong>
+                                    <div><code><?= htmlspecialchars($req['server_ip']) ?></code></div>
+                                </td>
+                                <td><?= htmlspecialchars($req['user_nick']) ?></td>
+                                <td><?= (int)$req['duration_days'] ?> giorni</td>
+                                <td>
+                                    <?php if (!empty($req['notes'])): ?>
+                                        <small><?= htmlspecialchars(substr($req['notes'], 0, 50)) ?><?= strlen($req['notes']) > 50 ? '...' : '' ?></small>
+                                    <?php else: ?>
+                                        <small class="text-secondary">-</small>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($req['status'] === 'pending'): ?>
+                                        <span class="badge bg-warning">In Attesa</span>
+                                    <?php elseif ($req['status'] === 'approved'): ?>
+                                        <span class="badge bg-success">Approvata</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-danger">Rifiutata</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><small><?= htmlspecialchars(date('Y-m-d H:i', strtotime($req['created_at']))) ?></small></td>
+                                <td>
+                                    <?php if ($req['status'] === 'pending'): ?>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-success btn-admin" onclick="approveSponsorRequest(<?= (int)$req['id'] ?>, <?= (int)$req['server_id'] ?>, <?= (int)$req['duration_days'] ?>)" title="Approva">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger btn-admin" onclick="rejectSponsorRequest(<?= (int)$req['id'] ?>)" title="Rifiuta">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    <?php else: ?>
+                                        <small class="text-secondary">Processata</small>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div>
+
+    <script>
+    function approveSponsorRequest(requestId, serverId, durationDays) {
+        confirmAction('Approvare questa richiesta di sponsorizzazione?', () => {
+            // Calcola data scadenza
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + durationDays);
+            const expiresStr = expiresAt.toISOString().split('T')[0];
+            
+            // Prima crea lo sponsor
+            makeAjaxRequest('add_sponsorship', { 
+                server_id: serverId, 
+                priority: 1, 
+                expires_at: expiresStr 
+            }, (response) => {
+                if (response.success) {
+                    // Poi aggiorna lo stato della richiesta
+                    fetch('admin.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            ajax: '1',
+                            action: 'update_sponsor_request_status',
+                            request_id: requestId,
+                            status: 'approved'
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            showAlert('Richiesta approvata e sponsor creato!', 'success');
+                            setTimeout(() => location.reload(), 1000);
+                        } else {
+                            showAlert(data.message || 'Errore aggiornamento stato richiesta', 'warning');
+                        }
+                    });
+                } else {
+                    showAlert(response.message || 'Errore creazione sponsor', 'danger');
+                }
+            });
         });
     }
 
-    function updateSponsorship(id) {
-        const pr = parseInt(document.getElementById('priority-' + id).value || '1', 10);
-        const ex = document.getElementById('expires-' + id).value;
-        makeAjaxRequest('update_sponsorship', { id: id, priority: pr, expires_at: ex }, (response) => {
-            if (response.success) { showAlert(response.message, 'success'); }
-            else { showAlert(response.message || 'Errore aggiornamento sponsor', 'danger'); }
-        });
-    }
-
-    function deleteSponsorship(id) {
-        confirmAction('Eliminare questo sponsor?', () => {
-            makeAjaxRequest('delete_sponsorship', { id: id }, (response) => {
-                if (response.success) { showAlert(response.message, 'success'); setTimeout(() => location.reload(), 800); }
-                else { showAlert(response.message || 'Errore eliminazione sponsor', 'danger'); }
+    function rejectSponsorRequest(requestId) {
+        confirmAction('Rifiutare questa richiesta di sponsorizzazione?', () => {
+            fetch('admin.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    ajax: '1',
+                    action: 'update_sponsor_request_status',
+                    request_id: requestId,
+                    status: 'rejected'
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Richiesta rifiutata', 'success');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showAlert(data.message || 'Errore', 'danger');
+                }
             });
         });
     }
@@ -3692,6 +3903,8 @@ function include_forum_manager() {
     try { $pdo->exec("ALTER TABLE sl_forum_categories ADD COLUMN allow_user_threads TINYINT(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
     try { $pdo->exec("CREATE TABLE IF NOT EXISTS sl_forum_sections ( id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(120) NOT NULL, slug VARCHAR(160) NOT NULL UNIQUE, description VARCHAR(255) NULL, sort_order INT DEFAULT 0 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE sl_forum_categories ADD COLUMN section_id INT NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_forum_categories ADD COLUMN icon_key VARCHAR(64) NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_forum_categories ADD COLUMN icon_url VARCHAR(255) NULL"); } catch (Exception $e) {}
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? '';
         if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -3706,8 +3919,9 @@ function include_forum_manager() {
                 else {
                     try {
                         $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i','-', $name), '-'));
-                        $stmt = $pdo->prepare("INSERT INTO sl_forum_categories (name, slug, sort_order, allow_user_threads, section_id) VALUES (?, ?, ?, ?, ?)");
-                        $stmt->execute([$name, $slug, $sort, $allow, $section_id]);
+                        $icon_url = trim($_POST['icon_url'] ?? '');
+                        $stmt = $pdo->prepare("INSERT INTO sl_forum_categories (name, slug, sort_order, allow_user_threads, section_id, icon_url) VALUES (?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$name, $slug, $sort, $allow, $section_id, $icon_url]);
                         $message = 'Categoria creata.';
                     } catch (Exception $e) { $error = 'Errore creazione categoria.'; }
                 }
@@ -3721,7 +3935,8 @@ function include_forum_manager() {
                 else {
                     try {
                         $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i','-', $name), '-'));
-                        $pdo->prepare("UPDATE sl_forum_categories SET name = ?, slug = ?, sort_order = ?, allow_user_threads = ?, section_id = ? WHERE id = ?")->execute([$name, $slug, $sort, $allow, $section_id, $id]);
+                        $icon_url = trim($_POST['icon_url'] ?? '');
+                        $pdo->prepare("UPDATE sl_forum_categories SET name = ?, slug = ?, sort_order = ?, allow_user_threads = ?, section_id = ?, icon_url = ? WHERE id = ?")->execute([$name, $slug, $sort, $allow, $section_id, $icon_url, $id]);
                         $message = 'Categoria aggiornata.';
                     } catch (Exception $e) { $error = 'Errore aggiornamento categoria.'; }
                 }
@@ -3733,6 +3948,29 @@ function include_forum_manager() {
                         $pdo->prepare("DELETE FROM sl_forum_categories WHERE id = ?")->execute([$id]);
                         $message = 'Categoria eliminata.';
                     } catch (Exception $e) { $error = 'Errore eliminazione categoria.'; }
+                }
+            } elseif ($action === 'bulk_update_categories') {
+                $ids = $_POST['id'] ?? [];
+                if (!is_array($ids) || empty($ids)) { $error = 'Nessuna categoria da aggiornare.'; }
+                else {
+                    $updated = 0;
+                    foreach ($ids as $idRaw) {
+                        $id = (int)$idRaw;
+                        if ($id <= 0) { continue; }
+                        $name = trim($_POST['name'][$id] ?? '');
+                        if ($name === '') { continue; }
+                        $sort = (int)($_POST['sort_order'][$id] ?? 0);
+                        $allow = isset($_POST['allow_user_threads'][$id]) ? 1 : 0;
+                        $section_id = isset($_POST['section_id'][$id]) && $_POST['section_id'][$id] !== '' ? (int)$_POST['section_id'][$id] : null;
+                        $icon_url = trim($_POST['icon_url'][$id] ?? '');
+                        $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i','-', $name), '-'));
+                        try {
+                            $stmt = $pdo->prepare("UPDATE sl_forum_categories SET name = ?, slug = ?, sort_order = ?, allow_user_threads = ?, section_id = ?, icon_url = ? WHERE id = ?");
+                            $stmt->execute([$name, $slug, $sort, $allow, $section_id, $icon_url, $id]);
+                            $updated++;
+                        } catch (Exception $e) { /* skip errore singolo */ }
+                    }
+                    if ($updated > 0) { $message = 'Categorie aggiornate: ' . $updated . '.'; } else { $error = 'Nessun aggiornamento eseguito.'; }
                 }
             } elseif ($action === 'create_section') {
                 $name = trim($_POST['name'] ?? '');
@@ -3865,6 +4103,7 @@ function include_forum_manager() {
                         <label class="form-check-label" for="allowUserThreadsNew">Consenti thread agli utenti</label>
                     </div>
                 </div>
+                <div class="col-md-4"><input type="url" name="icon_url" class="form-control" placeholder="URL icona (https://...)"></div>
                 <div class="col-12"><button class="btn btn-primary btn-admin w-100" type="submit"><i class="bi bi-plus-circle"></i> Aggiungi</button></div>
             </form>
         </div>
@@ -3872,6 +4111,13 @@ function include_forum_manager() {
 
     <div class="data-table">
         <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-list-ol"></i> Categorie</h6></div>
+        <form id="bulkCatForm" method="POST" action="?action=forum" class="d-none">
+            <?= csrfInput(); ?>
+            <input type="hidden" name="action" value="bulk_update_categories">
+        </form>
+        <div class="d-flex justify-content-end mb-2">
+            <button class="btn btn-success btn-admin" type="submit" form="bulkCatForm"><i class="bi bi-save"></i> Salva tutte</button>
+        </div>
         <div class="table-responsive">
             <table class="table table-dark table-hover">
                 <thead><tr><th>ID</th><th>Nome</th><th>Slug</th><th>Ordine</th><th>Azioni</th></tr></thead>
@@ -3880,24 +4126,22 @@ function include_forum_manager() {
                     <tr>
                         <td><?= (int)$c['id'] ?></td>
                         <td>
-                            <form method="POST" action="?action=forum" class="d-flex align-items-center" style="gap:0.5rem;">
-                                <?= csrfInput(); ?>
-                                <input type="hidden" name="action" value="update_category">
-                                <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
-                                <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($c['name']) ?>" style="max-width:260px;" required>
-                                <input type="number" name="sort_order" class="form-control" value="<?= (int)$c['sort_order'] ?>" style="max-width:120px;">
-                                <select name="section_id" class="form-select" style="max-width:220px;">
+                            <div class="d-flex align-items-center" style="gap:0.5rem;">
+                                <input type="hidden" name="id[]" value="<?= (int)$c['id'] ?>" form="bulkCatForm">
+                                <input type="text" name="name[<?= (int)$c['id'] ?>]" class="form-control" value="<?= htmlspecialchars($c['name']) ?>" style="max-width:260px;" required form="bulkCatForm">
+                                <input type="number" name="sort_order[<?= (int)$c['id'] ?>]" class="form-control" value="<?= (int)$c['sort_order'] ?>" style="max-width:120px;" form="bulkCatForm">
+                                <select name="section_id[<?= (int)$c['id'] ?>]" class="form-select" style="max-width:220px;" form="bulkCatForm">
                                     <option value="">Nessuna sezione</option>
                                     <?php foreach ($sections as $s): ?>
                                     <option value="<?= (int)$s['id'] ?>" <?= isset($c['section_id']) && (int)$c['section_id'] === (int)$s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
+                                <input type="url" name="icon_url[<?= (int)$c['id'] ?>]" class="form-control" value="<?= htmlspecialchars($c['icon_url'] ?? '') ?>" style="max-width:160px;" placeholder="URL icona (https://...)" form="bulkCatForm">
                                 <div class="form-check form-switch text-nowrap">
-                                    <input class="form-check-input" type="checkbox" id="allowUserThreads<?= (int)$c['id'] ?>" name="allow_user_threads" value="1" <?= isset($c['allow_user_threads']) && (int)$c['allow_user_threads'] === 1 ? 'checked' : '' ?>>
+                                    <input class="form-check-input" type="checkbox" id="allowUserThreads<?= (int)$c['id'] ?>" name="allow_user_threads[<?= (int)$c['id'] ?>]" value="1" <?= isset($c['allow_user_threads']) && (int)$c['allow_user_threads'] === 1 ? 'checked' : '' ?> form="bulkCatForm">
                                     <label class="form-check-label" for="allowUserThreads<?= (int)$c['id'] ?>">Utenti possono creare</label>
                                 </div>
-                                <button class="btn btn-sm btn-success btn-admin" type="submit"><i class="bi bi-save"></i> Salva</button>
-                            </form>
+                            </div>
                         </td>
                         <td><code><?= htmlspecialchars($c['slug']) ?></code></td>
                         <td><?= (int)$c['sort_order'] ?></td>

@@ -37,7 +37,7 @@ if (preg_match('#^/utente/([0-9]+)(?:-[A-Za-z0-9_-]+)?/?$#', $request_path, $m))
 }
 
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
-if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout)/?$#', $request_path, $m)) {
+if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server)/?$#', $request_path, $m)) {
     $map = [
         'forum' => 'forum.php',
         'annunci' => 'annunci.php',
@@ -49,6 +49,7 @@ if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|veri
         'reset' => 'reset.php',
         'verifica-nickname' => 'verifica-nickname.php',
         'logout' => 'logout.php',
+        'sponsorizza-il-tuo-server' => 'sponsorizza.php',
     ];
     $target = $map[$m[1]] ?? null;
     if ($target) {
@@ -220,7 +221,7 @@ include 'header.php';
                 </div>
                 <div class="sponsored-cta">
                     <span class="sponsored-cta-text">Se vuoi sponsorizzare il tuo server </span>
-                    <a href="/forum" class="sponsored-cta-link">clicca qui</a>
+                    <a href="/sponsorizza-il-tuo-server" class="sponsored-cta-link">clicca qui</a>
                 </div>
             </div>
             <?php endif; ?>
@@ -292,6 +293,10 @@ include 'header.php';
                         if (empty($tags)) {
                             $tags[] = 'Generale';
                         }
+                        
+                        // Mostra max 4 tag, il resto come "+X"
+                        $visible_tags = array_slice($tags, 0, 4);
+                        $remaining_count = count($tags) - 4;
                     ?>
                         <div class="homepage-server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" data-server-id="<?php echo $server['id']; ?>" data-votes="<?php echo $server['voti_totali']; ?>">
                             <div class="server-rank-container">
@@ -331,9 +336,12 @@ include 'header.php';
                                     <div class="server-ip"><?php echo htmlspecialchars($server['ip']); ?></div>
                                 </div>
                                 <div class="server-tags">
-                                    <?php foreach ($tags as $tag): ?>
-                                        <span class="server-tag"><?php echo $tag; ?></span>
+                                    <?php foreach ($visible_tags as $tag): ?>
+                                        <span class="server-tag"><?php echo htmlspecialchars($tag); ?></span>
                                     <?php endforeach; ?>
+                                    <?php if ($remaining_count > 0): ?>
+                                        <span class="server-tag server-tag-more" title="<?php echo htmlspecialchars(implode(', ', array_slice($tags, 4))); ?>">+<?php echo $remaining_count; ?></span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             

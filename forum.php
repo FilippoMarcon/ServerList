@@ -200,9 +200,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Helper semplice per rendering contenuto
+// Helper per rendering contenuto con formattazione markdown-like
 function renderText($text) {
-    return nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+    // Prima sanitizza l'HTML
+    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    
+    // Applica formattazione markdown-like
+    // Bold: **testo** o __testo__
+    $text = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $text);
+    $text = preg_replace('/__(.+?)__/', '<strong>$1</strong>', $text);
+    
+    // Italic: *testo* o _testo_
+    $text = preg_replace('/\*(.+?)\*/', '<em>$1</em>', $text);
+    $text = preg_replace('/_(.+?)_/', '<em>$1</em>', $text);
+    
+    // Underline: ~~testo~~
+    $text = preg_replace('/~~(.+?)~~/', '<u>$1</u>', $text);
+    
+    // Strikethrough: --testo--
+    $text = preg_replace('/--(.+?)--/', '<del>$1</del>', $text);
+    
+    // Code inline: `codice`
+    $text = preg_replace('/`(.+?)`/', '<code style="background: var(--primary-bg); padding: 2px 6px; border-radius: 4px; font-family: monospace;">$1</code>', $text);
+    
+    // Links: [testo](url)
+    $text = preg_replace('/\[([^\]]+)\]\(([^\)]+)\)/', '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--accent-purple); text-decoration: underline;">$1</a>', $text);
+    
+    // Converti newline in <br>
+    $text = nl2br($text);
+    
+    return $text;
 }
 include 'header.php';
 ?>
@@ -491,6 +518,9 @@ include 'header.php';
                     $latest = $pdo->query("SELECT t.id, t.title, t.slug, t.created_at, t.replies_count, t.views, u.minecraft_nick, ml.minecraft_nick AS verified_nick, c.name AS category_name, c.slug AS category_slug, c.id AS category_id FROM sl_forum_threads t JOIN sl_users u ON u.id = t.author_id LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id LEFT JOIN sl_forum_categories c ON c.id = t.category_id ORDER BY COALESCE(t.updated_at, t.created_at) DESC LIMIT 12")->fetchAll();
                 } catch (Exception $e) {}
                 ?>
+                <?php
+                // Icon mapping rimosso: ora si usa $c['icon_url'] settato dall'admin
+                ?>
 
                 <?php if (isLoggedIn()): ?>
                 <div class="collapse" id="newThreadGlobal">
@@ -524,98 +554,94 @@ include 'header.php';
                 <?php endif; ?>
 
                 <div class="row g-3">
-                    <div class="col-md-4">
-                        <div class="forum-card forum-card--categories">
-                            <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-collection"></i> Sezioni</h6></div>
-                            <div class="sections-wrap">
-                                <?php foreach ($sections as $s): ?>
-                                    <div class="section-block mb-3">
-                                        <div class="section-header">
-                                            <div class="d-flex align-items-center justify-content-between">
-                                                <h6 class="mb-1" style="font-weight:700;">
-                                                    <i class="bi bi-folder2"></i> <?= htmlspecialchars($s['name']) ?>
-                                                </h6>
-                                            </div>
-                                            <?php if (!empty($s['description'])): ?>
-                                                <div class="text-secondary" style="font-size:0.9rem;">
-                                                    <?= htmlspecialchars($s['description']) ?>
+                    <div class="col-lg-9">
+                        <?php foreach ($sections as $s): ?>
+                            <div class="board-section mb-3">
+                                <div class="board-header d-flex align-items-center justify-content-between">
+                                    <h6 class="m-0" style="font-weight:700;"><i class="bi bi-collection"></i> <?= htmlspecialchars($s['name']) ?></h6>
+                                    <?php if (!empty($s['description'])): ?>
+                                        <small class="text-secondary"><?= htmlspecialchars($s['description']) ?></small>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="board-list">
+                                    <?php foreach ($categories as $c): if ((int)($c['section_id'] ?? 0) !== (int)$s['id']) continue; ?>
+                                        <a class="board-row" href="/forum/category/<?= (int)$c['id'] ?>-<?= urlencode($c['slug'] ?? 'categoria') ?>">
+                                            <div class="board-info d-flex align-items-center" style="gap:0.75rem;">
+                                                <div class="board-icon">
+                                                    <?php $iconUrl = trim($c['icon_url'] ?? ''); if (!empty($iconUrl)): ?>
+                                                        <img src="<?= htmlspecialchars($iconUrl) ?>" alt="" style="width:24px;height:24px; image-rendering: pixelated;">
+                                                    <?php else: ?>
+                                                        <i class="bi bi-chat-dots"></i>
+                                                    <?php endif; ?>
                                                 </div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <ul class="list-group list-group-flush">
-                                            <?php foreach ($categories as $c): if ((int)($c['section_id'] ?? 0) !== (int)$s['id']) continue; ?>
-                                                <li class="list-group-item bg-transparent text-white">
-                                                    <div class="d-flex justify-content-between align-items-start">
-                                                        <div>
-                                                            <a href="/forum/category/<?= (int)$c['id'] ?>-<?= urlencode($c['slug'] ?? 'categoria') ?>" class="forum-link" style="font-weight:600;">
-                                                                <?= htmlspecialchars($c['name']) ?>
-                                                            </a>
-                                                            <div class="text-secondary" style="font-size:0.85rem;">
-                                                                Discussioni <?= (int)$c['threads_count'] ?> • Messaggi <?= (int)$c['posts_count'] ?>
-                                                            </div>
-                                                            <?php if (isset($latest_by_cat[(int)$c['id']])): $lt = $latest_by_cat[(int)$c['id']]; ?>
-                                                                <div class="text-secondary" style="font-size:0.85rem;">
-                                                                    <span class="me-1"><?= htmlspecialchars($lt['minecraft_nick'] ?: ($lt['verified_nick'] ?? '')) ?></span>
-                                                                    <a href="/forum/<?= (int)$lt['id'] ?>-<?= urlencode($lt['slug'] ?? 'thread') ?>" class="forum-link">
-                                                                        <?= htmlspecialchars($lt['title']) ?>
-                                                                    </a>
-                                                                    <span>• <?= htmlspecialchars(date('d/m/Y', strtotime($lt['latest_date']))) ?></span>
-                                                                </div>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                        <span class="badge bg-secondary rounded-pill"><?= (int)$c['threads_count'] ?></span>
-                                                    </div>
-                                                </li>
-                                            <?php endforeach; ?>
-                                            <?php
-                                            $hasCat = false; foreach ($categories as $c) { if ((int)($c['section_id'] ?? 0) === (int)$s['id']) { $hasCat = true; break; } }
-                                            if (!$hasCat): ?>
-                                                <li class="list-group-item bg-transparent text-secondary">Nessuna categoria in questa sezione.</li>
-                                            <?php endif; ?>
-                                        </ul>
-                                    </div>
-                                <?php endforeach; ?>
-                                <?php
-                                // Categorie senza sezione
-                                $unassigned = array_filter($categories, function($c){ return empty($c['section_id']); });
-                                if (!empty($unassigned)): ?>
-                                    <div class="section-block mb-3">
-                                        <div class="section-header">
-                                            <h6 class="mb-1" style="font-weight:700;"><i class="bi bi-folder2"></i> Varie</h6>
-                                            <div class="text-secondary" style="font-size:0.9rem;">Categorie non assegnate a nessuna sezione.</div>
-                                        </div>
-                                        <ul class="list-group list-group-flush">
-                                            <?php foreach ($unassigned as $c): ?>
-                                                <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-start">
-                                                    <div>
-                                                        <a href="/forum/category/<?= (int)$c['id'] ?>-<?= urlencode($c['slug'] ?? 'categoria') ?>" class="forum-link" style="font-weight:600;">
-                                                            <?= htmlspecialchars($c['name']) ?>
-                                                        </a>
-                                                        <div class="text-secondary" style="font-size:0.85rem;">
-                                                            Discussioni <?= (int)$c['threads_count'] ?> • Messaggi <?= (int)$c['posts_count'] ?>
-                                                        </div>
-                                                        <?php if (isset($latest_by_cat[(int)$c['id']])): $lt = $latest_by_cat[(int)$c['id']]; ?>
-                                                            <div class="text-secondary" style="font-size:0.85rem;">
-                                                                <span class="me-1"><?= htmlspecialchars($lt['minecraft_nick'] ?: ($lt['verified_nick'] ?? '')) ?></span>
-                                                                <a href="/forum/<?= (int)$lt['id'] ?>-<?= urlencode($lt['slug'] ?? 'thread') ?>" class="forum-link">
-                                                                    <?= htmlspecialchars($lt['title']) ?>
-                                                                </a>
-                                                                <span>• <?= htmlspecialchars(date('d/m/Y', strtotime($lt['latest_date']))) ?></span>
-                                                            </div>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                    <span class="badge bg-secondary rounded-pill"><?= (int)$c['threads_count'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    </div>
-                                <?php endif; ?>
+                                                <div>
+                                                    <div class="board-title" style="font-weight:600;"><?= htmlspecialchars($c['name']) ?></div>
+                                                    <?php if (!empty($c['description'])): ?>
+                                                        <div class="board-desc text-secondary" style="font-size:0.85rem;"><?= htmlspecialchars($c['description']) ?></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                            <div class="board-counts text-secondary">Discussioni <?= (int)$c['threads_count'] ?> • Messaggi <?= (int)$c['posts_count'] ?></div>
+                                            <div class="board-latest text-secondary">
+                                                <?php if (isset($latest_by_cat[(int)$c['id']])): $lt = $latest_by_cat[(int)$c['id']]; ?>
+                                                    <span class="me-1"><?= htmlspecialchars($lt['minecraft_nick'] ?: ($lt['verified_nick'] ?? '')) ?></span>
+                                                    <span>• <?= htmlspecialchars(date('d/m/Y', strtotime($lt['latest_date']))) ?></span>
+                                                <?php else: ?>
+                                                    <span>Nessun messaggio recente</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </a>
+                                    <?php endforeach; ?>
+                                    <?php
+                                    $hasCat = false; foreach ($categories as $c) { if ((int)($c['section_id'] ?? 0) === (int)$s['id']) { $hasCat = true; break; } }
+                                    if (!$hasCat): ?>
+                                        <div class="list-group-item bg-transparent text-secondary">Nessuna categoria in questa sezione.</div>
+                                    <?php endif; ?>
+                                </div>
                             </div>
-                        </div>
+                        <?php endforeach; ?>
+                        <?php
+                        // Categorie senza sezione
+                        $unassigned = array_filter($categories, function($c){ return empty($c['section_id']); });
+                        if (!empty($unassigned)): ?>
+                            <div class="board-section mb-3">
+                                <div class="board-header d-flex align-items-center justify-content-between">
+                                    <h6 class="m-0" style="font-weight:700;"><i class="bi bi-folder2"></i> Varie</h6>
+                                    <small class="text-secondary">Categorie non assegnate a nessuna sezione.</small>
+                                </div>
+                                <div class="board-list">
+                                    <?php foreach ($unassigned as $c): ?>
+                                        <a class="board-row" href="/forum/category/<?= (int)$c['id'] ?>-<?= urlencode($c['slug'] ?? 'categoria') ?>">
+                                            <div class="board-info d-flex align-items-center" style="gap:0.75rem;">
+                                                <div class="board-icon">
+                                                    <?php $iconUrl = trim($c['icon_url'] ?? ''); if (!empty($iconUrl)): ?>
+                                                        <img src="<?= htmlspecialchars($iconUrl) ?>" alt="" style="width:24px;height:24px; image-rendering: pixelated;">
+                                                    <?php else: ?>
+                                                        <i class="bi bi-chat-dots"></i>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div>
+                                                    <div class="board-title" style="font-weight:600;"><?= htmlspecialchars($c['name']) ?></div>
+                                                </div>
+                                            </div>
+                                            <div class="board-counts text-secondary">Discussioni <?= (int)$c['threads_count'] ?> • Messaggi <?= (int)$c['posts_count'] ?></div>
+                                            <div class="board-latest text-secondary">
+                                                <?php if (isset($latest_by_cat[(int)$c['id']])): $lt = $latest_by_cat[(int)$c['id']]; ?>
+                                                    <span class="me-1"><?= htmlspecialchars($lt['minecraft_nick'] ?: ($lt['verified_nick'] ?? '')) ?></span>
+                                                    <span>• <?= htmlspecialchars(date('d/m/Y', strtotime($lt['latest_date']))) ?></span>
+                                                <?php else: ?>
+                                                    <span>Nessun messaggio recente</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </div>
-                    <div class="col-md-8">
+                    <div class="col-lg-3">
                         <div class="forum-card forum-card--latest">
-                            <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-chat-dots"></i> Ultimi Thread</h6></div>
+                            <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-chat-dots"></i> Ultimi Messaggi</h6></div>
                             <div class="list-group list-group-flush">
                                 <?php foreach ($latest as $t): ?>
                                     <a class="list-group-item list-group-item-action bg-transparent text-white forum-latest-item" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>">
@@ -712,6 +738,18 @@ include 'header.php';
  }
  /* Thread list item styling */
  .thread-row { background: var(--card-bg); border:1px solid var(--border-color); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.6rem; }
+ /* Board-style home layout */
+ .board-section { background: var(--card-bg); border:1px solid var(--border-color); border-radius:12px; overflow:hidden; box-shadow: 0 8px 22px rgba(0,0,0,0.25); }
+ .board-header { padding:0.75rem 1rem; border-bottom:1px solid var(--border-color); background: linear-gradient(90deg, rgba(124,58,237,0.10), rgba(56,189,248,0.08)); }
+ .board-list { display:flex; flex-direction:column; }
+ .board-row { display:grid; grid-template-columns: minmax(0,1fr) auto auto; align-items:center; gap:0.75rem; padding:0.75rem 1rem; border-bottom:1px solid var(--border-color); text-decoration:none; color:inherit; }
+ .board-list .board-row:last-child { border-bottom:none; }
+ .board-row:hover { background: rgba(124,58,237,0.08); }
+ .board-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:rgba(124,58,237,0.15); border:1px solid rgba(124,58,237,0.35); color:#fff; }
+ .board-title { font-size:1rem; }
+ .board-desc { color: var(--text-secondary); }
+ .board-counts, .board-latest { font-size:0.9rem; color: var(--text-secondary); }
+ @media (max-width: 992px) { .board-row { grid-template-columns: minmax(0,1fr); } .board-counts, .board-latest { display:none; } }
  </style>
 
 <?php include 'footer.php'; ?>

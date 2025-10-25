@@ -132,3 +132,21 @@ user_id
 token
 expires_at
 created_at
+
+`sl_minecraft_links`:
+id
+user_id
+minecraft_nick
+verified_at
+
+`sl_sponsorship_requests`:
+id
+server_id
+user_id
+duration_days
+notes
+status (ENUM: 'pending', 'approved', 'rejected')
+created_at
+processed_at
+processed_by
+admin_notes

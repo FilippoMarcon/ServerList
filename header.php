@@ -85,6 +85,21 @@
             --border-color: #e2e8f0;
             --hover-bg: #f1f5f9;
         }
+
+        /* Fix visibilità in light mode */
+        [data-theme="light"] .server-stats,
+        [data-theme="light"] .server-stats span,
+        [data-theme="light"] .server-stats .stat-chip {
+            color: var(--text-primary) !important;
+        }
+
+        [data-theme="light"] .thread-link {
+            color: var(--text-primary) !important;
+        }
+
+        [data-theme="light"] .thread-link:hover {
+            color: var(--accent-purple) !important;
+        }
         
         body {
             background: var(--primary-bg);
@@ -893,6 +908,19 @@
             background: var(--accent-purple);
             color: white;
             border-color: var(--accent-purple);
+        }
+
+        .server-tag-more {
+            background: var(--accent-purple);
+            color: white;
+            border-color: var(--accent-purple);
+            font-weight: 700;
+            cursor: help;
+        }
+
+        .server-tag-more:hover {
+            background: var(--accent-pink);
+            border-color: var(--accent-pink);
         }
         
         .server-players {

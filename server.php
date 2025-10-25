@@ -127,9 +127,11 @@ redirect('/');
     elseif ($server_rank == 3) $rank_class = 'bronze';
     
     // Recupera TUTTI gli utenti che hanno votato per questo server OGGI (voti giornalieri)
-    $stmt = $pdo->prepare("SELECT u.minecraft_nick, v.data_voto 
+    // Usa minecraft_links per ottenere l'avatar corretto
+    $stmt = $pdo->prepare("SELECT COALESCE(ml.minecraft_nick, u.minecraft_nick) as minecraft_nick, v.data_voto 
                           FROM sl_votes v 
                           JOIN sl_users u ON v.user_id = u.id 
+                          LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id
                           WHERE v.server_id = ? AND DATE(v.data_voto) = CURDATE()
                           ORDER BY v.data_voto DESC");
     $stmt->execute([$server_id]);
