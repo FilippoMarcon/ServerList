@@ -85,6 +85,19 @@ try {
     $update_stmt = $pdo->prepare("UPDATE sl_vote_codes SET status = 'used', used_at = NOW() WHERE id = ?");
     $update_stmt->execute([$vote_code['id']]);
     
+    // Elimina tutti i codici pending precedenti dello stesso utente per lo stesso server
+    $delete_stmt = $pdo->prepare("
+        DELETE FROM sl_vote_codes 
+        WHERE vote_id IN (
+            SELECT v.id FROM sl_votes v 
+            WHERE v.user_id = ? 
+            AND v.server_id = ? 
+            AND v.id != ?
+        )
+        AND status = 'pending'
+    ");
+    $delete_stmt->execute([$vote_code['user_id'], $vote_code['server_id'], $vote_code['vote_id']]);
+    
     // Log della ricompensa (usa il server_id corretto dal risultato)
     $actual_server_id = $vote_code['server_id'];
     $log_stmt = $pdo->prepare("

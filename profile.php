@@ -456,7 +456,7 @@ include 'header.php';
                 }
                 
                 .btn-request-license {
-                    background: var(--gradient-primary);
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                     color: white;
                     border: none;
                     padding: 0.5rem 1rem;
@@ -466,12 +466,19 @@ include 'header.php';
                     transition: all 0.3s ease;
                     display: inline-flex;
                     align-items: center;
+                    justify-content: center;
                     gap: 0.5rem;
+                    min-height: 36px;
+                    font-size: 0.9rem;
+                    line-height: 1.5;
+                    text-decoration: none;
+                    vertical-align: middle;
                 }
                 
                 .btn-request-license:hover {
+                    background: linear-gradient(135deg, #059669 0%, #047857 100%);
                     transform: translateY(-2px);
-                    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+                    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
                 }
                 </style>
                 <script>
@@ -648,7 +655,16 @@ include 'header.php';
                     <p>Tutti i voti che hai dato ai server</p>
                 </div>
                 
-                <?php if (!empty($user_votes)): ?>
+                <?php if (!$verified_nick): ?>
+                    <div class="no-votes-section">
+                        <i class="bi bi-link-45deg no-votes-icon"></i>
+                        <h3>Account Minecraft Non Collegato</h3>
+                        <p>Collega il tuo account Minecraft per poter votare i server e visualizzare la cronologia dei tuoi voti.</p>
+                        <a href="/verifica-nickname" class="btn-primary">
+                            <i class="bi bi-link-45deg"></i> Collega Account Minecraft
+                        </a>
+                    </div>
+                <?php elseif (!empty($user_votes)): ?>
                     <div class="votes-list">
                         <?php foreach ($user_votes as $vote): ?>
                             <div class="vote-item">
@@ -703,6 +719,17 @@ include 'header.php';
                     <p>Compila il form per richiedere l'aggiunta del tuo server alla lista</p>
                 </div>
                 
+                <?php if (!$verified_nick): ?>
+                    <div class="no-votes-section">
+                        <i class="bi bi-link-45deg no-votes-icon"></i>
+                        <h3>Account Minecraft Non Collegato</h3>
+                        <p>Collega il tuo account Minecraft per poter richiedere l'aggiunta di un nuovo server.</p>
+                        <a href="/verifica-nickname" class="btn-primary">
+                            <i class="bi bi-link-45deg"></i> Collega Account Minecraft
+                        </a>
+                    </div>
+                <?php else: ?>
+                
                 <form method="POST" class="server-request-form">
                     <?php echo csrfInput(); ?>
                     <input type="hidden" name="request_server" value="1">
@@ -746,10 +773,25 @@ include 'header.php';
                         </button>
                     </div>
                 </form>
+                <?php endif; ?>
             </div>
 
             <!-- Sezione: Gestione Server -->
             <div class="content-section" id="server-management-section">
+                <?php if (!$verified_nick): ?>
+                    <div class="section-header">
+                        <h2><i class="bi bi-server"></i> Gestione Server</h2>
+                        <p>Gestisci i tuoi server e visualizza le licenze</p>
+                    </div>
+                    <div class="no-votes-section">
+                        <i class="bi bi-link-45deg no-votes-icon"></i>
+                        <h3>Account Minecraft Non Collegato</h3>
+                        <p>Collega il tuo account Minecraft per poter gestire i tuoi server.</p>
+                        <a href="/verifica-nickname" class="btn-primary">
+                            <i class="bi bi-link-45deg"></i> Collega Account Minecraft
+                        </a>
+                    </div>
+                <?php else: ?>
                 <div class="section-header">
                     <h2><i class="bi bi-server"></i> Gestione Server</h2>
                     <p>Gestisci i tuoi server e visualizza le licenze</p>
@@ -1066,6 +1108,7 @@ include 'header.php';
                         <h3>Nessuna Licenza</h3>
                         <p>Non hai licenze attive per i tuoi server. Le licenze vengono generate automaticamente quando un server viene aggiunto; se il server risulta attivo ma non ha licenza, è stata disattivata da un amministratore.</p>
                     </div>
+                <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>

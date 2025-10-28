@@ -93,13 +93,13 @@ include 'header.php';
 
 <div class="container" style="margin-top: 2rem; margin-bottom: 3rem;">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="sponsorship-page">
-                <div class="page-header text-center mb-4">
-                    <h1 class="page-title">
-                        <i class="bi bi-star-fill" style="color: #FFD700;"></i>
-                        Sponsorizza il tuo Server
-                    </h1>
+        <div class="col-lg-10">
+            <div class="plugin-page">
+                <div class="page-header text-center mb-5">
+                    <div class="plugin-icon mb-3">
+                        <i class="bi bi-star-fill" style="font-size: 4rem; color: #FFD700;"></i>
+                    </div>
+                    <h1 class="page-title">Sponsorizza il tuo Server</h1>
                     <p class="page-subtitle">Ottieni maggiore visibilità e raggiungi più giocatori</p>
                 </div>
 
@@ -115,28 +115,50 @@ include 'header.php';
                     </div>
                 <?php endif; ?>
 
-                <div class="benefits-section mb-4">
-                    <h3 class="section-title">Vantaggi della Sponsorizzazione</h3>
+                <!-- Come Funziona -->
+                <div class="info-section mb-5">
+                    <h2 class="section-title">
+                        <i class="bi bi-gear"></i> Come Funziona la Sponsorizzazione?
+                    </h2>
+                    <div class="info-card">
+                        <p>
+                            Quando sponsorizzi il tuo server su <?php echo SITE_NAME; ?>, ottieni una <strong>visibilità premium</strong> che ti permette di raggiungere molti più giocatori.
+                        </p>
+                        <h4 class="mt-3 mb-2" style="color: var(--text-primary); font-weight: 700;">Sistema di Rotazione</h4>
+                        <p>
+                            I server sponsorizzati vengono mostrati in <strong>due card speciali</strong> nella parte alta della homepage, prima di tutti gli altri server. Ad ogni refresh della pagina, i server sponsor vengono ruotati casualmente, garantendo che tutti i server sponsor ricevano visibilità equa nel tempo.
+                        </p>
+                        <h4 class="mt-3 mb-2" style="color: var(--text-primary); font-weight: 700;">Badge Distintivo</h4>
+                        <p>
+                            Il tuo server avrà un <strong>badge "SPONSOR"</strong> dorato che lo distingue dagli altri server nella lista, attirando immediatamente l'attenzione dei visitatori.
+                        </p>
+                        <h4 class="mt-3 mb-2" style="color: var(--text-primary); font-weight: 700;">Durata Flessibile</h4>
+                        <p>
+                            Puoi scegliere la durata della sponsorizzazione in base alle tue esigenze: 30, 60 o 90 giorni. Durante questo periodo, il tuo server rimarrà sempre in evidenza.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Vantaggi -->
+                <div class="info-section mb-5">
+                    <h2 class="section-title">
+                        <i class="bi bi-star"></i> Vantaggi della Sponsorizzazione
+                    </h2>
                     <div class="benefits-grid">
                         <div class="benefit-card">
-                            <i class="bi bi-eye-fill benefit-icon"></i>
+                            <i class="bi bi-eye-fill"></i>
                             <h4>Maggiore Visibilità</h4>
-                            <p>Il tuo server apparirà in evidenza nella homepage</p>
+                            <p>Due card in evidenza nella homepage con rotazione ad ogni refresh</p>
                         </div>
                         <div class="benefit-card">
-                            <i class="bi bi-graph-up-arrow benefit-icon"></i>
+                            <i class="bi bi-graph-up-arrow"></i>
                             <h4>Più Giocatori</h4>
                             <p>Attira nuovi giocatori e fai crescere la tua community</p>
                         </div>
                         <div class="benefit-card">
-                            <i class="bi bi-star-fill benefit-icon"></i>
+                            <i class="bi bi-star-fill"></i>
                             <h4>Badge Sponsor</h4>
-                            <p>Badge distintivo che evidenzia il tuo server</p>
-                        </div>
-                        <div class="benefit-card">
-                            <i class="bi bi-lightning-fill benefit-icon"></i>
-                            <h4>Priorità</h4>
-                            <p>Posizione prioritaria nei risultati di ricerca</p>
+                            <p>Badge dorato distintivo che evidenzia il tuo server</p>
                         </div>
                     </div>
                 </div>
@@ -180,16 +202,16 @@ include 'header.php';
 
                             <div class="form-group mb-3">
                                 <label for="duration" class="form-label">Durata Sponsorizzazione</label>
-                                <select name="duration" id="duration" class="form-control" required>
-                                    <option value="30">30 giorni</option>
-                                    <option value="60">60 giorni</option>
-                                    <option value="90">90 giorni</option>
-                                </select>
+                                <div class="input-group">
+                                    <input type="number" name="duration" id="duration" class="form-control" min="1" max="365" value="30" required style="color: var(--text-primary); font-size: 1rem;">
+                                    <span class="input-group-text" style="background: var(--primary-bg); border: 1px solid var(--border-color); color: var(--text-secondary);">giorni</span>
+                                </div>
+                                <small class="form-text" style="display: block; margin-top: 0.5rem; color: var(--text-secondary); opacity: 0.9;">Inserisci il numero di giorni (minimo 1, massimo 365)</small>
                             </div>
 
                             <div class="form-group mb-3">
                                 <label for="notes" class="form-label">Note Aggiuntive (opzionale)</label>
-                                <textarea name="notes" id="notes" class="form-control" rows="4" placeholder="Aggiungi eventuali note o richieste speciali..."></textarea>
+                                <textarea name="notes" id="notes" class="form-control" rows="4" placeholder="Aggiungi eventuali note o richieste speciali..." style="color: var(--text-primary); font-size: 1rem;"></textarea>
                             </div>
 
                             <div class="info-box mb-3">
@@ -199,7 +221,7 @@ include 'header.php';
                                 </div>
                             </div>
 
-                            <button type="submit" class="btn btn-hero w-100">
+                            <button type="submit" class="btn btn-hero w-100" style="font-weight: 600; font-size: 1.1rem; color: white;">
                                 <i class="bi bi-send"></i> Invia Richiesta
                             </button>
                         </form>
@@ -211,41 +233,69 @@ include 'header.php';
 </div>
 
 <style>
-.sponsorship-page {
+.plugin-page {
     background: var(--card-bg);
     border-radius: 16px;
-    padding: 2rem;
+    padding: 3rem;
     border: 1px solid var(--border-color);
 }
 
-.page-header {
-    margin-bottom: 2rem;
-}
-
 .page-title {
-    font-size: 2.5rem;
+    font-size: 3rem;
     font-weight: 800;
     color: var(--text-primary);
     margin-bottom: 0.5rem;
 }
 
 .page-subtitle {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     color: var(--text-secondary);
 }
 
+.plugin-icon {
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
 .section-title {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-title i {
+    color: var(--accent-purple);
+}
+
+.info-card {
+    background: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem;
+    line-height: 1.8;
+}
+
+.info-card p {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+.info-card p:last-child {
+    margin-bottom: 0;
 }
 
 .benefits-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1.5rem;
-    margin-bottom: 2rem;
 }
 
 .benefit-card {
@@ -260,10 +310,9 @@ include 'header.php';
 .benefit-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-    border-color: var(--accent-purple);
 }
 
-.benefit-icon {
+.benefit-card i {
     font-size: 2.5rem;
     color: var(--accent-purple);
     margin-bottom: 1rem;
@@ -277,9 +326,9 @@ include 'header.php';
 }
 
 .benefit-card p {
-    font-size: 0.9rem;
     color: var(--text-secondary);
     margin: 0;
+    font-size: 0.9rem;
 }
 
 .sponsorship-form .form-label {
@@ -294,12 +343,19 @@ include 'header.php';
     color: var(--text-primary);
     border-radius: 8px;
     padding: 0.75rem;
+    font-size: 1rem;
+}
+
+.sponsorship-form .form-control::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
 }
 
 .sponsorship-form .form-control:focus {
     border-color: var(--accent-purple);
     box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
     outline: none;
+    background: var(--card-bg);
 }
 
 .info-box {
@@ -341,12 +397,16 @@ include 'header.php';
 }
 
 @media (max-width: 768px) {
-    .benefits-grid {
-        grid-template-columns: 1fr;
+    .plugin-page {
+        padding: 1.5rem;
     }
     
     .page-title {
         font-size: 2rem;
+    }
+    
+    .benefits-grid {
+        grid-template-columns: 1fr;
     }
 }
 </style>

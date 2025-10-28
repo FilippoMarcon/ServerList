@@ -92,57 +92,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 break;
 
             case 'edit_user':
-                $user_id = (int)$_POST['user_id'];
-                $minecraft_nick = trim($_POST['minecraft_nick']);
-                $password = trim($_POST['password']);
-                $email = trim($_POST['email'] ?? '');
-                
-                // Validazione
-                if (empty($minecraft_nick)) {
-                    echo json_encode(['success' => false, 'message' => 'Il nome Minecraft è obbligatorio']);
-                    exit;
-                }
-                
-                // Verifica che il nome Minecraft non sia già in uso da un altro utente
-                $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE minecraft_nick = ? AND id != ?");
-                $stmt->execute([$minecraft_nick, $user_id]);
-                if ($stmt->fetch()) {
-                    echo json_encode(['success' => false, 'message' => 'Nome Minecraft già in uso']);
-                    exit;
-                }
-                
-                // Verifica email se fornita
-                if (!empty($email)) {
-                    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                        echo json_encode(['success' => false, 'message' => 'Email non valida']);
+                try {
+                    $user_id = (int)($_POST['user_id'] ?? 0);
+                    $minecraft_nick = trim($_POST['minecraft_nick'] ?? '');
+                    $password = trim($_POST['password'] ?? '');
+                    $email = trim($_POST['email'] ?? '');
+                    
+                    // Debug log
+                    error_log("Edit user - ID: $user_id, Nick: $minecraft_nick, Email: $email");
+                    
+                    // Validazione
+                    if ($user_id <= 0) {
+                        echo json_encode(['success' => false, 'message' => 'ID utente non valido']);
                         exit;
                     }
-                    $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE email = ? AND id != ?");
-                    $stmt->execute([$email, $user_id]);
+                    
+                    if (empty($minecraft_nick)) {
+                        echo json_encode(['success' => false, 'message' => 'Il nome Minecraft è obbligatorio']);
+                        exit;
+                    }
+                    
+                    // Verifica che il nome Minecraft non sia già in uso da un altro utente
+                    $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE minecraft_nick = ? AND id != ?");
+                    $stmt->execute([$minecraft_nick, $user_id]);
                     if ($stmt->fetch()) {
-                        echo json_encode(['success' => false, 'message' => 'Email già in uso']);
+                        echo json_encode(['success' => false, 'message' => 'Nome Minecraft già in uso']);
                         exit;
                     }
+                    
+                    // Verifica email se fornita
+                    if (!empty($email)) {
+                        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                            echo json_encode(['success' => false, 'message' => 'Email non valida']);
+                            exit;
+                        }
+                        $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE email = ? AND id != ?");
+                        $stmt->execute([$email, $user_id]);
+                        if ($stmt->fetch()) {
+                            echo json_encode(['success' => false, 'message' => 'Email già in uso']);
+                            exit;
+                        }
+                    }
+                    
+                    // Aggiorna nome Minecraft
+                    $stmt = $pdo->prepare("UPDATE sl_users SET minecraft_nick = ? WHERE id = ?");
+                    $stmt->execute([$minecraft_nick, $user_id]);
+                    
+                    // Aggiorna email se fornita
+                    if (!empty($email)) {
+                        $stmt = $pdo->prepare("UPDATE sl_users SET email = ? WHERE id = ?");
+                        $stmt->execute([$email, $user_id]);
+                    }
+                    
+                    // Aggiorna password se fornita
+                    if (!empty($password)) {
+                        $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                        $stmt = $pdo->prepare("UPDATE sl_users SET password_hash = ? WHERE id = ?");
+                        $stmt->execute([$password_hash, $user_id]);
+                    }
+                    
+                    echo json_encode(['success' => true, 'message' => 'Utente aggiornato con successo']);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'message' => 'Errore durante il salvataggio: ' . $e->getMessage()]);
                 }
-                
-                // Aggiorna nome Minecraft
-                $stmt = $pdo->prepare("UPDATE sl_users SET minecraft_nick = ? WHERE id = ?");
-                $stmt->execute([$minecraft_nick, $user_id]);
-                
-                // Aggiorna email se fornita
-                if (!empty($email)) {
-                    $stmt = $pdo->prepare("UPDATE sl_users SET email = ? WHERE id = ?");
-                    $stmt->execute([$email, $user_id]);
-                }
-                
-                // Aggiorna password se fornita
-                if (!empty($password)) {
-                    $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE sl_users SET password_hash = ? WHERE id = ?");
-                    $stmt->execute([$password_hash, $user_id]);
-                }
-                
-                echo json_encode(['success' => true, 'message' => 'Utente aggiornato con successo']);
                 break;
 
             // Server Management
@@ -1364,7 +1376,9 @@ function include_dashboard() {
             <a href="?action=users" class="btn btn-hero"><i class="bi bi-people"></i> Utenti</a>
             <a href="?action=servers" class="btn btn-hero"><i class="bi bi-server"></i> Server</a>
             <a href="?action=licenses" class="btn btn-hero"><i class="bi bi-key"></i> Licenze</a>
-            <a href="?action=rewards" class="btn btn-hero"><i class="bi bi-gift"></i> Reward</a>
+            <a href="?action=verify_minecraft" class="btn btn-hero"><i class="bi bi-shield-check"></i> Verifica</a>
+            <a href="?action=annunci" class="btn btn-hero"><i class="bi bi-megaphone"></i> Annunci</a>
+            <a href="?action=sponsors" class="btn btn-hero"><i class="bi bi-star-fill"></i> Sponsor</a>
         </div>
     </div>
 
@@ -1438,7 +1452,7 @@ function include_dashboard() {
                     <table class="table table-dark table-hover mb-0">
                         <thead>
                             <tr>
-                                <th>Minecraft Nick</th>
+                                <th>Utente</th>
                                 <th>Registrazione</th>
                             </tr>
                         </thead>
@@ -1589,7 +1603,7 @@ function include_users() {
                 <div class="col-md-6">
                     <form method="GET" class="d-flex">
                         <input type="hidden" name="action" value="users">
-                        <input type="text" name="search" class="form-control me-2" placeholder="Cerca minecraft nick..." value="<?= htmlspecialchars($search) ?>">
+                        <input type="text" name="search" class="form-control me-2" placeholder="Cerca Utente..." value="<?= htmlspecialchars($search) ?>">
                         <button type="submit" class="btn btn-primary btn-admin"><i class="bi bi-search"></i> Cerca</button>
                     </form>
                 </div>
@@ -1618,7 +1632,7 @@ function include_users() {
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Minecraft Nick</th>
+                        <th>Utente</th>
                         <th>Email</th>
                         <th>Ruolo</th>
                         <th>Registrazione</th>
@@ -1761,7 +1775,7 @@ function include_servers() {
     // Query server
     $servers_query = "
         SELECT s.*, 
-               u.minecraft_nick as owner_name,
+               COALESCE(ml.minecraft_nick, u.minecraft_nick) as owner_name,
                COUNT(v.id) as total_votes,
                COUNT(CASE WHEN v.data_voto >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN 1 END) as monthly_votes,
                MAX(v.data_voto) as last_vote,
@@ -1771,6 +1785,7 @@ function include_servers() {
                     THEN 1 ELSE 0 END as is_sponsored
         FROM sl_servers s 
         LEFT JOIN sl_users u ON s.owner_id = u.id
+        LEFT JOIN sl_minecraft_links ml ON u.id = ml.user_id
         LEFT JOIN sl_votes v ON s.id = v.server_id 
         LEFT JOIN sl_sponsored_servers sp ON s.id = sp.server_id
         $where_clause
@@ -2459,10 +2474,12 @@ function include_sponsors() {
         // Carica richieste di sponsorizzazione
         try {
             $stmt = $pdo->query("
-                SELECT sr.*, s.nome as server_name, s.ip as server_ip, u.minecraft_nick as user_nick
+                SELECT sr.*, s.nome as server_name, s.ip as server_ip, 
+                       COALESCE(ml.minecraft_nick, u.minecraft_nick) as user_nick
                 FROM sl_sponsorship_requests sr
                 JOIN sl_servers s ON sr.server_id = s.id
                 JOIN sl_users u ON sr.user_id = u.id
+                LEFT JOIN sl_minecraft_links ml ON u.id = ml.user_id
                 ORDER BY 
                     CASE sr.status 
                         WHEN 'pending' THEN 1 
@@ -2510,9 +2527,9 @@ function include_sponsors() {
                                 </td>
                                 <td><?= htmlspecialchars($req['user_nick']) ?></td>
                                 <td><?= (int)$req['duration_days'] ?> giorni</td>
-                                <td>
+                                <td style="max-width: 300px;">
                                     <?php if (!empty($req['notes'])): ?>
-                                        <small><?= htmlspecialchars(substr($req['notes'], 0, 50)) ?><?= strlen($req['notes']) > 50 ? '...' : '' ?></small>
+                                        <small style="display: block; white-space: pre-wrap; word-wrap: break-word;"><?= htmlspecialchars($req['notes']) ?></small>
                                     <?php else: ?>
                                         <small class="text-secondary">-</small>
                                     <?php endif; ?>
@@ -2649,13 +2666,14 @@ function include_votes() {
     // Query voti
     $votes_query = "
         SELECT v.*, 
-               u.minecraft_nick as username,
+               COALESCE(ml.minecraft_nick, u.minecraft_nick) as username,
                s.nome as server_name,
                s.ip as server_ip,
                vc.code as vote_code,
                vc.status as code_status
         FROM sl_votes v 
         LEFT JOIN sl_users u ON v.user_id = u.id
+        LEFT JOIN sl_minecraft_links ml ON u.id = ml.user_id
         LEFT JOIN sl_servers s ON v.server_id = s.id
         LEFT JOIN sl_vote_codes vc ON v.id = vc.vote_id
         $where_clause
@@ -2717,7 +2735,7 @@ function include_votes() {
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Utente</th>
+                        <th>Minecraft Nick</th>
                         <th>Server</th>
                         <th>Data Voto</th>
                         <th>Codice</th>
@@ -2868,11 +2886,12 @@ function include_rewards() {
     // Query reward logs
      $rewards_query = "
          SELECT rl.*, 
-                u.minecraft_nick as username,
+                COALESCE(ml.minecraft_nick, u.minecraft_nick) as username,
                 s.nome as server_name,
                 vc.code as vote_code
          FROM sl_reward_logs rl 
          LEFT JOIN sl_users u ON rl.user_id = u.id
+         LEFT JOIN sl_minecraft_links ml ON u.id = ml.user_id
          LEFT JOIN sl_servers s ON rl.server_id = s.id
          LEFT JOIN sl_vote_codes vc ON rl.vote_code_id = vc.id
          $where_clause
@@ -2933,7 +2952,7 @@ function include_rewards() {
                  <thead>
                      <tr>
                          <th>ID</th>
-                         <th>Utente</th>
+                         <th>Minecraft Nick</th>
                          <th>Server</th>
                          <th>Tipo</th>
                          <th>Stato</th>
@@ -3123,10 +3142,11 @@ function include_rewards() {
      $licenses_query = "
          SELECT sl.*, 
                 s.nome as server_name,
-                u.minecraft_nick as owner_name
+                COALESCE(ml.minecraft_nick, u.minecraft_nick) as owner_name
          FROM sl_server_licenses sl 
          LEFT JOIN sl_servers s ON sl.server_id = s.id
          LEFT JOIN sl_users u ON s.owner_id = u.id
+         LEFT JOIN sl_minecraft_links ml ON u.id = ml.user_id
          $where_clause
          ORDER BY sl.created_at DESC 
          LIMIT $limit OFFSET $offset
@@ -3208,10 +3228,12 @@ function include_rewards() {
     // Carica richieste di licenza (solo pending)
     try {
         $stmt = $pdo->query("
-            SELECT lr.*, s.nome as server_name, s.ip as server_ip, u.minecraft_nick as user_nick
+            SELECT lr.*, s.nome as server_name, s.ip as server_ip, 
+                   COALESCE(ml.minecraft_nick, u.minecraft_nick) as user_nick
             FROM sl_license_requests lr
             JOIN sl_servers s ON lr.server_id = s.id
             JOIN sl_users u ON lr.user_id = u.id
+            LEFT JOIN sl_minecraft_links ml ON u.id = ml.user_id
             WHERE lr.status = 'pending'
             ORDER BY lr.created_at DESC
         ");
@@ -4470,25 +4492,39 @@ function editUser(userId, currentNick, currentEmail) {
 function saveUserChanges() {
     const form = document.getElementById('editUserForm');
     const formData = new FormData(form);
+    formData.append('ajax', '1');
     formData.append('action', 'edit_user');
     
     fetch('admin.php', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert(data.message, 'success');
-            bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showAlert(data.message, 'danger');
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.text();
+    })
+    .then(text => {
+        console.log('Response:', text);
+        try {
+            const data = JSON.parse(text);
+            if (data.success) {
+                showAlert(data.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(data.message || 'Errore sconosciuto', 'danger');
+            }
+        } catch (e) {
+            console.error('JSON Parse Error:', e);
+            console.error('Response text:', text);
+            showAlert('Errore durante il parsing della risposta', 'danger');
         }
     })
     .catch(error => {
-        console.error('Error:', error);
-        showAlert('Errore durante il salvataggio', 'danger');
+        console.error('Fetch Error:', error);
+        showAlert('Errore durante il salvataggio: ' + error.message, 'danger');
     });
 }
 

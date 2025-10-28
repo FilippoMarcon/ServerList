@@ -257,7 +257,7 @@ commands:
                         </div>
                         <div class="faq-item">
                             <h4>Come faccio a sapere se il plugin funziona?</h4>
-                            <p>Dopo l'installazione, controlla la console del server per messaggi di conferma. Puoi anche usare il comando <code>/blocksy info</code> per verificare lo stato della licenza.</p>
+                            <p>Dopo l'installazione, controlla la console del server per messaggi di conferma. Puoi anche usare il comando <code>/blocksy debug</code> per verificare lo stato della licenza e la configurazione.</p>
                         </div>
                         <div class="faq-item">
                             <h4>Il plugin rallenta il server?</h4>
@@ -273,7 +273,7 @@ commands:
                         </div>
                         <div class="faq-item">
                             <h4>Posso vedere quanti reward sono stati consegnati?</h4>
-                            <p>Sì, usa il comando <code>/blocksy stats</code> per vedere statistiche dettagliate sui reward consegnati sul tuo server.</p>
+                            <p>Il plugin registra automaticamente tutte le consegne nei log del server. Puoi monitorare l'attività controllando i log della console o usando il comando <code>/blocksy debug</code> per vedere informazioni sul sistema.</p>
                         </div>
                         <div class="faq-item">
                             <h4>Il plugin supporta più server con lo stesso IP ma porte diverse?</h4>
