@@ -644,6 +644,189 @@ include 'header.php';
             /* Gli stili inline hanno automaticamente precedenza */
         }
 
+/* Server Header Layout */
+.server-header-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 400px;
+}
+
+.server-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 1200px;
+}
+
+.server-main-info {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    .server-header {
+        min-height: auto;
+        padding: 2rem 0;
+    }
+    
+    .server-header-container {
+        min-height: auto;
+        padding: 0 1rem;
+        display: block;
+    }
+    
+    .server-header-content {
+        display: block;
+        width: 100%;
+    }
+    
+    /* Sezione superiore: Logo + Info */
+    .server-main-info {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        width: 100%;
+    }
+    
+    .server-logo-section {
+        flex-shrink: 0;
+    }
+    
+    .server-logo-large {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .server-title-section {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .server-title {
+        font-size: 1.4rem;
+        margin-bottom: 0.75rem;
+        line-height: 1.3;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    
+    .server-details-row {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    
+    .server-rank-badge {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.8rem;
+        white-space: nowrap;
+    }
+    
+    .server-ip-display {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.8rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+        word-break: break-all;
+    }
+    
+    /* Sezione voto: sotto tutto */
+    .server-vote-section {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        width: 100%;
+    }
+    
+    .vote-button-container {
+        width: 100%;
+    }
+    
+    .vote-button {
+        width: 100%;
+        font-size: 1rem;
+        padding: 0.875rem 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    
+    .vote-link-tip {
+        text-align: center;
+        font-size: 0.85rem;
+    }
+    
+    .vote-count {
+        font-size: 1.1rem;
+        text-align: center;
+    }
+    
+    .vote-action {
+        display: none;
+    }
+    
+    /* Spaziatura tra le card su mobile */
+    .tab-content-container {
+        margin-bottom: 1.5rem;
+    }
+    
+    .server-info-card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .server-info-card:last-child {
+        margin-bottom: 0;
+    }
+}
+
+@media (max-width: 576px) {
+    .server-header {
+        padding: 1.5rem 0;
+    }
+    
+    .server-header-container {
+        padding: 0 0.75rem;
+    }
+    
+    .server-logo-large {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .server-title {
+        font-size: 1.2rem;
+    }
+    
+    .server-rank-badge {
+        font-size: 0.8rem;
+        padding: 0.35rem 0.7rem;
+    }
+    
+    .server-ip-display {
+        font-size: 0.85rem;
+        padding: 0.35rem 0.7rem;
+    }
+    
+    .vote-button {
+        font-size: 0.95rem;
+        padding: 0.75rem 1rem;
+    }
+    
+    .vote-count {
+        font-size: 1rem;
+    }
+}
         
 </style>
 
@@ -661,8 +844,8 @@ include 'header.php';
             </div>
         <?php endif; ?>
         
-        <div class="container" style="display: flex !important; align-items: center !important; justify-content: center !important; height: 100% !important; min-height: 400px !important;">
-            <div class="server-header-content" style="display: flex !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; max-width: 1200px !important;">
+        <div class="container server-header-container">
+            <div class="server-header-content">
                 <div class="server-main-info">
                     <div class="server-logo-section">
                         <?php if ($server['logo_url']): ?>
