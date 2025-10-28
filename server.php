@@ -21,24 +21,35 @@ $server_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($server_slug) {
     try {
+        // Converti lo slug: sostituisci trattini con spazi per cercare il nome reale
+        $server_name_from_slug = str_replace('-', ' ', $server_slug);
+        
         // Risolvi direttamente per colonna nome (case-insensitive)
         $stmt = $pdo->prepare("SELECT id FROM sl_servers WHERE is_active = 1 AND LOWER(nome) = LOWER(?) LIMIT 1");
-        $stmt->execute([$server_slug]);
+        $stmt->execute([$server_name_from_slug]);
         $row = $stmt->fetch();
         if ($row && isset($row['id'])) {
             $server_id = (int)$row['id'];
         } else {
-            // Fallback: prova a cercare lo slug all'interno dell'IP del server
-            $stmt = $pdo->prepare("SELECT id FROM sl_servers WHERE is_active = 1 AND LOWER(ip) LIKE CONCAT('%', LOWER(?), '%') LIMIT 1");
+            // Fallback: prova anche con lo slug originale (senza conversione)
+            $stmt = $pdo->prepare("SELECT id FROM sl_servers WHERE is_active = 1 AND LOWER(nome) = LOWER(?) LIMIT 1");
             $stmt->execute([$server_slug]);
-            $row2 = $stmt->fetch();
-            if ($row2 && isset($row2['id'])) {
-                $server_id = (int)$row2['id'];
+            $row = $stmt->fetch();
+            if ($row && isset($row['id'])) {
+                $server_id = (int)$row['id'];
+            } else {
+                // Fallback finale: prova a cercare lo slug all'interno dell'IP del server
+                $stmt = $pdo->prepare("SELECT id FROM sl_servers WHERE is_active = 1 AND LOWER(ip) LIKE CONCAT('%', LOWER(?), '%') LIMIT 1");
+                $stmt->execute([$server_slug]);
+                $row2 = $stmt->fetch();
+                if ($row2 && isset($row2['id'])) {
+                    $server_id = (int)$row2['id'];
+                }
             }
         }
         // Debug opzionale della risoluzione dello slug
         if (isset($_GET['slug_debug'])) {
-            echo "<!-- SLUG DEBUG: input='{$server_slug}' resolved_id='{$server_id}' -->";
+            echo "<!-- SLUG DEBUG: input='{$server_slug}' converted='{$server_name_from_slug}' resolved_id='{$server_id}' -->";
         }
     } catch (PDOException $e) {
 redirect('/');

@@ -37,7 +37,7 @@ if (preg_match('#^/utente/([0-9]+)(?:-[A-Za-z0-9_-]+)?/?$#', $request_path, $m))
 }
 
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
-if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server)/?$#', $request_path, $m)) {
+if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server|plugin-blocksy)/?$#', $request_path, $m)) {
     $map = [
         'forum' => 'forum.php',
         'annunci' => 'annunci.php',
@@ -50,6 +50,7 @@ if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|veri
         'verifica-nickname' => 'verifica-nickname.php',
         'logout' => 'logout.php',
         'sponsorizza-il-tuo-server' => 'sponsorizza.php',
+        'plugin-blocksy' => 'plugin-blocksy.php',
     ];
     $target = $map[$m[1]] ?? null;
     if ($target) {
@@ -117,7 +118,10 @@ try {
 try {
     $stmt = $pdo->query("
         SELECT s.*, COUNT(v.id) as voti_totali, 
-               CASE WHEN ss.server_id IS NOT NULL THEN 1 ELSE 0 END as is_sponsored
+               CASE WHEN ss.server_id IS NOT NULL 
+                    AND ss.is_active = 1 
+                    AND (ss.expires_at IS NULL OR ss.expires_at > NOW()) 
+                    THEN 1 ELSE 0 END as is_sponsored
         FROM sl_servers s 
         LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
         LEFT JOIN sl_sponsored_servers ss ON s.id = ss.server_id
@@ -294,11 +298,18 @@ include 'header.php';
                             $tags[] = 'Generale';
                         }
                         
-                        // Mostra max 4 tag, il resto come "+X"
-                        $visible_tags = array_slice($tags, 0, 4);
-                        $remaining_count = count($tags) - 4;
+                        // Mostra max 3 tag, il resto come "+X"
+                        $visible_tags = array_slice($tags, 0, 3);
+                        $remaining_count = count($tags) - 3;
+                        
+                        // Crea una stringa con TUTTE le modalità per il filtro
+                        $all_tags_string = strtolower(implode(',', $tags));
                     ?>
-                        <div class="homepage-server-card" data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" data-server-id="<?php echo $server['id']; ?>" data-votes="<?php echo $server['voti_totali']; ?>">
+                        <div class="homepage-server-card" 
+                             data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" 
+                             data-server-id="<?php echo $server['id']; ?>" 
+                             data-votes="<?php echo $server['voti_totali']; ?>"
+                             data-all-tags="<?php echo htmlspecialchars($all_tags_string); ?>">
                             <div class="server-rank-container">
                                 <div class="server-rank <?php echo ($rank > 3) ? 'outlined' : $rank_class; ?>">
                                     <?php if ($rank <= 3): ?>
@@ -340,7 +351,7 @@ include 'header.php';
                                         <span class="server-tag"><?php echo htmlspecialchars($tag); ?></span>
                                     <?php endforeach; ?>
                                     <?php if ($remaining_count > 0): ?>
-                                        <span class="server-tag server-tag-more" title="<?php echo htmlspecialchars(implode(', ', array_slice($tags, 4))); ?>">+<?php echo $remaining_count; ?></span>
+                                        <span class="server-tag server-tag-more" title="<?php echo htmlspecialchars(implode(', ', array_slice($tags, 3))); ?>">+<?php echo $remaining_count; ?></span>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -430,6 +441,31 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inizializza ordinamento salvato
     loadSavedSort();
     
+    // Controlla player-count e aggiorna status offline
+    function checkPlayerStatus() {
+        document.querySelectorAll('.server-players').forEach(playerSection => {
+            const playerCount = playerSection.querySelector('.player-count');
+            const playerStatus = playerSection.querySelector('.player-status');
+            
+            if (playerCount && playerStatus) {
+                const countText = playerCount.textContent.trim();
+                if (countText === '...' || countText === 'Offline' || countText === '0/0') {
+                    playerStatus.textContent = 'offline';
+                    playerStatus.style.color = '#ef4444';
+                } else {
+                    playerStatus.textContent = 'online';
+                    playerStatus.style.color = 'var(--accent-green)';
+                }
+            }
+        });
+    }
+    
+    // Controlla subito
+    checkPlayerStatus();
+    
+    // Controlla ogni 2 secondi per aggiornamenti dinamici
+    setInterval(checkPlayerStatus, 2000);
+    
     // Applica filtro da URL se presente
     <?php if (!empty($active_filter)): ?>
     applyFilterFromURL('<?php echo $active_filter; ?>');
@@ -515,7 +551,10 @@ function applyFilters() {
     
     servers.forEach(server => {
         const serverName = server.getAttribute('data-name') || '';
-        const serverTags = Array.from(server.querySelectorAll('.server-tag')).map(tag => tag.textContent.toLowerCase());
+        
+        // Usa data-all-tags per includere anche le modalità nascoste
+        const allTagsString = server.getAttribute('data-all-tags') || '';
+        const serverTags = allTagsString.split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag);
         
         const matchesSearch = !searchTerm || serverName.includes(searchTerm);
         const matchesFilter = activeFilters.length === 0 || activeFilters.some(filter => serverTags.includes(filter));

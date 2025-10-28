@@ -130,12 +130,21 @@ if ($edit_server_id > 0) {
 
 // Gestione form di modifica server
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
-    // Assicurati che esistano le colonne social (migrazione sicura)
+    // Assicurati che esistano le colonne necessarie (migrazione sicura)
     try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN website_url VARCHAR(255) NULL"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN shop_url VARCHAR(255) NULL"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN discord_url VARCHAR(255) NULL"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN telegram_url VARCHAR(255) NULL"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN social_links TEXT NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN modalita JSON NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN staff_list JSON NULL"); } catch (Exception $e) {}
+    
+    // Modifica tipo_server per accettare i valori corretti
+    try { 
+        $pdo->exec("ALTER TABLE sl_servers MODIFY COLUMN tipo_server VARCHAR(50) DEFAULT 'Java & Bedrock'"); 
+    } catch (Exception $e) {
+        error_log("Errore modifica tipo_server: " . $e->getMessage());
+    }
     $server_id = (int)($_POST['server_id'] ?? 0);
     $nome = sanitize($_POST['nome'] ?? '');
     $ip = sanitize($_POST['ip'] ?? '');
@@ -166,13 +175,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
             $stmt->execute([$server_id, $user_id]);
             
             if ($stmt->fetch()) {
-                // Prova ad aggiornare anche staff_list; fallback se la colonna non esiste
+                // Prova ad aggiornare con tutti i campi
                 try {
                     $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, website_url = ?, shop_url = ?, discord_url = ?, telegram_url = ?, modalita = ?, staff_list = ?, social_links = ? WHERE id = ? AND owner_id = ?");
                     $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $website_url, $shop_url, $discord_url, $telegram_url, $modalita_json, $staff_list_json, $social_links_json, $server_id, $user_id]);
                 } catch (PDOException $e1) {
-                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, website_url = ?, shop_url = ?, discord_url = ?, telegram_url = ?, modalita = ? WHERE id = ? AND owner_id = ?");
-                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $website_url, $shop_url, $discord_url, $telegram_url, $server_id, $user_id]);
+                    // Fallback: aggiorna solo i campi base se staff_list o social_links non esistono
+                    error_log("Errore UPDATE completo: " . $e1->getMessage() . " - Provo fallback");
+                    try {
+                        $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, website_url = ?, shop_url = ?, discord_url = ?, telegram_url = ?, modalita = ? WHERE id = ? AND owner_id = ?");
+                        $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $website_url, $shop_url, $discord_url, $telegram_url, $modalita_json, $server_id, $user_id]);
+                    } catch (PDOException $e2) {
+                        // Ultimo fallback: solo campi essenziali
+                        error_log("Errore UPDATE fallback: " . $e2->getMessage() . " - Provo ultimo fallback");
+                        $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ? WHERE id = ? AND owner_id = ?");
+                        $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $server_id, $user_id]);
+                    }
                 }
                 $message = 'Server modificato con successo!';
                 $server_to_edit = null;
@@ -181,7 +199,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
                 $error = 'Non hai i permessi per modificare questo server.';
             }
         } catch (PDOException $e) {
-            $error = 'Errore durante la modifica del server.';
+            $error = 'Errore durante la modifica del server: ' . $e->getMessage();
+            error_log("Errore modifica server: " . $e->getMessage());
+        }
+    }
+}
+
+// Crea tabella richieste licenza se non esiste
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_license_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        server_id INT NOT NULL,
+        user_id INT NOT NULL,
+        status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        processed_at TIMESTAMP NULL,
+        processed_by INT NULL,
+        admin_notes TEXT,
+        FOREIGN KEY (server_id) REFERENCES sl_servers(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES sl_users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_server_request (server_id),
+        INDEX(status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+} catch (PDOException $e) {
+    // Tabella già esistente
+}
+
+// Gestione richiesta licenza
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_license'])) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $error = 'Sessione scaduta o token CSRF non valido.';
+    } else {
+        $server_id = (int)($_POST['server_id'] ?? 0);
+        
+        if ($server_id <= 0) {
+            $error = 'Server non valido.';
+        } else {
+            try {
+                // Verifica che il server appartenga all'utente
+                $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE id = ? AND owner_id = ?");
+                $stmt->execute([$server_id, $user_id]);
+                $server = $stmt->fetch();
+                
+                if (!$server) {
+                    $error = 'Server non trovato o non hai i permessi.';
+                } else {
+                    // Verifica se esiste già una licenza
+                    $stmt = $pdo->prepare("SELECT id FROM sl_server_licenses WHERE server_id = ?");
+                    $stmt->execute([$server_id]);
+                    if ($stmt->fetch()) {
+                        $error = 'Questo server ha già una licenza.';
+                    } else {
+                        // Verifica se esiste già una richiesta pendente
+                        $stmt = $pdo->prepare("SELECT id FROM sl_license_requests WHERE server_id = ? AND status = 'pending'");
+                        $stmt->execute([$server_id]);
+                        if ($stmt->fetch()) {
+                            $error = 'Esiste già una richiesta pendente per questo server.';
+                        } else {
+                            // Crea la richiesta
+                            $stmt = $pdo->prepare("INSERT INTO sl_license_requests (server_id, user_id, status, created_at) VALUES (?, ?, 'pending', NOW())");
+                            $stmt->execute([$server_id, $user_id]);
+                            $message = 'Richiesta di licenza inviata con successo! Un amministratore la esaminerà a breve.';
+                        }
+                    }
+                }
+            } catch (PDOException $e) {
+                $error = 'Errore durante l\'invio della richiesta: ' . $e->getMessage();
+            }
         }
     }
 }
@@ -250,9 +334,15 @@ try {
 $owned_servers = [];
 try {
     $stmt = $pdo->prepare("
-        SELECT s.*, COUNT(v.id) as vote_count 
+        SELECT s.*, 
+               COUNT(v.id) as vote_count,
+               sl.id as has_license,
+               sl.is_active as license_is_active,
+               lr.status as license_request_status
         FROM sl_servers s 
         LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
+        LEFT JOIN sl_server_licenses sl ON s.id = sl.server_id
+        LEFT JOIN sl_license_requests lr ON s.id = lr.server_id AND lr.status = 'pending'
         WHERE s.owner_id = ? AND s.is_active IN (0, 1, 2)
         GROUP BY s.id 
         ORDER BY s.is_active DESC, vote_count DESC
@@ -322,6 +412,66 @@ include 'header.php';
                     border: none !important;
                     outline: none !important;
                     box-shadow: none !important;
+                }
+                
+                /* License Status Styles */
+                .license-status-container {
+                    display: flex;
+                    justify-content: center;
+                    margin-bottom: 1rem;
+                }
+                
+                .license-status {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem 1rem;
+                    border-radius: 8px;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                }
+                
+                .license-status.active {
+                    background: rgba(16, 185, 129, 0.1);
+                    color: #10b981;
+                    border: 1px solid rgba(16, 185, 129, 0.3);
+                }
+                
+                .license-status.pending {
+                    background: rgba(251, 191, 36, 0.1);
+                    color: #fbbf24;
+                    border: 1px solid rgba(251, 191, 36, 0.3);
+                }
+                
+                .license-status.missing {
+                    background: rgba(239, 68, 68, 0.1);
+                    color: #ef4444;
+                    border: 1px solid rgba(239, 68, 68, 0.3);
+                }
+                
+                .license-status.disabled {
+                    background: rgba(220, 38, 38, 0.1);
+                    color: #dc2626;
+                    border: 1px solid rgba(220, 38, 38, 0.3);
+                }
+                
+                .btn-request-license {
+                    background: var(--gradient-primary);
+                    color: white;
+                    border: none;
+                    padding: 0.5rem 1rem;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                
+                .btn-request-license:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
                 }
                 </style>
                 <script>
@@ -771,6 +921,27 @@ include 'header.php';
                                     
                                     <div class="server-card-body">
                                         <?php if ($server['is_active'] == 1): ?>
+                                            <!-- License Status -->
+                                            <div class="license-status-container mb-3">
+                                                <?php if ($server['has_license'] && $server['license_is_active'] == 1): ?>
+                                                    <span class="license-status active">
+                                                        <i class="bi bi-check-circle-fill"></i> Licenza Attiva
+                                                    </span>
+                                                <?php elseif ($server['has_license'] && $server['license_is_active'] == 0): ?>
+                                                    <span class="license-status disabled">
+                                                        <i class="bi bi-x-circle-fill"></i> Licenza Disattivata da un Amministratore
+                                                    </span>
+                                                <?php elseif ($server['license_request_status'] === 'pending'): ?>
+                                                    <span class="license-status pending">
+                                                        <i class="bi bi-clock-history"></i> Licenza in Approvazione
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="license-status missing">
+                                                        <i class="bi bi-exclamation-triangle-fill"></i> Licenza Mancante
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                            
                             <div class="server-actions">
                                 <a href="<?php $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($server['nome'])); echo '/server/' . urlencode(trim($slug, '-')); ?>" class="btn-view-server">
                                     <i class="bi bi-eye"></i> Visualizza
@@ -778,6 +949,16 @@ include 'header.php';
                                 <a href="/profile?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
                                     <i class="bi bi-pencil"></i> Modifica
                                 </a>
+                                <?php if (!$server['has_license'] && $server['license_request_status'] !== 'pending'): ?>
+                                    <form method="POST" style="display: inline;">
+                                        <?php echo csrfInput(); ?>
+                                        <input type="hidden" name="request_license" value="1">
+                                        <input type="hidden" name="server_id" value="<?php echo $server['id']; ?>">
+                                        <button type="submit" class="btn-request-license">
+                                            <i class="bi bi-key"></i> Richiedi Licenza
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
                             </div>
                         <?php elseif ($server['is_active'] == 2): ?>
                             <div class="pending-server-info">
@@ -814,6 +995,10 @@ include 'header.php';
                 <?php if (!empty($server_licenses)): ?>
                     <div class="licenses-section">
                         <h3><i class="bi bi-key-fill"></i> Licenze dei Server</h3>
+                        <p class="section-subtitle">
+                            Scarica il <a href="/plugin-blocksy" class="text-primary" style="text-decoration: underline;"><i class="bi bi-plugin"></i> plugin Blocksy</a> per utilizzare le tue licenze: 
+                            <a href="/Blocksy.jar" class="text-primary" style="text-decoration: underline;" download><i class="bi bi-download"></i> Download</a>
+                        </p>
                         
                         <div class="licenses-grid">
                             <?php foreach ($server_licenses as $license): ?>
@@ -988,8 +1173,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Gestione automatica della sezione attiva in base ai parametri URL
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('edit_server')) {
-        // Se c'è il parametro edit_server, attiva la sezione Gestione Server
+    if (urlParams.has('edit_server') || urlParams.get('action') === 'servers') {
+        // Se c'è il parametro edit_server o action=servers, attiva la sezione Gestione Server
         navButtons.forEach(btn => btn.classList.remove('active'));
         contentSections.forEach(section => section.classList.remove('active'));
         

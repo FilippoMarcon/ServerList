@@ -150,3 +150,13 @@ created_at
 processed_at
 processed_by
 admin_notes
+
+`sl_license_requests`:
+id
+server_id
+user_id
+status (ENUM: 'pending', 'approved', 'rejected')
+created_at
+processed_at
+processed_by
+admin_notes

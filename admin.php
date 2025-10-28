@@ -251,6 +251,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 echo json_encode(['success' => true, 'message' => 'Sponsor eliminato']);
                 break;
 
+            case 'change_server_owner':
+                $server_id = (int)($_POST['server_id'] ?? 0);
+                $new_owner_nick = trim($_POST['new_owner_nick'] ?? '');
+                
+                if ($server_id <= 0 || empty($new_owner_nick)) {
+                    echo json_encode(['success' => false, 'message' => 'Parametri non validi']);
+                    break;
+                }
+                
+                try {
+                    // Trova l'utente per nickname
+                    $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE minecraft_nick = ?");
+                    $stmt->execute([$new_owner_nick]);
+                    $new_owner = $stmt->fetch();
+                    
+                    if (!$new_owner) {
+                        echo json_encode(['success' => false, 'message' => 'Utente non trovato']);
+                        break;
+                    }
+                    
+                    // Aggiorna owner del server
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET owner_id = ? WHERE id = ?");
+                    $stmt->execute([$new_owner['id'], $server_id]);
+                    
+                    echo json_encode(['success' => true, 'message' => 'Owner cambiato con successo']);
+                } catch (PDOException $e) {
+                    echo json_encode(['success' => false, 'message' => 'Errore: ' . $e->getMessage()]);
+                }
+                break;
+
             case 'delete_server':
                 $server_id = (int)$_POST['server_id'];
                 
@@ -573,6 +603,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 $stmt->execute([$status, $_SESSION['user_id'], $request_id]);
                 
                 echo json_encode(['success' => true, 'message' => 'Stato richiesta aggiornato']);
+                break;
+
+            case 'approve_license_request':
+                $request_id = (int)($_POST['request_id'] ?? 0);
+                $server_id = (int)($_POST['server_id'] ?? 0);
+                
+                if ($request_id <= 0 || $server_id <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'Parametri non validi']);
+                    break;
+                }
+                
+                try {
+                    // Verifica che la richiesta esista e sia pending
+                    $stmt = $pdo->prepare("SELECT id FROM sl_license_requests WHERE id = ? AND status = 'pending'");
+                    $stmt->execute([$request_id]);
+                    if (!$stmt->fetch()) {
+                        echo json_encode(['success' => false, 'message' => 'Richiesta non trovata o già processata']);
+                        break;
+                    }
+                    
+                    // Verifica che non esista già una licenza
+                    $stmt = $pdo->prepare("SELECT id FROM sl_server_licenses WHERE server_id = ?");
+                    $stmt->execute([$server_id]);
+                    if ($stmt->fetch()) {
+                        echo json_encode(['success' => false, 'message' => 'Questo server ha già una licenza']);
+                        break;
+                    }
+                    
+                    // Genera licenza
+                    $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                    $license_key = '';
+                    for ($i = 0; $i < 24; $i++) {
+                        $license_key .= $characters[random_int(0, strlen($characters) - 1)];
+                    }
+                    
+                    // Inserisci licenza
+                    $stmt = $pdo->prepare("INSERT INTO sl_server_licenses (server_id, license_key, is_active, created_at) VALUES (?, ?, 1, NOW())");
+                    $stmt->execute([$server_id, $license_key]);
+                    
+                    // Aggiorna stato richiesta
+                    $stmt = $pdo->prepare("UPDATE sl_license_requests SET status = 'approved', processed_at = NOW(), processed_by = ? WHERE id = ?");
+                    $stmt->execute([$_SESSION['user_id'], $request_id]);
+                    
+                    echo json_encode(['success' => true, 'message' => 'Licenza generata e richiesta approvata!']);
+                } catch (PDOException $e) {
+                    echo json_encode(['success' => false, 'message' => 'Errore: ' . $e->getMessage()]);
+                }
+                break;
+
+            case 'reject_license_request':
+                $request_id = (int)($_POST['request_id'] ?? 0);
+                
+                if ($request_id <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'Parametri non validi']);
+                    break;
+                }
+                
+                $stmt = $pdo->prepare("UPDATE sl_license_requests SET status = 'rejected', processed_at = NOW(), processed_by = ? WHERE id = ?");
+                $stmt->execute([$_SESSION['user_id'], $request_id]);
+                
+                echo json_encode(['success' => true, 'message' => 'Richiesta rifiutata']);
                 break;
 
             // Annunci Management
@@ -927,7 +1018,7 @@ include 'header.php';
 /* Metric cards grid */
 .admin-stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
@@ -1674,7 +1765,10 @@ function include_servers() {
                COUNT(v.id) as total_votes,
                COUNT(CASE WHEN v.data_voto >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN 1 END) as monthly_votes,
                MAX(v.data_voto) as last_vote,
-               sp.is_active as is_sponsored
+               CASE WHEN sp.server_id IS NOT NULL 
+                    AND sp.is_active = 1 
+                    AND (sp.expires_at IS NULL OR sp.expires_at > NOW()) 
+                    THEN 1 ELSE 0 END as is_sponsored
         FROM sl_servers s 
         LEFT JOIN sl_users u ON s.owner_id = u.id
         LEFT JOIN sl_votes v ON s.id = v.server_id 
@@ -1700,7 +1794,7 @@ function include_servers() {
     $active_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_servers WHERE is_active = 1")->fetchColumn();
     $pending_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_servers WHERE is_active = 2")->fetchColumn();
     $disabled_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_servers WHERE is_active = 0")->fetchColumn();
-    $sponsored_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1")->fetchColumn();
+    $sponsored_servers = (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())")->fetchColumn();
     ?>
     
     <!-- Header moderno server -->
@@ -1847,6 +1941,11 @@ function include_servers() {
                                         title="Toggle Sponsorship">
                                     <i class="bi bi-star"></i>
                                 </button>
+                                <button class="btn btn-sm btn-outline-primary btn-admin" 
+                                        onclick="changeServerOwner(<?= $server['id'] ?>, '<?= htmlspecialchars($server['nome']) ?>')"
+                                        title="Cambia Owner">
+                                    <i class="bi bi-person-gear"></i>
+                                </button>
                                 <a class="btn btn-sm btn-outline-primary btn-admin" 
                                    href="?action=edit_server&id=<?= $server['id'] ?>" 
                                    title="Modifica">
@@ -1929,6 +2028,24 @@ function include_servers() {
         });
     }
     
+    function changeServerOwner(serverId, serverName) {
+        const newOwnerNick = prompt(`Cambia owner di "${serverName}"\n\nInserisci il nickname Minecraft del nuovo owner:`);
+        
+        if (newOwnerNick && newOwnerNick.trim()) {
+            makeAjaxRequest('change_server_owner', {
+                server_id: serverId,
+                new_owner_nick: newOwnerNick.trim()
+            }, (response) => {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(response.message, 'danger');
+                }
+            });
+        }
+    }
+
     function deleteServer(serverId) {
         confirmAction('Sei sicuro di voler eliminare questo server? Tutti i dati correlati verranno eliminati!', () => {
             makeAjaxRequest('delete_server', {
@@ -1955,8 +2072,9 @@ function include_sponsors() {
     $limit = 20;
     $offset = ($page - 1) * $limit;
     $search = $_GET['search'] ?? '';
-    $status_filter = $_GET['status_filter'] ?? '';
-    $expiry_filter = $_GET['expiry_filter'] ?? '';
+    // Default: mostra solo sponsor attivi e validi (non scaduti)
+    $status_filter = $_GET['status_filter'] ?? '1';
+    $expiry_filter = $_GET['expiry_filter'] ?? 'valid';
 
     // Costruisci condizioni WHERE
     $where_conditions = [];
@@ -2013,8 +2131,8 @@ function include_sponsors() {
     try {
         $stats = [
             'total' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers")->fetchColumn(),
-            'active' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1")->fetchColumn(),
-            'expired' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE expires_at IS NOT NULL AND expires_at <= NOW() ")->fetchColumn(),
+            'active' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())")->fetchColumn(),
+            'expired' => (int)$pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE expires_at IS NOT NULL AND expires_at <= NOW()")->fetchColumn(),
         ];
     } catch (PDOException $e) {
         $stats = ['total' => 0, 'active' => 0, 'expired' => 0];
@@ -2137,7 +2255,11 @@ function include_sponsors() {
                                     <input type="number" class="form-control form-control-sm" id="priority-<?= (int)$sp['id'] ?>" value="<?= (int)$sp['priority'] ?>" min="1">
                                 </td>
                                 <td>
-                                    <?php if ((int)$sp['is_active'] === 1): ?>
+                                    <?php 
+                                    $is_expired = !empty($sp['expires_at']) && strtotime($sp['expires_at']) <= time();
+                                    if ($is_expired): ?>
+                                        <span class="badge bg-warning text-dark">Scaduto</span>
+                                    <?php elseif ((int)$sp['is_active'] === 1): ?>
                                         <span class="badge bg-success">Attivo</span>
                                     <?php else: ?>
                                         <span class="badge bg-danger">Disattivato</span>
@@ -2301,6 +2423,21 @@ function include_sponsors() {
                     makeAjaxRequest('delete_sponsorship', { id: id }, (response) => {
                         if (response.success) { showAlert(response.message, 'success'); setTimeout(() => location.reload(), 800); }
                         else { showAlert(response.message || 'Errore eliminazione sponsor', 'danger'); }
+                    });
+                });
+            }
+
+            function toggleSponsorById(sponsorId) {
+                confirmAction('Sei sicuro di voler modificare lo stato di sponsorizzazione?', () => {
+                    makeAjaxRequest('toggle_sponsorship', {
+                        id: sponsorId
+                    }, (response) => {
+                        if (response.success) {
+                            showAlert(response.message, 'success');
+                            setTimeout(() => location.reload(), 1000);
+                        } else {
+                            showAlert(response.message || 'Errore nel toggle sponsor', 'danger');
+                        }
                     });
                 });
             }
@@ -3014,6 +3151,14 @@ function include_rewards() {
      <h2><i class="bi bi-key"></i> Gestione Licenze</h2>
     <p class="text-secondary">Gestisci licenze server e chiavi di accesso</p>
     
+    <?php
+    // Carica richieste di licenza per la statistica
+    $pending_license_requests = 0;
+    try {
+        $pending_license_requests = (int)$pdo->query("SELECT COUNT(*) FROM sl_license_requests WHERE status = 'pending'")->fetchColumn();
+    } catch (PDOException $e) {}
+    ?>
+    
     <!-- Statistiche Licenze (Metric Cards) -->
     <div class="admin-stats-grid mb-4">
         <div class="metric-card">
@@ -3048,9 +3193,86 @@ function include_rewards() {
                 <span class="metric-meta">Da generare</span>
             </div>
         </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-clock-history"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Licenze in Attesa</p>
+                <h3 class="metric-value text-warning"><?= (int)$pending_license_requests ?></h3>
+                <span class="metric-meta">Da processare</span>
+            </div>
+        </div>
     </div>
     
-    <!-- Server Senza Licenza -->
+    <!-- Richieste di Licenza -->
+    <?php
+    // Carica richieste di licenza (solo pending)
+    try {
+        $stmt = $pdo->query("
+            SELECT lr.*, s.nome as server_name, s.ip as server_ip, u.minecraft_nick as user_nick
+            FROM sl_license_requests lr
+            JOIN sl_servers s ON lr.server_id = s.id
+            JOIN sl_users u ON lr.user_id = u.id
+            WHERE lr.status = 'pending'
+            ORDER BY lr.created_at DESC
+        ");
+        $license_requests = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        $license_requests = [];
+    }
+    ?>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="mb-3"><i class="bi bi-inbox"></i> Richieste di Licenza in Attesa (<?= count($license_requests) ?>)</h5>
+            <div class="alert alert-info alert-persistent" style="border-radius: 8px; border: 1px solid #3b82f6; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: 500; position: relative; z-index: 1050;">
+                <?php if (!empty($license_requests)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Server</th>
+                                    <th>Owner</th>
+                                    <th>Data Richiesta</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($license_requests as $req): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= htmlspecialchars($req['server_name']) ?></strong>
+                                        <br>
+                                        <small class="text-secondary"><?= htmlspecialchars($req['server_ip']) ?></small>
+                                    </td>
+                                    <td><?= htmlspecialchars($req['user_nick']) ?></td>
+                                    <td><small><?= date('d/m/Y H:i', strtotime($req['created_at'])) ?></small></td>
+                                    <td>
+                                        <span class="badge bg-warning">In Attesa</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-success" onclick="approveLicenseRequest(<?= (int)$req['id'] ?>, <?= (int)$req['server_id'] ?>, '<?= htmlspecialchars($req['server_name']) ?>')" title="Approva e Genera Licenza">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" onclick="rejectLicenseRequest(<?= (int)$req['id'] ?>)" title="Rifiuta">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <p class="mb-0">Nessuna richiesta di licenza al momento.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Server Senza Licenza (Sezione Ridotta) -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="alert alert-warning alert-persistent" style="border-radius: 8px; border: 1px solid #ffc107; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: 500; position: relative; z-index: 1050;">
@@ -3209,6 +3431,37 @@ function include_rewards() {
                 if (response.success) {
                     showAlert(response.message + '<br><strong>Licenza:</strong> <code>' + response.license_key + '</code>', 'success');
                     setTimeout(() => location.reload(), 3000);
+                } else {
+                    showAlert(response.message, 'danger');
+                }
+            });
+        });
+    }
+    
+    function approveLicenseRequest(requestId, serverId, serverName) {
+        confirmAction(`Approvare la richiesta di licenza per "${serverName}"?`, () => {
+            makeAjaxRequest('approve_license_request', {
+                request_id: requestId,
+                server_id: serverId
+            }, (response) => {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(response.message, 'danger');
+                }
+            });
+        });
+    }
+    
+    function rejectLicenseRequest(requestId) {
+        confirmAction('Rifiutare questa richiesta di licenza?', () => {
+            makeAjaxRequest('reject_license_request', {
+                request_id: requestId
+            }, (response) => {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    setTimeout(() => location.reload(), 800);
                 } else {
                     showAlert(response.message, 'danger');
                 }

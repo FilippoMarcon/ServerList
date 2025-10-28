@@ -39,6 +39,8 @@
                             <h5 class="section-title">Navigazione</h5>
                             <ul class="footer-links">
                                 <li><a href="/">Lista Server</a></li>
+                                <li><a href="/plugin-blocksy"><i class="bi bi-plugin"></i> Plugin Blocksy</a></li>
+                                <li><a href="/sponsorizza-il-tuo-server"><i class="bi bi-star-fill"></i> Sponsorizza Server</a></li>
                                 <li><a href="/login">Accedi</a></li>
                                 <li><a href="/register">Registrati</a></li>
                                 <li><a href="/verifica-nickname">Verifica Nickname</a></li>
