@@ -12,6 +12,16 @@ $page_description = "Sponsorizza il tuo server Minecraft e ottieni maggiore visi
 $message = '';
 $error = '';
 
+// Gestione messaggi di sessione (per evitare alert di refresh)
+if (isset($_SESSION['success_message'])) {
+    $message = $_SESSION['success_message'];
+    unset($_SESSION['success_message']);
+}
+if (isset($_SESSION['error_message'])) {
+    $error = $_SESSION['error_message'];
+    unset($_SESSION['error_message']);
+}
+
 // Gestione invio richiesta sponsorizzazione
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'request_sponsorship') {
     if (!isLoggedIn()) {
@@ -44,7 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         // Crea la richiesta
                         $stmt = $pdo->prepare("INSERT INTO sl_sponsorship_requests (server_id, user_id, duration_days, notes, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
                         $stmt->execute([$server_id, $_SESSION['user_id'], $duration, $notes]);
-                        $message = 'Richiesta di sponsorizzazione inviata con successo! Un amministratore la esaminerà a breve.';
+                        $_SESSION['success_message'] = 'Richiesta di sponsorizzazione inviata con successo! Un amministratore la esaminerà a breve.';
+                        redirect('/sponsorizza-il-tuo-server');
                     }
                 }
             } catch (PDOException $e) {

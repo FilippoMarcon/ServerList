@@ -15,6 +15,16 @@ $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
 
+// Gestione messaggi di sessione (per evitare alert di refresh)
+if (isset($_SESSION['success_message'])) {
+    $message = $_SESSION['success_message'];
+    unset($_SESSION['success_message']);
+}
+if (isset($_SESSION['error_message'])) {
+    $error = $_SESSION['error_message'];
+    unset($_SESSION['error_message']);
+}
+
 // Assicurati che esista la colonna staff_list per memorizzare lo staff (JSON)
 try {
     $pdo->exec("ALTER TABLE sl_servers ADD COLUMN staff_list JSON NULL");
@@ -44,7 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_public_nick'])
                 $stmt = $pdo->prepare('UPDATE sl_users SET minecraft_nick = ? WHERE id = ?');
                 $stmt->execute([$new_nick, $user_id]);
                 $_SESSION['minecraft_nick'] = $new_nick;
-                $message = 'Nickname aggiornato con successo.';
+                $_SESSION['success_message'] = 'Nickname aggiornato con successo.';
+                redirect('/profile');
             } catch (Exception $e) {
                 $error = 'Errore durante l\'aggiornamento del nickname.';
             }
@@ -76,7 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_server'])) {
         try {
             $stmt = $pdo->prepare("INSERT INTO sl_servers (nome, ip, versione, tipo_server, descrizione, banner_url, logo_url, modalita, owner_id, is_active, data_inserimento) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 2, NOW())");
             $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $user_id]);
-            $message = 'Richiesta inviata con successo! Il tuo server sarà revisionato dagli amministratori.';
+            $_SESSION['success_message'] = 'Richiesta inviata con successo! Il tuo server sarà revisionato dagli amministratori.';
+            redirect('/profile');
         } catch (PDOException $e) {
             $error = 'Errore durante l\'invio della richiesta.';
         }
@@ -259,7 +271,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_license'])) {
                             // Crea la richiesta
                             $stmt = $pdo->prepare("INSERT INTO sl_license_requests (server_id, user_id, status, created_at) VALUES (?, ?, 'pending', NOW())");
                             $stmt->execute([$server_id, $user_id]);
-                            $message = 'Richiesta di licenza inviata con successo! Un amministratore la esaminerà a breve.';
+                            $_SESSION['success_message'] = 'Richiesta di licenza inviata con successo! Un amministratore la esaminerà a breve.';
+                            redirect('/profile');
                         }
                     }
                 }
