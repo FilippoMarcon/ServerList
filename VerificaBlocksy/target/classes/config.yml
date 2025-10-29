@@ -1,7 +1,7 @@
-api_base_url: "https://blocksy.it"
+api_base_url: "https://www.blocksy.it"
 registration_endpoint_path: "/register_verification_code.php"
 check_verification_endpoint_path: "/check_minecraft_link.php"
-site_verification_url: "https://blocksy.it/verifica-nickname"
+site_verification_url: "https://www.blocksy.it/verifica-nickname"
 support_ticket_url: "https://discord.blocksy.it"
 code_length: 7
 max_unconsumed_codes_per_player: 5

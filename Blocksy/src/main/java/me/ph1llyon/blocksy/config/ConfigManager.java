@@ -20,7 +20,7 @@ public class ConfigManager {
         FileConfiguration config = plugin.getConfig();
         
         // Carica le impostazioni API
-        this.apiUrl = config.getString("api.url", "http://localhost/ServerList/");
+        this.apiUrl = config.getString("api.url", "https://www.blocksy.it/");
         this.apiKey = config.getString("api.key", "");
         this.timeoutSeconds = config.getInt("api.timeout", 30);
         this.maxRetries = config.getInt("api.max-retries", 3);
