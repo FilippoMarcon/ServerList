@@ -1039,7 +1039,7 @@ include 'header.php';
                         <h3><i class="bi bi-key-fill"></i> Licenze dei Server</h3>
                         <p class="section-subtitle">
                             Scarica il <a href="/plugin-blocksy" class="text-primary" style="text-decoration: underline;"><i class="bi bi-plugin"></i> plugin Blocksy</a> per utilizzare le tue licenze: 
-                            <a href="/Blocksy.jar" class="text-primary" style="text-decoration: underline;" download><i class="bi bi-download"></i> Download</a>
+                            <a href="/Blocksy-2.3.jar" class="text-primary" style="text-decoration: underline;" download><i class="bi bi-download"></i> Download</a>
                         </p>
                         
                         <div class="licenses-grid">

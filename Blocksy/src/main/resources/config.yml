@@ -6,14 +6,6 @@
 # OBBLIGATORIO: Inserisci la tua licenza qui 
 server-license: "" # ES: AbC123dEF456gHi789jKL012
 
-# URL dell'API del sito web (senza slash finale)
-# Website API URL (without trailing slash)
-api:
-  url: "http://blocksylist.site.namedhosting.com"  # URL dell'API senza spazi extra
-  key: ""  # Chiave API opzionale per autenticazione
-  timeout: 30  # Timeout in secondi
-  max-retries: 3  # Numero massimo di tentativi in caso di errore
-
 # Impostazioni generali
 # General settings
 debug: false  # Abilita la modalità debug per vedere i log dettagliati
@@ -32,13 +24,12 @@ messages:
 # Comandi per le ricompense automatiche (eseguiti quando un giocatore ha votato)
 # Commands for automatic rewards (executed when a player has voted)
 auto-reward-commands:
-  - "give {player} minecraft:diamond 2"
-  - "give {player} minecraft:emerald 5"
-  - "eco give {player} 100"
+  - "crate key give {player} vote 1"
+  - "voteparty addvote {player} true 1"
+  - "bc &b{player} ha votato il server su &nBlocksy"
 
 # Impostazioni ricompense automatiche
 # Automatic reward settings
 auto-reward:
-  enabled: true  # Abilita le ricompense automatiche
   check-interval: 20  # Secondi tra un controllo e l'altro (default: 20 secondi)
   only-online-players: true  # Dai ricompense solo ai giocatori online

@@ -3,12 +3,6 @@
 # La licenza identifica automaticamente il server e assegna le ricompense al server corretto
 server-license: ""
 
-# Impostazioni API
-api:
-  url: "http://blocksylist.site.namedhosting.com"
-  debug: true
-  timeout: 10
-
 # Messaggi personalizzati
 messages:
   prefix: "§a§l[Blocksy] §r"
@@ -28,7 +22,6 @@ reward-commands:
 
 # Ricompense automatiche (controlla voti pendenti ogni 5 minuti)
 auto-reward:
-  enabled: true
   interval-minutes: 5
   check-on-join: true
   max-pending-votes: 10

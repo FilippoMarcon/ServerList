@@ -3,9 +3,9 @@
 session_start();
 
 $servername = "phpmyadmin.namedhosting.com";
-$username = "user_5907";
-$password = "JyLYLLB3D0Bvh68MaYgn0RYS3RDMtIkpA0o7fPOOEzg";
-$dbname = "site_5907";
+$username = "user_6909";
+$password = "AIsxFxqH-d0DW5BxPQN9nkwpf5_yACano3z6hER8nD8";
+$dbname = "site_6909";
 
 try {
     $pdo = new PDO("mysql:host=$servername;dbname=$dbname;charset=utf8mb4", $username, $password, [
@@ -23,9 +23,9 @@ try {
 
 // Configurazione database MySQL
 $servername = "phpmyadmin.namedhosting.com";
-$username = "user_5907";
-$password = "JyLYLLB3D0Bvh68MaYgn0RYS3RDMtIkpA0o7fPOOEzg";
-$dbname = "site_5907";
+$username = "user_6909";
+$password = "AIsxFxqH-d0DW5BxPQN9nkwpf5_yACano3z6hER8nD8";
+$dbname = "site_6909";
 
 // Opzioni PDO per la connessione sicura
 $options = [
