@@ -995,6 +995,7 @@
             font-weight: 500;
             position: relative;
             overflow: hidden;
+            width: 47%;
         }
         
         .filter-tag::before {
@@ -3190,7 +3191,6 @@
             
             .server-stats {
                 min-width: 70px;
-                padding: 0.75rem;
             }
             
             .stat-number {
@@ -3614,6 +3614,10 @@
         
         .server-tags-section {
             margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
         }
         
         .server-tag-modern {
@@ -3624,6 +3628,12 @@
             font-size: 0.9rem;
             font-weight: 500;
             border: 1px solid var(--border-color);
+            display: inline-block;
+            width: 140px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .social-links-modern {
@@ -5647,6 +5657,9 @@
                             </a></li>
                             <li><a class="dropdown-item" href="/utente/<?php echo (int)$_SESSION['user_id']; ?>">
                                 <i class="bi bi-person-badge"></i> Profilo Pubblico
+                            </a></li>
+                            <li><a class="dropdown-item" href="/eventi-server">
+                                <i class="bi bi-calendar-event"></i> Gestione Eventi
                             </a></li>
                             <?php if (isAdmin()): ?>
                         <li><a class="dropdown-item" href="/admin">

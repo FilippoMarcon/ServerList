@@ -394,17 +394,64 @@ include 'header.php';
     background: transparent;
 }
 
-.server-description .description-text .ql-editor p {
-    margin: 0.3rem 0;
+.server-description .description-text .ql-editor p,
+.server-description .description-text p {
+    margin: 0.5rem 0;
     line-height: 1.6;
 }
 
-.server-description .description-text .ql-editor p:first-child {
+.server-description .description-text .ql-editor p:first-child,
+.server-description .description-text p:first-child {
     margin-top: 0;
 }
 
-.server-description .description-text .ql-editor p:last-child {
+.server-description .description-text .ql-editor p:last-child,
+.server-description .description-text p:last-child {
     margin-bottom: 0;
+}
+
+/* Headings */
+.server-description .description-text h1,
+.server-description .description-text h2,
+.server-description .description-text h3,
+.server-description .description-text h4,
+.server-description .description-text h5,
+.server-description .description-text h6 {
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 1rem 0 0.5rem 0;
+    line-height: 1.3;
+}
+
+.server-description .description-text h1 { font-size: 2rem; }
+.server-description .description-text h2 { font-size: 1.75rem; }
+.server-description .description-text h3 { font-size: 1.5rem; }
+.server-description .description-text h4 { font-size: 1.25rem; }
+.server-description .description-text h5 { font-size: 1.1rem; }
+.server-description .description-text h6 { font-size: 1rem; }
+
+/* Code blocks */
+.server-description .description-text code {
+    background: var(--secondary-bg);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: var(--accent-purple);
+}
+
+.server-description .description-text pre {
+    background: var(--secondary-bg);
+    padding: 1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+.server-description .description-text pre code {
+    background: transparent;
+    padding: 0;
+    color: var(--text-primary);
 }
 
 .server-description .description-text strong {
@@ -496,6 +543,47 @@ include 'header.php';
 
 .server-description .description-text .ql-color-purple {
     color: var(--accent-purple);
+}
+
+/* Font sizes */
+.server-description .description-text .ql-size-small {
+    font-size: 0.75em;
+}
+
+.server-description .description-text .ql-size-large {
+    font-size: 1.5em;
+}
+
+.server-description .description-text .ql-size-huge {
+    font-size: 2.5em;
+}
+
+/* Indent */
+.server-description .description-text .ql-indent-1 {
+    padding-left: 3em;
+}
+
+.server-description .description-text .ql-indent-2 {
+    padding-left: 6em;
+}
+
+.server-description .description-text .ql-indent-3 {
+    padding-left: 9em;
+}
+
+/* Video embeds */
+.server-description .description-text .ql-video {
+    width: 100%;
+    height: 400px;
+    border-radius: 8px;
+    margin: 1rem 0;
+}
+
+/* Horizontal rule */
+.server-description .description-text hr {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: 1.5rem 0;
 }
 
 .server-description .description-text .ql-bg-yellow {
@@ -802,6 +890,47 @@ include 'header.php';
     .server-info-card:last-child {
         margin-bottom: 0;
     }
+    
+    /* Staff scrollabile orizzontalmente su mobile */
+    .staff-rank-members {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        gap: 12px !important;
+        justify-content: center !important;
+        padding: 8px 4px !important;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent-purple) var(--secondary-bg);
+    }
+    
+    /* Se ci sono più di 2 staffer, allinea a sinistra per lo scroll */
+    .staff-rank-members:has(.staff-member-card:nth-child(3)) {
+        justify-content: flex-start !important;
+    }
+    
+    .staff-rank-members::-webkit-scrollbar {
+        height: 6px;
+    }
+    
+    .staff-rank-members::-webkit-scrollbar-track {
+        background: var(--secondary-bg);
+        border-radius: 10px;
+    }
+    
+    .staff-rank-members::-webkit-scrollbar-thumb {
+        background: var(--accent-purple);
+        border-radius: 10px;
+    }
+    
+    .staff-member-card {
+        flex-shrink: 0 !important;
+        scroll-snap-align: start;
+        min-width: 140px !important;
+        width: 140px !important;
+    }
 }
 
 @media (max-width: 576px) {
@@ -1038,7 +1167,7 @@ include 'header.php';
                     
                     <div class="info-item">
                         <span class="info-label">Edizione:</span>
-                        <span class="info-value"><?php echo htmlspecialchars($server['tipo_server'] ?? 'Java & Bedrock'); ?></span>
+                        <span class="info-value"><?php echo $server['tipo_server'] ?? 'Java & Bedrock'; ?></span>
                     </div>
                     
                     <div class="info-item">

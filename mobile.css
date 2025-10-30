@@ -232,9 +232,10 @@
 
   /* Metti il badge sponsor sotto il nome su mobile */
   .homepage-server-card .sponsored-indicator { 
-    display: block !important; 
-    flex-basis: 100% !important; 
-    margin-top: 2px !important; 
+    display: inline-flex !important; 
+    margin-top: 2px !important;
+    margin-left: 0 !important;
+    width: auto !important;
   }
 
   /* Rendi ben visibili i voti sotto al rank */

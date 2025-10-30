@@ -642,37 +642,41 @@ include 'header.php';
                     <div class="col-lg-3">
                         <div class="forum-card forum-card--latest">
                             <div class="card-header bg-transparent border-bottom"><h6 class="mb-0"><i class="bi bi-chat-dots"></i> Ultimi Messaggi</h6></div>
-                            <div class="list-group list-group-flush">
-                                <?php foreach ($latest as $t): ?>
-                                    <a class="list-group-item list-group-item-action bg-transparent text-white forum-latest-item" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>">
-                                        <div class="d-flex w-100 align-items-center justify-content-between">
-                                            <div class="d-flex align-items-center" style="gap:0.6rem;">
-                                                <img src="<?= !empty($t['verified_nick']) ? htmlspecialchars(getMinecraftAvatar($t['verified_nick'], 24)) : '/logo.png' ?>" alt="Avatar" width="24" height="24" class="rounded-circle forum-avatar">
-                                                <div>
-                                                    <h6 class="mb-1 thread-link" style="margin:0;"><?= htmlspecialchars($t['title']) ?></h6>
-                                                    <div class="thread-small thread-meta">
-                                                        <span class="meta-item"><i class="bi bi-folder2"></i> <?= htmlspecialchars($t['category_name'] ?? '') ?></span>
-                                                        <span class="meta-item"><i class="bi bi-person"></i> <?= htmlspecialchars($t['minecraft_nick']) ?></span>
-                                                        <?php if (!empty($t['verified_nick'])): ?>
-                                                            <span class="meta-item"><i class="bi bi-check2-circle"></i> <?= htmlspecialchars($t['verified_nick']) ?></span>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
+                            <div class="latest-messages-container">
+                                <?php 
+                                // Limita a 10 messaggi massimo
+                                $latest_limited = array_slice($latest, 0, 10);
+                                foreach ($latest_limited as $t): 
+                                ?>
+                                    <a class="latest-message-item" href="/forum/<?= (int)$t['id'] ?>-<?= urlencode($t['slug'] ?? slugify($t['title'])) ?>">
+                                        <div class="message-avatar">
+                                            <img src="<?= !empty($t['verified_nick']) ? htmlspecialchars(getMinecraftAvatar($t['verified_nick'], 32)) : '/logo.png' ?>" alt="Avatar" width="32" height="32" class="rounded-circle">
+                                        </div>
+                                        <div class="message-content">
+                                            <div class="message-title"><?= htmlspecialchars(mb_substr($t['title'], 0, 50)) ?><?= mb_strlen($t['title']) > 50 ? '...' : '' ?></div>
+                                            <div class="message-meta">
+                                                <span class="message-author"><?= htmlspecialchars($t['minecraft_nick']) ?></span>
+                                                <span class="message-separator">•</span>
+                                                <span class="message-category"><?= htmlspecialchars($t['category_name'] ?? '') ?></span>
                                             </div>
-                                            <div class="d-flex align-items-center thread-stats" style="gap:0.6rem;">
-                                                <span class="stat-chip"><i class="bi bi-eye"></i> <?= (int)$t['views'] ?></span>
-                                                <span class="stat-chip"><i class="bi bi-chat"></i> <?= (int)$t['replies_count'] ?></span>
-                                                <small class="text-secondary"><?php 
+                                        </div>
+                                        <div class="message-stats">
+                                            <div class="stat-item">
+                                                <i class="bi bi-chat"></i>
+                                                <span><?= (int)$t['replies_count'] ?></span>
+                                            </div>
+                                            <div class="message-time">
+                                                <?php 
                                                     $dtlast = new DateTime($t['created_at'], new DateTimeZone('UTC'));
                                                     $dtlast->setTimezone(new DateTimeZone(date_default_timezone_get()));
-                                                    echo $dtlast->format('d/m/Y H:i');
-                                                ?></small>
+                                                    echo $dtlast->format('d/m');
+                                                ?>
                                             </div>
                                         </div>
                                     </a>
                                 <?php endforeach; ?>
-                                <?php if (empty($latest)): ?>
-                                    <div class="list-group-item bg-transparent text-white">Nessun thread recente.</div>
+                                <?php if (empty($latest_limited)): ?>
+                                    <div class="no-messages">Nessun thread recente.</div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -723,11 +727,107 @@ include 'header.php';
  .forum-card--categories .section-block .list-group-item:hover { background: rgba(124,58,237,0.08); transform: translateX(2px); }
 
  .forum-card--latest { background: linear-gradient(180deg, rgba(56,189,248,0.12), rgba(56,189,248,0.06)), var(--card-bg); border-color: rgba(56,189,248,0.35); }
- .forum-card--latest .forum-latest-item { position: relative; padding-left: 1.1rem; }
- .forum-card--latest .forum-latest-item::before { content:''; position:absolute; left:0.5rem; top:0.6rem; bottom:0.6rem; width:3px; border-radius:2px; background: linear-gradient(180deg, rgba(56,189,248,0.7), rgba(124,58,237,0.7)); opacity:0.6; transition: opacity 0.2s ease, transform 0.2s ease; }
- .forum-card--latest .forum-latest-item:hover::before { opacity:1; transform: scaleX(1.05); }
- .forum-card--latest .forum-avatar { box-shadow: 0 0 0 2px rgba(56,189,248,0.4), 0 2px 8px rgba(0,0,0,0.25); }
- .forum-card--latest .thread-stats .stat-chip { background: transparent; border-color: rgba(56,189,248,0.3); }
+ 
+ /* Nuovo stile per gli ultimi messaggi */
+ .latest-messages-container {
+     display: flex;
+     flex-direction: column;
+     max-height: 600px;
+     overflow-y: auto;
+ }
+ 
+ .latest-message-item {
+     display: flex;
+     align-items: center;
+     gap: 0.75rem;
+     padding: 0.75rem 1rem;
+     border-bottom: 1px solid var(--border-color);
+     text-decoration: none;
+     color: inherit;
+     transition: all 0.2s ease;
+     min-height: 60px;
+ }
+ 
+ .latest-message-item:last-child {
+     border-bottom: none;
+ }
+ 
+ .latest-message-item:hover {
+     background: rgba(56,189,248,0.08);
+     transform: translateX(2px);
+ }
+ 
+ .message-avatar img {
+     box-shadow: 0 0 0 2px rgba(56,189,248,0.4), 0 2px 8px rgba(0,0,0,0.25);
+ }
+ 
+ .message-content {
+     flex: 1;
+     min-width: 0;
+ }
+ 
+ .message-title {
+     font-weight: 600;
+     font-size: 0.9rem;
+     color: var(--text-primary);
+     line-height: 1.3;
+     margin-bottom: 0.25rem;
+     overflow: hidden;
+     text-overflow: ellipsis;
+     white-space: nowrap;
+ }
+ 
+ .message-meta {
+     display: flex;
+     align-items: center;
+     gap: 0.5rem;
+     font-size: 0.8rem;
+     color: var(--text-secondary);
+ }
+ 
+ .message-author {
+     font-weight: 500;
+ }
+ 
+ .message-separator {
+     opacity: 0.6;
+ }
+ 
+ .message-category {
+     opacity: 0.8;
+ }
+ 
+ .message-stats {
+     display: flex;
+     flex-direction: column;
+     align-items: flex-end;
+     gap: 0.25rem;
+ }
+ 
+ .stat-item {
+     display: flex;
+     align-items: center;
+     gap: 0.25rem;
+     font-size: 0.8rem;
+     color: var(--text-secondary);
+     background: rgba(56,189,248,0.1);
+     padding: 0.2rem 0.5rem;
+     border-radius: 12px;
+     border: 1px solid rgba(56,189,248,0.2);
+ }
+ 
+ .message-time {
+     font-size: 0.75rem;
+     color: var(--text-muted);
+     font-weight: 500;
+ }
+ 
+ .no-messages {
+     padding: 1rem;
+     text-align: center;
+     color: var(--text-secondary);
+     font-style: italic;
+ }
  /* Global link normalization in forum contexts */
  .forum-card a, .thread-card a, .thread-row a, .post-card a, .thread-meta a, .post-header a {
    text-decoration: none;

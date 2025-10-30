@@ -273,13 +273,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 }
                 
                 try {
-                    // Trova l'utente per nickname
-                    $stmt = $pdo->prepare("SELECT id FROM sl_users WHERE minecraft_nick = ?");
+                    // Trova l'utente tramite il nickname Minecraft dalla tabella sl_minecraft_links
+                    $stmt = $pdo->prepare("
+                        SELECT u.id, ml.minecraft_nick
+                        FROM sl_users u
+                        INNER JOIN sl_minecraft_links ml ON u.id = ml.user_id
+                        WHERE BINARY ml.minecraft_nick = ?
+                    ");
                     $stmt->execute([$new_owner_nick]);
                     $new_owner = $stmt->fetch();
                     
                     if (!$new_owner) {
-                        echo json_encode(['success' => false, 'message' => 'Utente non trovato']);
+                        echo json_encode(['success' => false, 'message' => 'Utente con nickname Minecraft "' . htmlspecialchars($new_owner_nick) . '" non trovato o account non linkato']);
                         break;
                     }
                     
@@ -287,7 +292,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                     $stmt = $pdo->prepare("UPDATE sl_servers SET owner_id = ? WHERE id = ?");
                     $stmt->execute([$new_owner['id'], $server_id]);
                     
-                    echo json_encode(['success' => true, 'message' => 'Owner cambiato con successo']);
+                    echo json_encode(['success' => true, 'message' => 'Owner cambiato con successo a ' . htmlspecialchars($new_owner_nick)]);
                 } catch (PDOException $e) {
                     echo json_encode(['success' => false, 'message' => 'Errore: ' . $e->getMessage()]);
                 }

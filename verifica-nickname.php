@@ -137,7 +137,7 @@ include 'header.php';
                         <div class="verify-status mb-3">
                             <?php if ($current_link): ?>
                                 <i class="bi bi-patch-check" style="color: var(--accent-blue);"></i>
-                                Attualmente verificato come <strong><?php echo htmlspecialchars($current_link); ?></strong>.
+                                Attualmente verificato come <strong><?php echo htmlspecialchars($current_link); ?></strong>
                             <?php else: ?>
                                 <i class="bi bi-dash-circle"></i> Nessun account Minecraft collegato.
                             <?php endif; ?>
@@ -203,7 +203,7 @@ include 'header.php';
                             <div class="pending-server-info">
                                 <p class="pending-message">
                                     <i class="bi bi-info-circle"></i>
-                                    Il tuo profilo è già collegato come <strong><?= htmlspecialchars($current_link) ?></strong>.
+                                    Il tuo profilo è già collegato come <strong><?= htmlspecialchars($current_link) ?></strong>
                                 </p>
                                 <form method="POST" action="/verifica-nickname" class="mt-2">
                                     <?= csrfInput(); ?>

@@ -37,7 +37,7 @@ if (preg_match('#^/utente/([0-9]+)(?:-[A-Za-z0-9_-]+)?/?$#', $request_path, $m))
 }
 
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
-if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server|plugin-blocksy)/?$#', $request_path, $m)) {
+if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server|plugin-blocksy|eventi-server)/?$#', $request_path, $m)) {
     $map = [
         'forum' => 'forum.php',
         'annunci' => 'annunci.php',
@@ -51,6 +51,7 @@ if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|veri
         'logout' => 'logout.php',
         'sponsorizza-il-tuo-server' => 'sponsorizza.php',
         'plugin-blocksy' => 'plugin-blocksy.php',
+        'eventi-server' => 'eventi-server.php',
     ];
     $target = $map[$m[1]] ?? null;
     if ($target) {
@@ -82,6 +83,27 @@ try {
             expires_at TIMESTAMP NULL,
             FOREIGN KEY (server_id) REFERENCES sl_servers(id) ON DELETE CASCADE,
             UNIQUE KEY unique_server (server_id)
+        )
+    ");
+} catch (PDOException $e) {
+    // Ignora errori di creazione tabella se già esiste
+}
+
+// Crea la tabella eventi server se non esiste
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS sl_server_events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            server_id INT NOT NULL,
+            title VARCHAR(200) NOT NULL,
+            description TEXT,
+            event_date DATE NOT NULL,
+            event_time TIME NULL,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (server_id) REFERENCES sl_servers(id) ON DELETE CASCADE,
+            INDEX(event_date),
+            INDEX(server_id)
         )
     ");
 } catch (PDOException $e) {
@@ -177,6 +199,526 @@ include 'header.php';
     margin-left: 6px;
     font-weight: 700;
 }
+
+.events-section-standalone {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.events-section-standalone h5 {
+    color: var(--text-primary);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.events-section-standalone h5 i {
+    color: var(--accent-purple);
+}
+
+.events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.event-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.event-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.event-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 50px;
+    padding: 0.5rem;
+    background: var(--gradient-primary);
+    border-radius: 8px;
+    color: white;
+    font-weight: 700;
+}
+
+.date-label {
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
+.event-time {
+    font-size: 0.7rem;
+    opacity: 0.9;
+    margin-top: 2px;
+}
+
+.event-info {
+    flex: 1;
+}
+
+.event-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    line-height: 1.2;
+}
+
+.event-server {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.event-server-with-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 4px;
+}
+
+.event-server-logo {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid var(--border-color);
+}
+
+.event-server-logo-fallback {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: var(--accent-purple);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.7rem;
+    border: 1px solid var(--border-color);
+}
+
+.event-server-name {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.refresh-events-btn {
+    background: none;
+    border: none;
+    color: var(--accent-purple);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    margin-left: auto;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    border-radius: 6px;
+}
+
+.refresh-events-btn:hover {
+    transform: rotate(180deg);
+}
+
+.refresh-events-btn.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.events-section-standalone h5 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+/* Modal Styles */
+.event-modal-content {
+    padding: 1rem;
+}
+
+.event-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.event-modal-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 2px solid var(--border-color);
+}
+
+.event-modal-logo-fallback {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+    border: 2px solid var(--border-color);
+}
+
+.event-modal-info h3 {
+    color: var(--text-primary);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.event-modal-type {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: rgba(124, 58, 237, 0.1);
+    color: var(--accent-purple);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid rgba(124, 58, 237, 0.3);
+}
+
+.event-modal-section {
+    margin-bottom: 1.5rem;
+}
+
+.event-modal-section h5 {
+    color: var(--text-primary);
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.event-modal-section h5 i {
+    color: var(--accent-purple);
+}
+
+.event-modal-description {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    padding: 1rem;
+    background: var(--primary-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.event-modal-ip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.event-modal-ip button {
+    margin-left: auto;
+    padding: 0.5rem 1rem;
+    background: var(--gradient-primary);
+    border: none;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.event-modal-ip button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.event-modal-socials {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.event-modal-social-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.event-modal-social-link:hover {
+    background: var(--gradient-primary);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.event-modal-social-link i {
+    font-size: 1.2rem;
+}
+
+/* Tema chiaro */
+[data-theme="light"] .modal-content {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .modal-header,
+[data-theme="light"] .modal-footer {
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .event-modal-description,
+[data-theme="light"] .event-modal-ip {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .event-modal-social-link {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+[data-theme="light"] .event-modal-social-link:hover {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+}
+
+[data-theme="light"] .btn-close {
+    filter: invert(1);
+}
+
+.btn-close-white {
+    filter: brightness(0) invert(1);
+}
+
+[data-theme="light"] .btn-close-white {
+    filter: none;
+}
+
+/* Pulsanti Toggle Mobile */
+.mobile-sidebar-toggle {
+    display: none;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Pulsante chiusura mobile */
+.mobile-close-btn {
+    display: none;
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    width: 40px;
+    height: 40px;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    z-index: 10000;
+    transition: all 0.3s ease;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-close-btn:hover {
+    background: var(--accent-purple);
+    color: white;
+    border-color: var(--accent-purple);
+    transform: rotate(90deg);
+}
+
+/* Desktop: mostra sempre eventi e filtri */
+@media (min-width: 992px) {
+    .col-lg-3 #eventsSection,
+    .col-lg-3 #filtersSection {
+        display: block !important;
+    }
+}
+
+.btn-toggle-sidebar {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-toggle-sidebar:hover {
+    background: var(--primary-bg);
+    border-color: var(--accent-purple);
+}
+
+.btn-toggle-sidebar.active {
+    background: var(--gradient-primary);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-toggle-sidebar i {
+    font-size: 1.1rem;
+}
+
+/* Media Queries Mobile */
+@media (max-width: 991px) {
+    /* Mostra i pulsanti toggle */
+    .mobile-sidebar-toggle {
+        display: flex;
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Rimuovi lo stato active dai pulsanti */
+    .btn-toggle-sidebar.active {
+        background: var(--card-bg);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+        box-shadow: none;
+    }
+    
+    /* Sidebar come modal overlay */
+    .col-lg-3 {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+        display: none;
+        padding: 1rem;
+        overflow-y: auto;
+    }
+    
+    .col-lg-3.modal-open {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    /* Mostra pulsante chiusura su mobile */
+    .col-lg-3.modal-open .mobile-close-btn {
+        display: flex;
+    }
+    
+    /* Contenuto del modal centrato */
+    .col-lg-3 > div {
+        max-width: 500px;
+        margin: 2rem auto;
+    }
+    
+    /* Nascondi le sezioni di default */
+    .col-lg-3 #eventsSection,
+    .col-lg-3 #filtersSection {
+        display: none;
+    }
+    
+    .col-lg-3 #eventsSection.active,
+    .col-lg-3 #filtersSection.active {
+        display: block;
+    }
+    
+    /* Allinea al centro il CTA sponsor */
+    .sponsored-cta {
+        text-align: center;
+    }
+    
+    /* Fix dimensioni pulsanti sort */
+    .sort-controls {
+        flex-wrap: wrap;
+    }
+    
+    .btn-sort {
+        min-width: 120px;
+        min-height: 44px;
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        gap: 0.5rem;
+    }
+    
+    .btn-sort i {
+        font-size: 1rem;
+        margin-right: 0;
+    }
+    
+    /* Migliora spacing eventi */
+    .events-section-standalone {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Pulsanti sort più piccoli su schermi molto piccoli */
+    .btn-sort {
+        min-width: 100px;
+        min-height: 42px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        gap: 0.4rem;
+    }
+    
+    .sort-controls {
+        gap: 0.4rem;
+    }
+    
+    /* Toggle buttons più compatti */
+    .btn-toggle-sidebar {
+        padding: 0.6rem 0.75rem;
+        font-size: 0.85rem;
+    }
+}
 </style>
 
 
@@ -229,6 +771,16 @@ include 'header.php';
                 </div>
             </div>
             <?php endif; ?>
+            
+            <!-- Pulsanti Toggle Mobile per Eventi e Filtri -->
+            <div class="mobile-sidebar-toggle">
+                <button class="btn-toggle-sidebar active" data-target="events">
+                    <i class="bi bi-calendar-event"></i> EVENTI
+                </button>
+                <button class="btn-toggle-sidebar" data-target="filters">
+                    <i class="bi bi-funnel"></i> FILTRI
+                </button>
+            </div>
             
             <!-- Server List Header -->
             <div class="server-list-header">
@@ -309,6 +861,7 @@ include 'header.php';
                              data-name="<?php echo htmlspecialchars(strtolower($server['nome'])); ?>" 
                              data-server-id="<?php echo $server['id']; ?>" 
                              data-votes="<?php echo $server['voti_totali']; ?>"
+                             data-original-rank="<?php echo $rank; ?>"
                              data-all-tags="<?php echo htmlspecialchars($all_tags_string); ?>">
                             <div class="server-rank-container">
                                 <div class="server-rank <?php echo ($rank > 3) ? 'outlined' : $rank_class; ?>">
@@ -362,7 +915,7 @@ include 'header.php';
                                 </div>
                                 <div class="player-status">online</div>
                                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
-                                    <?php echo htmlspecialchars($server['tipo_server'] ?? 'Java & Bedrock'); ?>
+                                    <?php echo $server['tipo_server'] ?? 'Java & Bedrock'; ?>
                                 </div>
                             </div>
                         </div>
@@ -375,10 +928,92 @@ include 'header.php';
         </div>
         
         <!-- Sidebar -->
-        <div class="col-lg-3">
-            <div class="filters-sidebar">
+        <div class="col-lg-3" id="mobileSidebar">
+            <!-- Pulsante chiusura mobile -->
+            <button class="mobile-close-btn" id="closeMobileSidebar">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            
+            <!-- Eventi Prossimi (Separato dai filtri) -->
+            <?php
+            // Ottieni eventi prossimi (oggi e prossimi 7 giorni) con logo server
+            $upcoming_events = [];
+            try {
+                $stmt = $pdo->query("
+                    SELECT e.*, s.nome as server_name, s.id as server_id, s.logo_url
+                    FROM sl_server_events e 
+                    JOIN sl_servers s ON e.server_id = s.id 
+                    WHERE e.is_active = 1 
+                    AND s.is_active = 1 
+                    AND e.event_date >= CURDATE() 
+                    AND e.event_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+                    ORDER BY e.event_date ASC, e.event_time ASC 
+                    LIMIT 5
+                ");
+                $upcoming_events = $stmt->fetchAll();
+            } catch (PDOException $e) {
+                $upcoming_events = [];
+            }
+            ?>
+            
+            <div class="events-section-standalone" id="eventsSection" <?php if (empty($upcoming_events)): ?>style="display: none;"<?php endif; ?>>
+            <?php if (!empty($upcoming_events)): ?>
+                <h5>
+                    <i class="bi bi-calendar-event"></i> Eventi Prossimi
+                    <button id="refreshEventsBtn" class="refresh-events-btn" title="Aggiorna eventi">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </h5>
+                <div class="events-list" id="eventsList">
+                    <?php foreach ($upcoming_events as $event): ?>
+                        <?php
+                        $event_date = new DateTime($event['event_date']);
+                        $today = new DateTime();
+                        $tomorrow = new DateTime('+1 day');
+                        
+                        if ($event_date->format('Y-m-d') === $today->format('Y-m-d')) {
+                            $date_label = 'Oggi';
+                        } elseif ($event_date->format('Y-m-d') === $tomorrow->format('Y-m-d')) {
+                            $date_label = 'Domani';
+                        } else {
+                            $date_label = $event_date->format('d/m');
+                        }
+                        ?>
+                        <div class="event-card" style="cursor: pointer;" onclick="openEventModal(<?php echo $event['server_id']; ?>)">
+                            <div class="event-date">
+                                <span class="date-label"><?php echo $date_label; ?></span>
+                                <?php if (!empty($event['event_time'])): ?>
+                                    <span class="event-time"><?php echo date('H:i', strtotime($event['event_time'])); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="event-info">
+                                <div class="event-title"><?php echo htmlspecialchars($event['title']); ?></div>
+                                <div class="event-server-with-logo">
+                                    <?php if (!empty($event['logo_url'])): ?>
+                                        <img src="<?php echo htmlspecialchars($event['logo_url']); ?>" 
+                                             alt="<?php echo htmlspecialchars($event['server_name']); ?>" 
+                                             class="event-server-logo"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                                        <div class="event-server-logo-fallback" style="display: none;">
+                                            <i class="bi bi-server"></i>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="event-server-logo-fallback">
+                                            <i class="bi bi-server"></i>
+                                        </div>
+                                    <?php endif; ?>
+                                    <span class="event-server-name"><?php echo htmlspecialchars($event['server_name']); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </div>
+            </div>
+            
+            <div class="filters-sidebar" id="filtersSection">
                 <div class="filters-header">
-                    <h4>Filtri</h4>
+                    <h4><i class="bi bi-funnel"></i> Filtri</h4>
                     <button class="clear-filters">Rimuovi filtri</button>
                 </div>
                 
@@ -406,22 +1041,333 @@ include 'header.php';
     </div>
 </div>
 
+<!-- Modal Dettagli Evento -->
+<div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title" id="eventModalLabel" style="color: var(--text-primary);">
+                    <i class="bi bi-info-circle"></i> Dettagli Server
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="eventModalBody">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Caricamento...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+// Funzione per aprire il modal con i dettagli del server
+async function openEventModal(serverId) {
+    const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+    const modalBody = document.getElementById('eventModalBody');
+    
+    // Mostra loading
+    modalBody.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Caricamento...</span>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+    
+    try {
+        const response = await fetch(`/api_get_server_info.php?server_id=${serverId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            modalBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> ${data.error}
+                </div>
+            `;
+            return;
+        }
+        
+        const server = data.server;
+        
+        // Costruisci HTML del modal
+        let socialLinksHtml = '';
+        if (server.social_links && server.social_links.length > 0) {
+            socialLinksHtml = server.social_links.map(link => {
+                let icon = 'bi-link-45deg';
+                const title = link.title.toLowerCase();
+                if (title.includes('discord')) icon = 'bi-discord';
+                else if (title.includes('telegram')) icon = 'bi-telegram';
+                else if (title.includes('instagram')) icon = 'bi-instagram';
+                else if (title.includes('youtube')) icon = 'bi-youtube';
+                else if (title.includes('twitter') || title.includes('x')) icon = 'bi-twitter-x';
+                else if (title.includes('facebook')) icon = 'bi-facebook';
+                else if (title.includes('tiktok')) icon = 'bi-tiktok';
+                else if (title.includes('sito') || title.includes('web')) icon = 'bi-globe';
+                else if (title.includes('shop')) icon = 'bi-cart';
+                
+                return `
+                    <a href="${link.url}" target="_blank" class="event-modal-social-link">
+                        <i class="bi ${icon}"></i>
+                        ${link.title}
+                    </a>
+                `;
+            }).join('');
+        }
+        
+        modalBody.innerHTML = `
+            <div class="event-modal-content">
+                <div class="event-modal-header">
+                    ${server.logo_url ? 
+                        `<img src="${server.logo_url}" alt="${server.nome}" class="event-modal-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                         <div class="event-modal-logo-fallback" style="display: none;">
+                            <i class="bi bi-server"></i>
+                         </div>` :
+                        `<div class="event-modal-logo-fallback">
+                            <i class="bi bi-server"></i>
+                         </div>`
+                    }
+                    <div class="event-modal-info">
+                        <h3>${server.nome}</h3>
+                        <span class="event-modal-type">${server.tipo_server || 'Server'}</span>
+                    </div>
+                </div>
+                
+                ${server.descrizione ? `
+                    <div class="event-modal-section">
+                        <h5><i class="bi bi-file-text"></i> Descrizione</h5>
+                        <div class="event-modal-description">${server.descrizione.replace(/\n/g, '<br>')}</div>
+                    </div>
+                ` : ''}
+                
+                <div class="event-modal-section">
+                    <h5><i class="bi bi-hdd-network"></i> IP Server</h5>
+                    <div class="event-modal-ip">
+                        <span id="serverIpText">${server.ip}</span>
+                        <button onclick="copyServerIp('${server.ip}')">
+                            <i class="bi bi-clipboard"></i> Copia
+                        </button>
+                    </div>
+                </div>
+                
+                ${socialLinksHtml ? `
+                    <div class="event-modal-section">
+                        <h5><i class="bi bi-share"></i> Social & Link</h5>
+                        <div class="event-modal-socials">
+                            ${socialLinksHtml}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+    } catch (error) {
+        modalBody.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Errore nel caricamento dei dati
+            </div>
+        `;
+    }
+}
+
+// Funzione per copiare l'IP
+function copyServerIp(ip) {
+    navigator.clipboard.writeText(ip).then(() => {
+        // Mostra feedback visivo
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check"></i> Copiato!';
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+        }, 2000);
+    });
+}
+
+// Funzione per ricaricare gli eventi
+async function refreshEvents() {
+    const btn = document.getElementById('refreshEventsBtn');
+    const eventsList = document.getElementById('eventsList');
+    
+    // Aggiungi animazione di rotazione
+    btn.classList.add('spinning');
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/api_get_events.php');
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Errore nel caricamento degli eventi:', data.error);
+            return;
+        }
+        
+        // Ricostruisci la lista eventi
+        if (data.events && data.events.length > 0) {
+            eventsList.innerHTML = data.events.map(event => {
+                const eventDate = new Date(event.event_date);
+                const today = new Date();
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                let dateLabel;
+                if (eventDate.toDateString() === today.toDateString()) {
+                    dateLabel = 'Oggi';
+                } else if (eventDate.toDateString() === tomorrow.toDateString()) {
+                    dateLabel = 'Domani';
+                } else {
+                    dateLabel = eventDate.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+                }
+                
+                const eventTime = event.event_time ? 
+                    `<span class="event-time">${event.event_time.substring(0, 5)}</span>` : '';
+                
+                const logoHtml = event.logo_url ?
+                    `<img src="${event.logo_url}" alt="${event.server_name}" class="event-server-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                     <div class="event-server-logo-fallback" style="display: none;">
+                        <i class="bi bi-server"></i>
+                     </div>` :
+                    `<div class="event-server-logo-fallback">
+                        <i class="bi bi-server"></i>
+                     </div>`;
+                
+                return `
+                    <div class="event-card" style="cursor: pointer;" onclick="openEventModal(${event.server_id})">
+                        <div class="event-date">
+                            <span class="date-label">${dateLabel}</span>
+                            ${eventTime}
+                        </div>
+                        <div class="event-info">
+                            <div class="event-title">${event.title}</div>
+                            <div class="event-server-with-logo">
+                                ${logoHtml}
+                                <span class="event-server-name">${event.server_name}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            eventsList.innerHTML = '<p class="text-center text-muted">Nessun evento nei prossimi 7 giorni</p>';
+        }
+        
+    } catch (error) {
+        console.error('Errore nel refresh degli eventi:', error);
+    } finally {
+        // Rimuovi animazione
+        setTimeout(() => {
+            btn.classList.remove('spinning');
+            btn.disabled = false;
+        }, 500);
+    }
+}
+
+// Event listener per il pulsante refresh e toggle mobile
+document.addEventListener('DOMContentLoaded', function() {
+    const refreshBtn = document.getElementById('refreshEventsBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshEvents);
+    }
+    
+    // Gestione toggle mobile tra eventi e filtri (come modal)
+    const toggleButtons = document.querySelectorAll('.btn-toggle-sidebar');
+    const eventsSection = document.getElementById('eventsSection');
+    const filtersSection = document.getElementById('filtersSection');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const closeMobileSidebar = document.getElementById('closeMobileSidebar');
+    
+    // Funzione per chiudere il modal
+    function closeSidebarModal() {
+        if (mobileSidebar) {
+            mobileSidebar.classList.remove('modal-open');
+            document.body.style.overflow = '';
+        }
+    }
+    
+    // Gestione click sui pulsanti toggle
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const target = this.getAttribute('data-target');
+            
+            // Nascondi tutte le sezioni
+            if (eventsSection) eventsSection.classList.remove('active');
+            if (filtersSection) filtersSection.classList.remove('active');
+            
+            // Mostra la sezione selezionata
+            if (target === 'events' && eventsSection) {
+                eventsSection.classList.add('active');
+            } else if (target === 'filters' && filtersSection) {
+                filtersSection.classList.add('active');
+            }
+            
+            // Apri il modal su mobile
+            if (window.innerWidth <= 991 && mobileSidebar) {
+                mobileSidebar.classList.add('modal-open');
+                document.body.style.overflow = 'hidden';
+            }
+        });
+    });
+    
+    // Chiusura con pulsante X
+    if (closeMobileSidebar) {
+        closeMobileSidebar.addEventListener('click', closeSidebarModal);
+    }
+    
+    // Chiusura cliccando sul backdrop
+    if (mobileSidebar) {
+        mobileSidebar.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeSidebarModal();
+            }
+        });
+    }
+    
+    // Chiusura con tasto ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && mobileSidebar && mobileSidebar.classList.contains('modal-open')) {
+            closeSidebarModal();
+        }
+    });
+});
+
 // Funzione di ricerca server
 function searchServers() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput) return;
+    
+    const searchTerm = searchInput.value.toLowerCase().trim();
     const servers = document.querySelectorAll('.homepage-server-card');
     
+    let matchCount = 0;
+    
     servers.forEach(server => {
-        const serverName = server.getAttribute('data-name');
-        if (serverName && serverName.includes(searchTerm)) {
+        const serverName = (server.getAttribute('data-name') || '').toLowerCase().trim();
+        
+        // Se la searchbar è vuota, mostra tutti i server
+        if (searchTerm === '') {
             server.style.display = 'flex';
+            server.style.visibility = 'visible';
+            server.style.opacity = '1';
+            matchCount++;
+        } 
+        // Altrimenti mostra SOLO i server che contengono il termine di ricerca nel nome
+        else if (serverName.includes(searchTerm)) {
+            server.style.display = 'flex';
+            server.style.visibility = 'visible';
+            server.style.opacity = '1';
+            matchCount++;
         } else {
+            // Nascondi completamente i server che non corrispondono
             server.style.display = 'none';
+            server.style.visibility = 'hidden';
+            server.style.opacity = '0';
         }
     });
     
-    // Riapplica l'ordinamento corrente
+    // Riapplica l'ordinamento corrente (che chiamerà updateRankings)
     const currentSort = sessionStorage.getItem('serverSort') || 'votes';
     const currentDirection = sessionStorage.getItem('sortDirection') || 'desc';
     applySorting(currentSort, currentDirection);
@@ -486,10 +1432,12 @@ document.addEventListener('DOMContentLoaded', function() {
         filterTags.forEach(tag => tag.classList.remove('active'));
         document.querySelectorAll('.homepage-server-card').forEach(server => {
             server.style.display = 'flex';
+            server.style.visibility = 'visible';
+            server.style.opacity = '1';
         });
         document.getElementById('searchInput').value = '';
         updateClearFiltersButton();
-        // Riapplica l'ordinamento corrente
+        // Riapplica l'ordinamento corrente (che chiamerà updateRankings)
         const currentSort = sessionStorage.getItem('serverSort') || 'votes';
         const currentDirection = sessionStorage.getItem('sortDirection') || 'desc';
         applySorting(currentSort, currentDirection);
@@ -544,13 +1492,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function applyFilters() {
     const activeFilters = Array.from(document.querySelectorAll('.filter-tag.active')).map(tag => tag.textContent.toLowerCase());
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
     const servers = document.querySelectorAll('.homepage-server-card');
     
     let visibleCount = 0;
     
     servers.forEach(server => {
-        const serverName = server.getAttribute('data-name') || '';
+        const serverName = (server.getAttribute('data-name') || '').toLowerCase().trim();
         
         // Usa data-all-tags per includere anche le modalità nascoste
         const allTagsString = server.getAttribute('data-all-tags') || '';
@@ -561,16 +1509,20 @@ function applyFilters() {
         
         if (matchesSearch && matchesFilter) {
             server.style.display = 'flex';
+            server.style.visibility = 'visible';
+            server.style.opacity = '1';
             visibleCount++;
         } else {
             server.style.display = 'none';
+            server.style.visibility = 'hidden';
+            server.style.opacity = '0';
         }
     });
     
     // Update results count
     updateResultsCount(visibleCount);
     
-    // Riapplica l'ordinamento corrente sui server visibili
+    // Riapplica l'ordinamento corrente sui server visibili (che chiamerà updateRankings)
     const currentSort = sessionStorage.getItem('serverSort') || 'votes';
     const currentDirection = sessionStorage.getItem('sortDirection') || 'desc';
     applySorting(currentSort, currentDirection);
@@ -644,8 +1596,9 @@ function applySorting(sortType, direction = 'desc') {
 function updateRankings() {
     const visibleServers = Array.from(document.querySelectorAll('.homepage-server-card')).filter(server => server.style.display !== 'none');
     
-    visibleServers.forEach((server, index) => {
-        const rank = index + 1;
+    // Aggiorna ogni server con il suo rank ORIGINALE (posizione nella classifica globale)
+    visibleServers.forEach(server => {
+        const rank = parseInt(server.getAttribute('data-original-rank')) || 1;
         const rankContainer = server.querySelector('.server-rank-container');
         const rankElement = server.querySelector('.server-rank');
         const rankNumberTop = server.querySelector('.rank-number-top');

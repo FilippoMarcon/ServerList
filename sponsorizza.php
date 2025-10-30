@@ -214,10 +214,17 @@ include 'header.php';
                             <div class="form-group mb-3">
                                 <label for="duration" class="form-label">Durata Sponsorizzazione</label>
                                 <div class="input-group">
-                                    <input type="number" name="duration" id="duration" class="form-control" min="1" max="365" value="30" required style="color: var(--text-primary); font-size: 1rem;">
+                                    <input type="number" name="duration" id="duration" class="form-control" min="1" max="30" value="7" required style="color: var(--text-primary); font-size: 1rem;">
                                     <span class="input-group-text" style="background: var(--primary-bg); border: 1px solid var(--border-color); color: var(--text-secondary);">giorni</span>
                                 </div>
-                                <small class="form-text" style="display: block; margin-top: 0.5rem; color: var(--text-secondary); opacity: 0.9;">Inserisci il numero di giorni (minimo 1, massimo 365)</small>
+                                <small class="form-text" style="display: block; margin-top: 0.5rem; color: var(--text-secondary); opacity: 0.9;">Inserisci il numero di giorni (minimo 1, massimo 30)</small>
+                                <div class="pricing-info mt-2" style="background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+                                    <h6 style="color: var(--text-primary); margin-bottom: 0.5rem;"><i class="bi bi-calculator"></i> Calcolo Prezzo</h6>
+                                    <div class="price-display" style="font-size: 1.2rem; font-weight: 700; color: var(--accent-purple);">
+                                        €<span id="totalPrice">3.50</span>
+                                    </div>
+                                    <small style="color: var(--text-secondary);">€0.50 per giorno</small>
+                                </div>
                             </div>
 
                             <div class="form-group mb-3">
@@ -228,12 +235,12 @@ include 'header.php';
                             <div class="info-box mb-3">
                                 <i class="bi bi-info-circle"></i>
                                 <div>
-                                    <strong>Nota:</strong> Dopo l'invio della richiesta, un amministratore la esaminerà e ti contatterà per i dettagli del pagamento e l'attivazione della sponsorizzazione.
+                                    <strong>Nota:</strong> Dopo l'invio della richiesta, verrai reindirizzato a PayPal per completare il pagamento. La sponsorizzazione si attiverà automaticamente dopo il pagamento confermato.
                                 </div>
                             </div>
 
                             <button type="submit" class="btn btn-hero w-100" style="font-weight: 600; font-size: 1.1rem; color: white;">
-                                <i class="bi bi-send"></i> Invia Richiesta
+                                <i class="bi bi-paypal"></i> Procedi al Pagamento PayPal
                             </button>
                         </form>
                     </div>
@@ -420,6 +427,26 @@ include 'header.php';
         grid-template-columns: 1fr;
     }
 }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const durationInput = document.getElementById('duration');
+    const totalPriceElement = document.getElementById('totalPrice');
+    const pricePerDay = 0.50;
+    
+    function updatePrice() {
+        const days = parseInt(durationInput.value) || 1;
+        const total = (days * pricePerDay).toFixed(2);
+        totalPriceElement.textContent = total;
+    }
+    
+    if (durationInput && totalPriceElement) {
+        durationInput.addEventListener('input', updatePrice);
+        updatePrice(); // Calcolo iniziale
+    }
+});
+</script>
 </style>
 
 <?php include 'footer.php'; ?>
