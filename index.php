@@ -228,6 +228,27 @@ include 'header.php';
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    max-height: 350px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.events-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.events-list::-webkit-scrollbar-track {
+    background: var(--primary-bg);
+    border-radius: 10px;
+}
+
+.events-list::-webkit-scrollbar-thumb {
+    background: var(--accent-purple);
+    border-radius: 10px;
+}
+
+.events-list::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-blue);
 }
 
 .event-card {
@@ -239,11 +260,50 @@ include 'header.php';
     border: 1px solid var(--border-color);
     border-radius: 8px;
     transition: all 0.3s ease;
+    position: relative;
 }
 
 .event-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.event-card.pinned {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%);
+    border-color: rgba(255, 215, 0, 0.3);
+    order: -1;
+}
+
+.event-pin-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.event-pin-btn:hover {
+    background: rgba(255, 215, 0, 0.1);
+    color: #FFD700;
+}
+
+.event-card.pinned .event-pin-btn {
+    color: #FFD700;
+}
+
+.event-card.pinned .event-pin-btn i {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
 }
 
 .event-date {
@@ -320,37 +380,7 @@ include 'header.php';
     font-weight: 500;
 }
 
-.refresh-events-btn {
-    background: none;
-    border: none;
-    color: var(--accent-purple);
-    cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    margin-left: auto;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
-    border-radius: 6px;
-}
 
-.refresh-events-btn:hover {
-    transform: rotate(180deg);
-}
-
-.refresh-events-btn.spinning {
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-.events-section-standalone h5 {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-}
 
 /* Modal Styles */
 .event-modal-content {
@@ -871,7 +901,7 @@ include 'header.php';
                                         <i class="bi bi-trophy-fill" style="margin-right: 6px;"></i><?php echo $rank; ?>°
                                     <?php endif; ?>
                                 </div>
-                                <div class="rank-votes" style="font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;">
+                                <div class="rank-votes" style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px; text-align: center;">
                                     +<?php echo $server['voti_totali']; ?>
                                 </div>
                             </div>
@@ -895,7 +925,7 @@ include 'header.php';
                                                 <i class="bi bi-star-fill"></i> SPONSOR
                                             </span>
                                         <?php endif; ?>
-                                        <span style="font-size: 0.9rem; color: var(--text-muted);">
+                                        <span style="font-size: 0.9rem; color: var(--text-secondary);">
                                             <?php echo htmlspecialchars($server['versione'] ?: '1.20.2'); ?>
                                         </span>
                                     </a>
@@ -916,7 +946,7 @@ include 'header.php';
                                     ...
                                 </div>
                                 <div class="player-status">online</div>
-                                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">
                                     <?php echo $server['tipo_server'] ?? 'Java & Bedrock'; ?>
                                 </div>
                             </div>
@@ -941,16 +971,18 @@ include 'header.php';
             // Ottieni eventi prossimi (oggi e prossimi 7 giorni) con logo server
             $upcoming_events = [];
             try {
+                // Query per ottenere tutti gli eventi futuri (fino a 30 giorni)
                 $stmt = $pdo->query("
-                    SELECT e.*, s.nome as server_name, s.id as server_id, s.logo_url
+                    SELECT e.*, s.nome as server_name, s.id as server_id, s.logo_url,
+                           s.ip as server_ip
                     FROM sl_server_events e 
                     JOIN sl_servers s ON e.server_id = s.id 
                     WHERE e.is_active = 1 
                     AND s.is_active = 1 
                     AND e.event_date >= CURDATE() 
-                    AND e.event_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-                    ORDER BY e.event_date ASC, e.event_time ASC 
-                    LIMIT 5
+                    AND e.event_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+                    ORDER BY e.event_date ASC, e.event_time ASC, RAND()
+                    LIMIT 10
                 ");
                 $upcoming_events = $stmt->fetchAll();
             } catch (PDOException $e) {
@@ -961,9 +993,6 @@ include 'header.php';
             <div class="events-section-standalone" id="eventsSection">
                 <h5>
                     <i class="bi bi-calendar-event"></i> Eventi Prossimi
-                    <button id="refreshEventsBtn" class="refresh-events-btn" title="Aggiorna eventi">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
                 </h5>
                 <div class="events-list" id="eventsList">
                     <?php if (!empty($upcoming_events)): ?>
@@ -981,16 +1010,20 @@ include 'header.php';
                             $date_label = $event_date->format('d/m');
                         }
                         ?>
-                        <div class="event-card" style="cursor: pointer;" onclick='openEventModal(<?php echo json_encode([
-                            "id" => $event["id"],
-                            "title" => $event["title"],
-                            "description" => $event["description"] ?? "",
-                            "event_date" => $event["event_date"],
-                            "event_time" => $event["event_time"] ?? "",
-                            "server_id" => $event["server_id"],
-                            "server_name" => $event["server_name"],
-                            "logo_url" => $event["logo_url"] ?? ""
-                        ]); ?>)'>
+                        <div class="event-card" data-event-id="<?php echo $event['id']; ?>" data-event-date="<?php echo $event['event_date']; ?>">
+                            <button class="event-pin-btn" onclick="togglePinEvent(<?php echo $event['id']; ?>, event)" title="Fissa evento">
+                                <i class="bi bi-star"></i>
+                            </button>
+                            <div class="event-content" style="cursor: pointer; flex: 1; display: flex; align-items: center; gap: 0.75rem;" onclick='openEventModal(<?php echo json_encode([
+                                "id" => $event["id"],
+                                "title" => $event["title"],
+                                "description" => $event["description"] ?? "",
+                                "event_date" => $event["event_date"],
+                                "event_time" => $event["event_time"] ?? "",
+                                "server_id" => $event["server_id"],
+                                "server_name" => $event["server_name"],
+                                "logo_url" => $event["logo_url"] ?? ""
+                            ]); ?>)'>
                             <div class="event-date">
                                 <span class="date-label"><?php echo $date_label; ?></span>
                                 <?php if (!empty($event['event_time'])): ?>
@@ -1016,10 +1049,11 @@ include 'header.php';
                                     <span class="event-server-name"><?php echo htmlspecialchars($event['server_name']); ?></span>
                                 </div>
                             </div>
+                            </div>
                         </div>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <div class="no-events-message" style="text-align: center; padding: 2rem 1rem; color: var(--text-muted);">
+                        <div class="no-events-message" style="text-align: center; padding: 2rem 1rem; color: var(--text-secondary);">
                             <i class="bi bi-calendar-x" style="font-size: 2.5rem; margin-bottom: 0.5rem; display: block;"></i>
                             <p style="margin: 0;">Nessun evento nei prossimi 7 giorni</p>
                         </div>
@@ -1276,7 +1310,7 @@ async function refreshEvents() {
                 `;
             }).join('');
         } else {
-            eventsList.innerHTML = '<p class="text-center text-muted">Nessun evento nei prossimi 7 giorni</p>';
+            eventsList.innerHTML = '<p class="text-center text-secondary">Nessun evento nei prossimi 7 giorni</p>';
         }
         
     } catch (error) {
@@ -1290,12 +1324,103 @@ async function refreshEvents() {
     }
 }
 
+// Funzione per fissare/sbloccare un evento
+function togglePinEvent(eventId, event) {
+    event.stopPropagation(); // Previeni apertura modal
+    
+    const eventCard = document.querySelector(`.event-card[data-event-id="${eventId}"]`);
+    if (!eventCard) return;
+    
+    const isPinned = eventCard.classList.contains('pinned');
+    
+    // Ottieni tutti gli eventi pinnati dal localStorage
+    let pinnedEvents = JSON.parse(localStorage.getItem('pinnedEvents') || '[]');
+    
+    if (isPinned) {
+        // Rimuovi pin
+        eventCard.classList.remove('pinned');
+        const icon = eventCard.querySelector('.event-pin-btn i');
+        icon.classList.remove('bi-star-fill');
+        icon.classList.add('bi-star');
+        
+        // Rimuovi dal localStorage
+        pinnedEvents = pinnedEvents.filter(id => id !== eventId);
+    } else {
+        // Aggiungi pin
+        eventCard.classList.add('pinned');
+        const icon = eventCard.querySelector('.event-pin-btn i');
+        icon.classList.remove('bi-star');
+        icon.classList.add('bi-star-fill');
+        
+        // Aggiungi al localStorage
+        if (!pinnedEvents.includes(eventId)) {
+            pinnedEvents.push(eventId);
+        }
+    }
+    
+    // Salva nel localStorage
+    localStorage.setItem('pinnedEvents', JSON.stringify(pinnedEvents));
+    
+    // Riordina gli eventi (pinned in alto)
+    sortEventsByPin();
+}
+
+// Funzione per ordinare gli eventi con i pinned in alto
+function sortEventsByPin() {
+    const eventsList = document.getElementById('eventsList');
+    if (!eventsList) return;
+    
+    const events = Array.from(eventsList.querySelectorAll('.event-card'));
+    
+    events.sort((a, b) => {
+        const aPinned = a.classList.contains('pinned');
+        const bPinned = b.classList.contains('pinned');
+        
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        
+        // Se entrambi pinned o non pinned, mantieni ordine originale (per data)
+        return 0;
+    });
+    
+    // Riappendi gli eventi nell'ordine corretto
+    events.forEach(event => eventsList.appendChild(event));
+}
+
+// Funzione per ripristinare i pin salvati
+function restorePinnedEvents() {
+    const pinnedEvents = JSON.parse(localStorage.getItem('pinnedEvents') || '[]');
+    
+    pinnedEvents.forEach(eventId => {
+        const eventCard = document.querySelector(`.event-card[data-event-id="${eventId}"]`);
+        if (eventCard) {
+            // Verifica che l'evento non sia scaduto
+            const eventDate = eventCard.getAttribute('data-event-date');
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (eventDate >= today) {
+                eventCard.classList.add('pinned');
+                const icon = eventCard.querySelector('.event-pin-btn i');
+                if (icon) {
+                    icon.classList.remove('bi-star');
+                    icon.classList.add('bi-star-fill');
+                }
+            } else {
+                // Rimuovi eventi scaduti dal localStorage
+                let pinnedEvents = JSON.parse(localStorage.getItem('pinnedEvents') || '[]');
+                pinnedEvents = pinnedEvents.filter(id => id !== eventId);
+                localStorage.setItem('pinnedEvents', JSON.stringify(pinnedEvents));
+            }
+        }
+    });
+    
+    sortEventsByPin();
+}
+
 // Event listener per il pulsante refresh e toggle mobile
 document.addEventListener('DOMContentLoaded', function() {
-    const refreshBtn = document.getElementById('refreshEventsBtn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', refreshEvents);
-    }
+    // Ripristina eventi pinnati al caricamento
+    restorePinnedEvents();
     
     // Gestione toggle mobile tra eventi e filtri (come modal)
     const toggleButtons = document.querySelectorAll('.btn-toggle-sidebar');
@@ -1677,7 +1802,7 @@ function updateRankings() {
             if (!bottomVotes) {
                 bottomVotes = document.createElement('div');
                 bottomVotes.className = 'rank-votes';
-                bottomVotes.style.cssText = 'font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;';
+                bottomVotes.style.cssText = 'font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px; text-align: center;';
                 rankContainer.appendChild(bottomVotes);
             }
             bottomVotes.textContent = '+' + votesValue;
@@ -1689,7 +1814,7 @@ function updateRankings() {
             if (!bottomVotes) {
                 bottomVotes = document.createElement('div');
                 bottomVotes.className = 'rank-votes';
-                bottomVotes.style.cssText = 'font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; text-align: center;';
+                bottomVotes.style.cssText = 'font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px; text-align: center;';
                 rankContainer.appendChild(bottomVotes);
             }
             bottomVotes.textContent = '+' + votesValue;

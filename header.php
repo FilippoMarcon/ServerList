@@ -417,11 +417,21 @@
             grid-template-columns: 1fr 1fr;
             gap: 20px;
             margin-bottom: 20px;
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .form-row > * {
+            min-width: 0;
+            max-width: 100%;
         }
 
         .form-group {
             display: flex;
             flex-direction: column;
+            max-width: 100%;
+            width: 100%;
         }
 
         .form-group label {
@@ -441,6 +451,9 @@
             color: #fff;
             font-size: 14px;
             transition: all 0.3s ease;
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .form-group input:focus,
@@ -1382,6 +1395,12 @@
             border-radius: 12px;
             border: 1px solid var(--border-color);
             transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         
         .stat-item:hover {
@@ -1793,6 +1812,9 @@
             border: 1px solid var(--border-color);
             transition: all 0.3s ease;
             overflow: hidden;
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
         }
         
         .server-card-profile:hover {
@@ -1853,6 +1875,8 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.9rem;
             margin: 0;
+            word-break: break-all;
+            overflow-wrap: break-word;
         }
         
         .server-stats-small {
@@ -2045,6 +2069,16 @@
             min-height: 100vh;
             background: var(--bg-primary);
             padding: 2rem 0;
+            overflow-x: hidden;
+            max-width: 100%;
+        }
+        
+        .profile-container .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-left: 15px;
+            padding-right: 15px;
+            overflow-x: hidden;
         }
         
         /* Header del profilo */
@@ -2176,11 +2210,16 @@
             border-radius: 20px;
             border: 1px solid var(--border-color);
             overflow: hidden;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         
         .content-section {
             display: none;
             padding: 2rem;
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
         }
         
         .content-section.active {
@@ -2542,17 +2581,28 @@
         .servers-grid,
         .licenses-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
             gap: 1.5rem;
             width: 100%;
+            max-width: 100%;
             margin-top: 1.5rem;
             align-items: start;
+            box-sizing: border-box;
         }
         
         @media (min-width: 768px) {
             .servers-grid,
             .licenses-grid {
                 grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .profile-container .container {
+                padding-left: 15px;
+                padding-right: 15px;
+            }
+            
+            .content-section {
+                padding: 2rem;
             }
         }
         
@@ -2971,6 +3021,9 @@
             border-radius: 16px;
             overflow: hidden;
             transition: all 0.3s ease;
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
         }
         
         .license-card:hover {
@@ -3045,6 +3098,9 @@
             color: var(--text-primary);
             display: block;
             word-break: break-all;
+            overflow-wrap: break-word;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         
         .license-dots {
@@ -3096,10 +3152,32 @@
         
         /* Responsive */
         @media (max-width: 768px) {
+            /* Previeni overflow globale */
+            * {
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+            
+            body {
+                overflow-x: hidden;
+            }
+            
+            .profile-container .container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            
+            .profile-container {
+                padding: 1rem 0;
+            }
+            
             .profile-header {
                 flex-direction: column;
                 text-align: center;
                 gap: 1rem;
+                padding: 1rem;
+                margin-left: 0;
+                margin-right: 0;
             }
             
             .profile-navigation {
@@ -3118,6 +3196,10 @@
             .servers-grid,
             .licenses-grid {
                 grid-template-columns: 1fr;
+                gap: 1rem;
+                padding: 0;
+                margin-left: 0;
+                margin-right: 0;
             }
             
             .profile-stats-grid {
@@ -3136,10 +3218,147 @@
             
             .server-actions {
                 flex-direction: column;
+                width: 100%;
+            }
+            
+            .btn-view-server,
+            .btn-edit-server,
+            .btn-admin-edit {
+                width: 100%;
+                justify-content: center;
             }
             
             .license-actions {
                 flex-direction: column;
+            }
+            
+            /* Ottimizza card server per mobile */
+            .server-card-profile,
+            .license-card {
+                margin-bottom: 1rem;
+                margin-left: 0;
+                margin-right: 0;
+            }
+            
+            .server-card-header,
+            .license-card-header {
+                flex-direction: column;
+                text-align: center;
+                padding: 1rem;
+            }
+            
+            .license-card-body {
+                padding: 1rem;
+            }
+            
+            .server-logo-small {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .server-info-small {
+                width: 100%;
+            }
+            
+            .server-name-small {
+                font-size: 1.1rem;
+            }
+            
+            .server-ip-small {
+                font-size: 0.85rem;
+                word-break: break-all;
+            }
+            
+            .server-stats-small {
+                margin-top: 1rem;
+            }
+            
+            .server-card-body {
+                padding: 1rem;
+            }
+            
+            /* Form ottimizzato per mobile */
+            .server-request-form,
+            .edit-server-form {
+                padding: 0;
+                max-width: 100%;
+            }
+            
+            .content-section {
+                padding: 1rem;
+            }
+            
+            .profile-content {
+                margin: 0 0.5rem;
+            }
+            
+            .form-group label {
+                font-size: 0.9rem;
+            }
+            
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                font-size: 16px; /* Previene zoom su iOS */
+            }
+            
+            .form-actions {
+                margin-top: 1.5rem;
+            }
+            
+            .form-actions button {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+            
+            /* Modalità selection ottimizzata */
+            .modalita-selection {
+                gap: 8px;
+            }
+            
+            .modalita-tag {
+                font-size: 11px;
+                padding: 6px 10px;
+            }
+            
+            /* Staff list editor mobile */
+            .stafflist-editor,
+            #sociallinks-editor {
+                padding: 0.75rem !important;
+            }
+            
+            .stafflist-actions,
+            .sociallinks-actions {
+                flex-direction: column;
+            }
+            
+            .stafflist-actions button,
+            .sociallinks-actions button {
+                width: 100%;
+            }
+            
+            /* Rank groups mobile */
+            .staff-rank-group {
+                padding: 0.75rem !important;
+            }
+            
+            .rank-title-input,
+            .member-name-input {
+                width: 100% !important;
+                min-width: auto !important;
+            }
+            
+            /* Social links mobile */
+            .social-row {
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+            
+            .social-title-input,
+            .social-url-input {
+                width: 100% !important;
+                min-width: auto !important;
             }
         }
         
@@ -3187,6 +3406,65 @@
                 font-size: 2rem;
             }
             
+        }
+        
+        /* Ottimizzazioni extra per schermi molto piccoli */
+        @media (max-width: 480px) {
+            .profile-header {
+                padding: 1rem;
+            }
+            
+            .profile-avatar img {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .profile-nickname {
+                font-size: 1.5rem;
+            }
+            
+            .profile-navigation {
+                padding: 0.5rem;
+            }
+            
+            .nav-btn {
+                padding: 0.75rem;
+                font-size: 0.85rem;
+            }
+            
+            .nav-btn i {
+                font-size: 1rem;
+            }
+            
+            .section-header h2 {
+                font-size: 1.3rem;
+            }
+            
+            .section-header p {
+                font-size: 0.85rem;
+            }
+            
+            .server-logo-small {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .stat-number-small {
+                font-size: 1.2rem;
+            }
+            
+            .stat-label-small {
+                font-size: 0.7rem;
+            }
+            
+            .stat-item {
+                padding: 0.75rem;
+                margin: 0;
+            }
+            
+            .profile-stats-grid {
+                gap: 0.75rem;
+            }
         }
         
         @media (max-width: 992px) {
