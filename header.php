@@ -802,11 +802,35 @@
                 text-align: center;
             }
             
-            /* Mobile: metti server-version sotto votes-count */
-            .sponsored-server-card .server-stats {
+            /* Mobile: riorganizza ordine elementi sponsor */
+            .sponsored-server-card .server-info {
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .sponsored-server-card .server-info h4 {
+                order: 1;
+                margin-bottom: 0.5rem;
+            }
+            
+            .sponsored-server-card .server-info .server-ip {
+                order: 2;
+                margin-bottom: 0.5rem;
+            }
+            
+            .sponsored-server-card .server-info .server-stats {
+                order: 3;
                 flex-direction: column;
                 gap: 4px;
                 align-items: flex-start;
+            }
+            
+            .sponsored-server-card .server-stats .server-version {
+                order: 1;
+            }
+            
+            .sponsored-server-card .server-stats .votes-count {
+                order: 2;
             }
         }
         
@@ -3188,14 +3212,22 @@
             
             body {
                 overflow-x: hidden;
+                max-width: 100vw;
+            }
+            
+            html {
+                overflow-x: hidden;
+                max-width: 100vw;
             }
             
             /* Fix homepage server cards */
             .homepage-server-card {
                 margin-left: 0;
                 margin-right: 0;
-                padding: 1rem;
+                padding: 0.75rem;
                 max-width: 100%;
+                width: 100%;
+                box-sizing: border-box;
             }
             
             .homepage-server-card .server-rank-container,
@@ -3207,23 +3239,31 @@
             .server-list {
                 padding: 0;
                 margin: 0;
+                width: 100%;
+                max-width: 100%;
+            }
+            
+            .server-list-header {
+                padding: 1rem 0.5rem;
+                margin: 0;
             }
             
             /* Fix colonne Bootstrap su mobile */
             .container {
-                padding-left: 1rem;
-                padding-right: 1rem;
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+                max-width: 100%;
             }
             
             .col-lg-9,
             .col-lg-3 {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
+                padding-left: 0.25rem;
+                padding-right: 0.25rem;
             }
             
             .row {
-                margin-left: -0.5rem;
-                margin-right: -0.5rem;
+                margin-left: 0;
+                margin-right: 0;
             }
             
             .profile-container .container {
