@@ -162,10 +162,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 $server_id = (int)$_POST['server_id'];
                 $status = (int)$_POST['status'];
                 
-                $stmt = $pdo->prepare("UPDATE sl_servers SET is_active = ? WHERE id = ?");
-                $stmt->execute([$status, $server_id]);
-                
-                echo json_encode(['success' => true, 'message' => 'Stato server aggiornato']);
+                // Se approva il server (status = 1), metti in costruzione
+                if ($status === 1) {
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET is_active = ?, in_costruzione = 1 WHERE id = ?");
+                    $stmt->execute([$status, $server_id]);
+                    echo json_encode(['success' => true, 'message' => 'Server approvato e messo in costruzione']);
+                } else {
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET is_active = ? WHERE id = ?");
+                    $stmt->execute([$status, $server_id]);
+                    echo json_encode(['success' => true, 'message' => 'Stato server aggiornato']);
+                }
                 break;
 
             case 'toggle_sponsorship':

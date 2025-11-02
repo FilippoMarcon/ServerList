@@ -173,9 +173,6 @@
         });
     </script>
     
-    <!-- MC Player Counter Script -->
-    <script src="https://cdn.jsdelivr.net/gh/leonardosnt/mc-player-counter/dist/mc-player-counter.min.js"></script>
-    
     <!-- Quill.js Editor (solo per pagine che lo richiedono) -->
     <?php if (isset($include_rich_editor) && $include_rich_editor): ?>
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
@@ -304,19 +301,6 @@
                     card.style.transform = 'translateY(0)';
                 }, index * 100);
             });
-            
-            // Initialize MC Player Counter
-            if (typeof MinecraftPlayerCounter !== 'undefined') {
-                // Find all elements with player counter
-                const playerCounters = document.querySelectorAll('[data-playercounter-ip]');
-                
-                playerCounters.forEach(element => {
-                    const serverIP = element.getAttribute('data-playercounter-ip');
-                    
-                    // Initialize the counter for each server
-                    MinecraftPlayerCounter.init({
-                        ip: serverIP,
-                        element: element,
                         format: '{online}',
                         fallback: '0'
                     });

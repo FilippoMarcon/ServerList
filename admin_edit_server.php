@@ -9,10 +9,22 @@ if (!isset($pdo)) {
 $server_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $server = null;
 
+// Assicura che esistano tutte le colonne necessarie
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN website_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN shop_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN discord_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN telegram_url VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN modalita JSON NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN staff_list JSON NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN social_links TEXT NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN in_costruzione TINYINT(1) DEFAULT 0"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN votifier_host VARCHAR(255) NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN votifier_port INT DEFAULT 8192"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN votifier_key TEXT NULL"); } catch (Exception $e) {}
+try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN data_aggiornamento TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP"); } catch (Exception $e) {}
+
 // Gestione salvataggio
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_server_admin'])) {
-    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN staff_list JSON NULL"); } catch (Exception $e) {}
-    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN social_links TEXT NULL"); } catch (Exception $e) {}
 
     $server_id = (int)($_POST['server_id'] ?? 0);
     $nome = sanitize($_POST['nome'] ?? '');
@@ -38,17 +50,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_server_admin']))
     }
 
     $modalita_json = json_encode(array_values($modalita_input));
-
-    if ($server_id === 0 || $nome === '' || $ip === '' || $versione === '') {
-        $error = 'Nome, IP e Versione sono campi obbligatori.';
-    } else {
+    
+    if ($server_id > 0 && $nome !== '' && $ip !== '' && $versione !== '') {
         try {
-            $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ?, staff_list = ?, social_links = ?, votifier_host = ?, votifier_port = ?, votifier_key = ?, data_aggiornamento = NOW() WHERE id = ?");
-            $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $staff_list_json, $social_links_json, $votifier_host, $votifier_port, $votifier_key, $server_id]);
-            $message = 'Server aggiornato correttamente.';
+            // Prova UPDATE completo con tutti i campi
+            try {
+                $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, website_url = ?, shop_url = ?, discord_url = ?, telegram_url = ?, modalita = ?, staff_list = ?, social_links = ?, in_costruzione = ?, votifier_host = ?, votifier_port = ?, votifier_key = ?, data_aggiornamento = NOW() WHERE id = ?");
+                $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $website_url, $shop_url, $discord_url, $telegram_url, $modalita_json, $staff_list_json, $social_links_json, $in_costruzione, $votifier_host, $votifier_port, $votifier_key, $server_id]);
+                
+                // Log modifiche per admin
+                if (file_exists(__DIR__ . '/api_log_activity.php')) {
+                    require_once __DIR__ . '/api_log_activity.php';
+                    logActivity('server_updated_by_admin', 'server', $server_id, null, ['admin_id' => $_SESSION['user_id'] ?? 0]);
+                }
+                
+                $_SESSION['success_message'] = 'Server aggiornato correttamente.';
+                redirect('/admin?action=servers');
+            } catch (PDOException $e1) {
+                // Fallback: solo campi base se alcuni non esistono
+                error_log("Errore UPDATE admin completo: " . $e1->getMessage());
+                try {
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ?, staff_list = ?, social_links = ?, votifier_host = ?, votifier_port = ?, votifier_key = ?, data_aggiornamento = NOW() WHERE id = ?");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $staff_list_json, $social_links_json, $votifier_host, $votifier_port, $votifier_key, $server_id]);
+                    $_SESSION['success_message'] = 'Server aggiornato correttamente (alcuni campi opzionali non disponibili).';
+                    redirect('/admin?action=servers');
+                } catch (PDOException $e2) {
+                    // Ultimo fallback: solo campi essenziali
+                    error_log("Errore UPDATE admin fallback: " . $e2->getMessage());
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, data_aggiornamento = NOW() WHERE id = ?");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $server_id]);
+                    $_SESSION['success_message'] = 'Server aggiornato (solo campi base).';
+                    redirect('/admin?action=servers');
+                }
+            }
         } catch (PDOException $e) {
-            $error = 'Errore durante l\'aggiornamento del server.';
+            $_SESSION['error_message'] = 'Errore durante l\'aggiornamento del server.';
+            error_log("Errore UPDATE admin: " . $e->getMessage());
+            redirect('/admin?action=servers');
         }
+    } else {
+        $_SESSION['error_message'] = 'Dati non validi.';
+        redirect('/admin?action=servers');
     }
 }
 
@@ -140,6 +182,35 @@ if (!empty($server['social_links'])) {
                 <div class="col-md-12">
                     <label class="form-label">Descrizione</label>
                     <textarea class="form-control" name="descrizione" rows="6" placeholder="Descrizione dettagliata del server..."><?= htmlspecialchars($server['descrizione'] ?: '') ?></textarea>
+                </div>
+            </div>
+
+            <hr>
+            <h5 class="mb-3"><i class="bi bi-link-45deg"></i> Link Social Rapidi</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Sito Web</label>
+                    <input type="url" class="form-control" name="website_url" value="<?= htmlspecialchars($server['website_url'] ?? '') ?>" placeholder="https://...">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Shop</label>
+                    <input type="url" class="form-control" name="shop_url" value="<?= htmlspecialchars($server['shop_url'] ?? '') ?>" placeholder="https://...">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Discord</label>
+                    <input type="url" class="form-control" name="discord_url" value="<?= htmlspecialchars($server['discord_url'] ?? '') ?>" placeholder="https://discord.gg/...">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Telegram</label>
+                    <input type="url" class="form-control" name="telegram_url" value="<?= htmlspecialchars($server['telegram_url'] ?? '') ?>" placeholder="https://t.me/...">
+                </div>
+                <div class="col-md-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="in_costruzione" id="in_costruzione" value="1" <?= !empty($server['in_costruzione']) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="in_costruzione">
+                            <i class="bi bi-cone-striped"></i> Server in costruzione (mostra badge)
+                        </label>
+                    </div>
                 </div>
             </div>
 

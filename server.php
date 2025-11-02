@@ -771,6 +771,10 @@ include 'header.php';
 
 /* Mobile Responsive Styles */
 @media (max-width: 768px) {
+    .hide-mobile {
+        display: none !important;
+    }
+    
     .server-header {
         min-height: auto;
         padding: 2rem 0;
@@ -1013,7 +1017,7 @@ include 'header.php';
                             <div class="server-ip-display" title="Clicca per copiare">
                                 <?php echo htmlspecialchars($server['ip']); ?>
                             </div>
-                            <div class="server-players-live" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                            <div class="server-players-live hide-mobile" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
                                 <i class="bi bi-people"></i> 
                                 <span id="livePlayerCount">...</span> giocatori online
                             </div>
@@ -1178,8 +1182,8 @@ include 'header.php';
                             <!-- Period Selector -->
                             <div class="period-selector" style="margin-bottom: 1rem; display: flex; gap: 0.5rem; justify-content: center;">
                                 <button class="period-btn active" data-period="today">Oggi</button>
-                                <button class="period-btn" data-period="7days">7 Giorni</button>
                                 <button class="period-btn" data-period="30days">30 Giorni</button>
+                                <button class="period-btn" data-period="12months">12 Mesi</button>
                             </div>
                             
                             <div class="stats-section">
@@ -1539,38 +1543,88 @@ document.addEventListener('DOMContentLoaded', function() {
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
     
+    // Funzione per cambiare tab
+    function switchTab(targetTab) {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        
+        const btn = document.querySelector(`[data-tab="${targetTab}"]`);
+        if (btn) {
+            btn.classList.add('active');
+            document.getElementById(targetTab).classList.add('active');
+            
+            // Salva in localStorage
+            localStorage.setItem('serverTab', targetTab);
+            
+            // Se è stats, carica anche il tipo salvato
+            if (targetTab === 'stats') {
+                const savedStatsType = localStorage.getItem('statsType') || 'votes';
+                const savedPeriod = localStorage.getItem('playersPeriod') || 'today';
+                
+                // Ripristina tipo stats
+                document.querySelectorAll('.stats-type-btn').forEach(b => b.classList.remove('active'));
+                const typeBtn = document.querySelector(`[data-type="${savedStatsType}"]`);
+                if (typeBtn) {
+                    typeBtn.classList.add('active');
+                    document.getElementById('votes-stats').style.display = savedStatsType === 'votes' ? 'block' : 'none';
+                    document.getElementById('players-stats').style.display = savedStatsType === 'players' ? 'block' : 'none';
+                    
+                    if (savedStatsType === 'players' && !window.playersChartLoaded) {
+                        loadPlayerStats(savedPeriod);
+                        window.playersChartLoaded = true;
+                    }
+                }
+                
+                // Ripristina periodo player
+                if (savedStatsType === 'players') {
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                    const periodBtn = document.querySelector(`[data-period="${savedPeriod}"]`);
+                    if (periodBtn) {
+                        periodBtn.classList.add('active');
+                    }
+                }
+            }
+        }
+    }
+    
     tabBtns.forEach(btn => {
         btn.addEventListener('click', function() {
             const targetTab = this.getAttribute('data-tab');
-            
-            // Remove active class from all tabs and contents
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            
-            // Add active class to clicked tab and corresponding content
-            this.classList.add('active');
-            document.getElementById(targetTab).classList.add('active');
+            switchTab(targetTab);
         });
     });
     
-    // Aggiorna giocatori online in tempo reale
+    // Ripristina tab salvato al caricamento
+    const savedTab = localStorage.getItem('serverTab');
+    if (savedTab) {
+        switchTab(savedTab);
+    }
+    
+    // Aggiorna giocatori online in tempo reale (entrambi i contatori)
     async function updateLivePlayerCount() {
         const liveCount = document.getElementById('livePlayerCount');
-        if (!liveCount) return;
+        const sidebarCounter = document.querySelector('[data-playercounter-ip]');
         
         try {
             const response = await fetch(`/api_get_server_status.php?ip=<?php echo urlencode($server['ip']); ?>`);
             const data = await response.json();
             
-            if (data.success && data.online) {
-                liveCount.textContent = data.players.online;
-                liveCount.style.color = 'var(--accent-green)';
-            } else {
-                liveCount.textContent = '0';
-                liveCount.style.color = '#ef4444';
+            const playerCount = (data.success && data.online) ? data.players.online : 0;
+            const isOnline = data.success && data.online;
+            
+            // Aggiorna contatore principale
+            if (liveCount) {
+                liveCount.textContent = playerCount;
+                liveCount.style.color = isOnline ? 'var(--accent-green)' : '#ef4444';
+            }
+            
+            // Aggiorna contatore sidebar
+            if (sidebarCounter) {
+                sidebarCounter.textContent = playerCount;
             }
         } catch (error) {
-            liveCount.textContent = '...';
+            if (liveCount) liveCount.textContent = '...';
+            if (sidebarCounter) sidebarCounter.textContent = '...';
         }
     }
     
@@ -1641,22 +1695,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const ctx30 = document.getElementById('votes30daysChart');
     if (ctx30) {
         const chart30 = new Chart(ctx30, {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: last30LabelsRaw.map(formatDayLabel),
                 datasets: [{
                     label: 'Voti',
                     data: last30Data,
-                    backgroundColor: colorDaily,
-                    borderRadius: 6,
-                    maxBarThickness: 24,
+                    backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                    borderColor: 'rgba(102, 126, 234, 1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 plugins: {
                     tooltip: {
+                        mode: 'index',
+                        intersect: false,
                         callbacks: {
                             title: (items) => items[0].label,
                             label: (item) => 'Voti: ' + item.formattedValue
@@ -1676,22 +1740,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const ctx12 = document.getElementById('votes12monthsChart');
     if (ctx12) {
         const chart12 = new Chart(ctx12, {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: last12LabelsRaw.map(formatMonthLabel),
                 datasets: [{
                     label: 'Voti',
                     data: last12Data,
-                    backgroundColor: colorMonthly,
-                    borderRadius: 6,
-                    maxBarThickness: 36,
+                    backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                    borderColor: 'rgba(102, 126, 234, 1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 plugins: {
                     tooltip: {
+                        mode: 'index',
+                        intersect: false,
                         callbacks: {
                             title: (items) => items[0].label,
                             label: (item) => 'Voti: ' + item.formattedValue
@@ -1718,6 +1792,8 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.add('active');
             
             const type = this.getAttribute('data-type');
+            localStorage.setItem('statsType', type);
+            
             if (type === 'votes') {
                 votesStats.style.display = 'block';
                 playersStats.style.display = 'none';
@@ -1726,7 +1802,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 playersStats.style.display = 'block';
                 // Carica player stats se non già caricato
                 if (!window.playersChartLoaded) {
-                    loadPlayerStats('today');
+                    const savedPeriod = localStorage.getItem('playersPeriod') || 'today';
+                    loadPlayerStats(savedPeriod);
                     window.playersChartLoaded = true;
                 }
             }
@@ -1741,6 +1818,7 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.add('active');
             
             const period = this.getAttribute('data-period');
+            localStorage.setItem('playersPeriod', period);
             loadPlayerStats(period);
         });
     });
@@ -1756,8 +1834,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Aggiorna titolo
         const titles = {
             'today': 'Player Online - Oggi',
-            '7days': 'Player Online - Ultimi 7 Giorni',
-            '30days': 'Player Online - Ultimi 30 Giorni'
+            '30days': 'Player Online - Ultimi 30 Giorni',
+            '12months': 'Player Online - Ultimi 12 Mesi'
         };
         title.innerHTML = `<i class="bi bi-people"></i> ${titles[period]}`;
         
@@ -1779,8 +1857,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 const d = new Date(s.recorded_at);
                                 if (period === 'today') {
                                     return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                                } else {
+                                } else if (period === '30days') {
                                     return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+                                } else {
+                                    return d.toLocaleDateString('it-IT', { month: 'short', year: 'numeric' });
                                 }
                             }),
                             datasets: [{
@@ -1798,8 +1878,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
                             plugins: {
                                 tooltip: {
+                                    mode: 'index',
+                                    intersect: false,
                                     callbacks: {
                                         label: (item) => 'Player: ' + item.formattedValue
                                     }
@@ -1820,12 +1906,84 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     });
                 } else {
-                    // Nessun dato
+                    // Nessun dato - crea grafico con valori a 0
                     if (playersChartInstance) {
                         playersChartInstance.destroy();
-                        playersChartInstance = null;
                     }
-                    ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+                    
+                    // Genera labels e dati vuoti in base al periodo
+                    let labels = [];
+                    let emptyData = [];
+                    
+                    if (period === '30days') {
+                        // Ultimi 30 giorni
+                        for (let i = 29; i >= 0; i--) {
+                            const d = new Date();
+                            d.setDate(d.getDate() - i);
+                            labels.push(d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }));
+                            emptyData.push(0);
+                        }
+                    } else if (period === '12months') {
+                        // Ultimi 12 mesi
+                        for (let i = 11; i >= 0; i--) {
+                            const d = new Date();
+                            d.setMonth(d.getMonth() - i);
+                            labels.push(d.toLocaleDateString('it-IT', { month: 'short', year: 'numeric' }));
+                            emptyData.push(0);
+                        }
+                    } else {
+                        // Oggi - non mostrare grafico vuoto
+                        ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+                        return;
+                    }
+                    
+                    // Crea grafico con dati a 0
+                    playersChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Player Online',
+                                data: emptyData,
+                                backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                                borderColor: 'rgba(168, 85, 247, 1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 3,
+                                pointHoverRadius: 5
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: {
+                                tooltip: {
+                                    mode: 'index',
+                                    intersect: false,
+                                    callbacks: {
+                                        label: (item) => 'Player: ' + item.formattedValue
+                                    }
+                                },
+                                legend: { display: false }
+                            },
+                            scales: {
+                                x: { 
+                                    grid: { display: false },
+                                    ticks: { maxTicksLimit: 10 }
+                                },
+                                y: { 
+                                    display: true, 
+                                    beginAtZero: true,
+                                    ticks: { precision: 0 }
+                                }
+                            }
+                        }
+                    });
                 }
             })
             .catch(error => console.error('Errore caricamento player stats:', error));

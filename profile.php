@@ -186,9 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
     // Converti le modalità in JSON
     $modalita_json = json_encode(array_values($modalita));
     
-    if ($server_id === 0 || empty($nome) || empty($ip) || empty($versione)) {
-        $error = 'Nome, IP e Versione sono campi obbligatori.';
-    } else {
+    if ($server_id > 0 && !empty($nome) && !empty($ip) && !empty($versione)) {
         try {
             $stmt = $pdo->prepare("SELECT id FROM sl_servers WHERE id = ? AND owner_id = ?");
             $stmt->execute([$server_id, $user_id]);
@@ -228,16 +226,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
                         $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $server_id, $user_id]);
                     }
                 }
-                $message = 'Server modificato con successo!';
-                $server_to_edit = null;
-                $edit_server_id = 0;
+                $_SESSION['success_message'] = 'Server modificato con successo!';
+                redirect('/profile?section=server-management');
             } else {
                 $error = 'Non hai i permessi per modificare questo server.';
             }
         } catch (PDOException $e) {
-            $error = 'Errore durante la modifica del server: ' . $e->getMessage();
+            $_SESSION['error_message'] = 'Errore durante la modifica del server.';
             error_log("Errore modifica server: " . $e->getMessage());
+            redirect('/profile?section=server-management');
         }
+    } else {
+        $_SESSION['error_message'] = 'Dati non validi.';
+        redirect('/profile?section=server-management');
     }
 }
 

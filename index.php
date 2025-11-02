@@ -958,7 +958,6 @@ include 'header.php';
             }
             ?>
             
-            <?php if (!empty($upcoming_events)): ?>
             <div class="events-section-standalone" id="eventsSection">
                 <h5>
                     <i class="bi bi-calendar-event"></i> Eventi Prossimi
@@ -967,7 +966,8 @@ include 'header.php';
                     </button>
                 </h5>
                 <div class="events-list" id="eventsList">
-                    <?php foreach ($upcoming_events as $event): ?>
+                    <?php if (!empty($upcoming_events)): ?>
+                        <?php foreach ($upcoming_events as $event): ?>
                         <?php
                         $event_date = new DateTime($event['event_date']);
                         $today = new DateTime();
@@ -1017,10 +1017,15 @@ include 'header.php';
                                 </div>
                             </div>
                         </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="no-events-message" style="text-align: center; padding: 2rem 1rem; color: var(--text-muted);">
+                            <i class="bi bi-calendar-x" style="font-size: 2.5rem; margin-bottom: 0.5rem; display: block;"></i>
+                            <p style="margin: 0;">Nessun evento nei prossimi 7 giorni</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
-            <?php endif; ?>
             
             <div class="filters-sidebar" id="filtersSection">
                 <div class="filters-header">

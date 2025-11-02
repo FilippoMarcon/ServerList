@@ -1,7 +1,7 @@
 <?php
 /**
  * API per recuperare statistiche player
- * Supporta 3 periodi: today, 7days, 30days
+ * Supporta 3 periodi: today, 30days, 12months
  */
 require_once 'config.php';
 
@@ -30,18 +30,6 @@ try {
         $stmt->execute([$server_id]);
         $stats = $stmt->fetchAll();
         
-    } elseif ($period === '7days') {
-        // Ultimi 7 giorni (max giornaliero)
-        $stmt = $pdo->prepare("
-            SELECT max_players as player_count, date as recorded_at
-            FROM sl_player_stats_daily
-            WHERE server_id = ?
-            AND date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-            ORDER BY date ASC
-        ");
-        $stmt->execute([$server_id]);
-        $stats = $stmt->fetchAll();
-        
     } elseif ($period === '30days') {
         // Ultimi 30 giorni (max giornaliero)
         $stmt = $pdo->prepare("
@@ -50,6 +38,19 @@ try {
             WHERE server_id = ?
             AND date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
             ORDER BY date ASC
+        ");
+        $stmt->execute([$server_id]);
+        $stats = $stmt->fetchAll();
+        
+    } elseif ($period === '12months') {
+        // Ultimi 12 mesi (max mensile)
+        $stmt = $pdo->prepare("
+            SELECT max_players as player_count, 
+                   CONCAT(year_month, '-01') as recorded_at
+            FROM sl_player_stats_monthly
+            WHERE server_id = ?
+            AND year_month >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 12 MONTH), '%Y-%m')
+            ORDER BY year_month ASC
         ");
         $stmt->execute([$server_id]);
         $stats = $stmt->fetchAll();

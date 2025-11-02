@@ -14,6 +14,26 @@ header('Content-Type: text/plain; charset=utf-8');
 echo "=== BLOCKSY PLAYER STATS WEBHOOK ===\n";
 echo "Inizio: " . date('Y-m-d H:i:s') . "\n\n";
 
+// Controlla se sono passati almeno 5 minuti dall'ultimo salvataggio
+$last_save_file = sys_get_temp_dir() . '/blocksy_webhook_last_save.txt';
+$min_interval = 300; // 5 minuti = 300 secondi
+
+if (file_exists($last_save_file)) {
+    $last_save = (int)file_get_contents($last_save_file);
+    $elapsed = time() - $last_save;
+    
+    if ($elapsed < $min_interval) {
+        $wait = $min_interval - $elapsed;
+        echo "⏳ Troppo presto! Ultimo salvataggio: " . round($elapsed / 60, 1) . " minuti fa\n";
+        echo "⏰ Riprova tra: " . round($wait / 60, 1) . " minuti\n";
+        echo "\n✓ Webhook chiamato correttamente (ma non eseguito)\n";
+        exit(0);
+    }
+}
+
+// Aggiorna timestamp
+file_put_contents($last_save_file, time());
+
 require_once 'config.php';
 
 // Crea tabelle se non esistono

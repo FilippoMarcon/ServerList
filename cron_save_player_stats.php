@@ -25,6 +25,17 @@ try {
         INDEX(server_id),
         INDEX(date)
     )");
+    
+    // Tabella per statistiche mensili aggregate (max del mese)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_player_stats_monthly (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        server_id INT NOT NULL,
+        year_month VARCHAR(7) NOT NULL,
+        max_players INT NOT NULL,
+        UNIQUE KEY unique_server_month (server_id, year_month),
+        INDEX(server_id),
+        INDEX(year_month)
+    )");
 } catch (PDOException $e) {
     error_log("Errore creazione tabelle player_stats: " . $e->getMessage());
     exit(1);
@@ -67,7 +78,7 @@ try {
     // Pulizia: elimina record più vecchi di 2 giorni
     $pdo->exec("DELETE FROM sl_player_stats WHERE recorded_at < DATE_SUB(NOW(), INTERVAL 2 DAY)");
     
-    // Aggregazione giornaliera automatica
+    // Aggregazione giornaliera automatica (crea record giornaliero con max)
     $yesterday = date('Y-m-d', strtotime('-1 day'));
     $stmt = $pdo->query("SELECT DISTINCT server_id FROM sl_player_stats WHERE DATE(recorded_at) = '$yesterday'");
     $servers_yesterday = $stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -83,6 +94,25 @@ try {
     
     // Elimina dati dettagliati di ieri dopo aggregazione
     $pdo->exec("DELETE FROM sl_player_stats WHERE DATE(recorded_at) = '$yesterday'");
+    
+    // Aggregazione mensile automatica (primo giorno del mese, aggrega il mese precedente)
+    if (date('d') === '01') {
+        $last_month = date('Y-m', strtotime('-1 month'));
+        $stmt = $pdo->query("SELECT DISTINCT server_id FROM sl_player_stats_daily WHERE DATE_FORMAT(date, '%Y-%m') = '$last_month'");
+        $servers_last_month = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        foreach ($servers_last_month as $sid) {
+            $stmt = $pdo->prepare("SELECT MAX(max_players) as max_players FROM sl_player_stats_daily WHERE server_id = ? AND DATE_FORMAT(date, '%Y-%m') = ?");
+            $stmt->execute([$sid, $last_month]);
+            $max = $stmt->fetch()['max_players'] ?? 0;
+            
+            $stmt = $pdo->prepare("INSERT INTO sl_player_stats_monthly (server_id, year_month, max_players) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE max_players = ?");
+            $stmt->execute([$sid, $last_month, $max, $max]);
+        }
+        
+        // Elimina dati giornalieri più vecchi di 31 giorni dopo aggregazione mensile
+        $pdo->exec("DELETE FROM sl_player_stats_daily WHERE date < DATE_SUB(CURDATE(), INTERVAL 31 DAY)");
+    }
     
 } catch (PDOException $e) {
     error_log("Errore salvataggio player stats: " . $e->getMessage());

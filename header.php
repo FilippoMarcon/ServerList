@@ -788,6 +788,13 @@
                 gap: 12px;
                 text-align: center;
             }
+            
+            /* Mobile: metti server-version sotto votes-count */
+            .sponsored-server-card .server-stats {
+                flex-direction: column;
+                gap: 4px;
+                align-items: flex-start;
+            }
         }
         
         .server-logo {

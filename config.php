@@ -389,14 +389,14 @@ if (php_sapi_name() !== 'cli') {
     
     if (file_exists($last_save_file)) {
         $last_save = (int)file_get_contents($last_save_file);
-        if ((time() - $last_save) >= 600) { // 10 minuti = 600 secondi
+        if ((time() - $last_save) >= 300) { // 5 minuti = 300 secondi
             $should_save = true;
         }
     } else {
         $should_save = true;
     }
     
-    if ($should_save && rand(1, 100) <= 50) { // 50% probabilità per distribuire carico
+    if ($should_save && rand(1, 100) <= 100) { // 100% probabilità - esegui sempre
         file_put_contents($last_save_file, time());
         register_shutdown_function(function() {
             global $pdo;
