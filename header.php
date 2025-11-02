@@ -2615,6 +2615,23 @@
             .content-section {
                 padding: 2rem;
             }
+            
+            /* Ripristina margini standard su desktop */
+            .container {
+                padding-left: 15px;
+                padding-right: 15px;
+            }
+            
+            .row {
+                margin-left: -15px;
+                margin-right: -15px;
+            }
+            
+            .col-lg-9,
+            .col-lg-3 {
+                padding-left: 15px;
+                padding-right: 15px;
+            }
         }
         
         @media (min-width: 1200px) {
@@ -3193,6 +3210,11 @@
             }
             
             /* Fix colonne Bootstrap su mobile */
+            .container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            
             .col-lg-9,
             .col-lg-3 {
                 padding-left: 0.5rem;
@@ -3200,8 +3222,8 @@
             }
             
             .row {
-                margin-left: 0;
-                margin-right: 0;
+                margin-left: -0.5rem;
+                margin-right: -0.5rem;
             }
             
             .profile-container .container {

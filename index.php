@@ -754,8 +754,8 @@ include 'header.php';
 </style>
 
 
-<div class="container" style="margin-top: 2rem; max-width: 100%; overflow-x: hidden;">
-    <div class="row" style="margin: 0; max-width: 100%;">
+<div class="container" style="margin-top: 2rem;">
+    <div class="row">
         <!-- Main Content -->
         <div class="col-lg-9" style="position: relative;">
             
