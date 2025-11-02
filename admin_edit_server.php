@@ -25,6 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_server_admin']))
     $modalita_input = $_POST['modalita'] ?? [];
     $staff_list_json = $_POST['staff_list_json'] ?? '';
     $social_links_json = $_POST['social_links_json'] ?? '';
+    $votifier_host = sanitize($_POST['votifier_host'] ?? '');
+    $votifier_port = isset($_POST['votifier_port']) ? (int)$_POST['votifier_port'] : 8192;
+    $votifier_key = trim($_POST['votifier_key'] ?? '');
 
     // Se è stato passato un CSV, convertilo in array
     if (isset($_POST['modalita_csv']) && is_string($_POST['modalita_csv'])) {
@@ -40,8 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_server_admin']))
         $error = 'Nome, IP e Versione sono campi obbligatori.';
     } else {
         try {
-            $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ?, staff_list = ?, social_links = ?, data_aggiornamento = NOW() WHERE id = ?");
-            $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $staff_list_json, $social_links_json, $server_id]);
+            $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, modalita = ?, staff_list = ?, social_links = ?, votifier_host = ?, votifier_port = ?, votifier_key = ?, data_aggiornamento = NOW() WHERE id = ?");
+            $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $modalita_json, $staff_list_json, $social_links_json, $votifier_host, $votifier_port, $votifier_key, $server_id]);
             $message = 'Server aggiornato correttamente.';
         } catch (PDOException $e) {
             $error = 'Errore durante l\'aggiornamento del server.';
@@ -177,6 +180,41 @@ if (!empty($server['social_links'])) {
                     <div id="sociallinks-list" style="margin-top:8px;"></div>
                     <input type="hidden" id="social_links_json" name="social_links_json" value='<?= htmlspecialchars(json_encode($social_links_array)) ?>'>
                     <p class="text-secondary" style="font-size:12px; margin-top:6px;">Titoli tipici: Instagram, Discord, YouTube, Sito, Shop...</p>
+                </div>
+            </div>
+
+            <hr>
+            <div class="row g-3">
+                <div class="col-md-12">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-broadcast" style="font-size:20px; color:var(--accent-purple);"></i>
+                        <label class="form-label mb-0">Configurazione Votifier</label>
+                    </div>
+                    <p class="text-secondary" style="font-size:12px; margin-bottom:12px;">
+                        Votifier invia automaticamente i voti al tuo server Minecraft. 
+                        <a href="/VOTIFIER_SETUP.md" target="_blank" style="color:var(--accent-purple);">Leggi la guida setup</a>
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Host Votifier</label>
+                    <input type="text" class="form-control" name="votifier_host" value="<?= htmlspecialchars($server['votifier_host'] ?? '') ?>" placeholder="es. 123.45.67.89 o play.server.it">
+                    <small class="text-secondary">IP o hostname del server Minecraft</small>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Porta</label>
+                    <input type="number" class="form-control" name="votifier_port" value="<?= htmlspecialchars($server['votifier_port'] ?? '8192') ?>" placeholder="8192">
+                    <small class="text-secondary">Default: 8192</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Chiave Pubblica RSA</label>
+                    <textarea class="form-control" name="votifier_key" rows="3" placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----" style="font-family:monospace; font-size:11px;"><?= htmlspecialchars($server['votifier_key'] ?? '') ?></textarea>
+                    <small class="text-secondary">Copia da plugins/Votifier/rsa/public.pem</small>
+                </div>
+                <div class="col-md-12">
+                    <button type="button" class="btn btn-sm btn-outline-info" id="test-votifier-btn">
+                        <i class="bi bi-wifi"></i> Testa Connessione Votifier
+                    </button>
+                    <div id="votifier-test-result" style="margin-top:8px;"></div>
                 </div>
             </div>
 
@@ -409,5 +447,51 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const initData = Array.isArray(initialSocial) && initialSocial.length ? initialSocial : [];
     renderSocial(initData);
+});
+</script>
+
+<script>
+// Test Votifier Connection
+document.addEventListener('DOMContentLoaded', function() {
+    const testBtn = document.getElementById('test-votifier-btn');
+    const resultDiv = document.getElementById('votifier-test-result');
+    
+    if (testBtn) {
+        testBtn.addEventListener('click', async function() {
+            const host = document.querySelector('input[name="votifier_host"]').value.trim();
+            const port = document.querySelector('input[name="votifier_port"]').value.trim();
+            const key = document.querySelector('textarea[name="votifier_key"]').value.trim();
+            
+            if (!host || !port || !key) {
+                resultDiv.innerHTML = '<div class="alert alert-warning" style="font-size:13px; padding:8px;">Compila tutti i campi Votifier prima di testare.</div>';
+                return;
+            }
+            
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Test in corso...';
+            resultDiv.innerHTML = '<div class="alert alert-info" style="font-size:13px; padding:8px;">Connessione a ' + host + ':' + port + '...</div>';
+            
+            try {
+                const response = await fetch('test_votifier.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ host, port, key })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = '<div class="alert alert-success" style="font-size:13px; padding:8px;"><i class="bi bi-check-circle"></i> Connessione riuscita! Banner: ' + data.banner + '</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger" style="font-size:13px; padding:8px;"><i class="bi bi-x-circle"></i> Errore: ' + data.error + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="alert alert-danger" style="font-size:13px; padding:8px;"><i class="bi bi-x-circle"></i> Errore di rete: ' + error.message + '</div>';
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = '<i class="bi bi-wifi"></i> Testa Connessione Votifier';
+            }
+        });
+    }
 });
 </script>

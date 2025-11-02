@@ -221,9 +221,9 @@ include 'header.php';
                                 <div class="pricing-info mt-2" style="background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
                                     <h6 style="color: var(--text-primary); margin-bottom: 0.5rem;"><i class="bi bi-calculator"></i> Calcolo Prezzo</h6>
                                     <div class="price-display" style="font-size: 1.2rem; font-weight: 700; color: var(--accent-purple);">
-                                        €<span id="totalPrice">3.50</span>
+                                        €<span id="totalPrice">5.00</span>
                                     </div>
-                                    <small style="color: var(--text-secondary);">€0.50 per giorno</small>
+                                    <small style="color: var(--text-secondary);">€5.00 per giorno</small>
                                 </div>
                             </div>
 
@@ -433,7 +433,7 @@ include 'header.php';
 document.addEventListener('DOMContentLoaded', function() {
     const durationInput = document.getElementById('duration');
     const totalPriceElement = document.getElementById('totalPrice');
-    const pricePerDay = 0.50;
+    const pricePerDay = 5.00;
     
     function updatePrice() {
         const days = parseInt(durationInput.value) || 1;

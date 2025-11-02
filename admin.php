@@ -587,6 +587,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 echo json_encode(['success' => true, 'message' => 'Collegamento rimosso']);
                 break;
 
+            case 'ban_user':
+                $user_id = (int)($_POST['user_id'] ?? 0);
+                $reason = trim($_POST['reason'] ?? '');
+                
+                if ($user_id <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'ID utente non valido']);
+                    break;
+                }
+                
+                try {
+                    // Crea tabella bans se non esiste
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_user_bans (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        user_id INT NOT NULL,
+                        reason TEXT,
+                        banned_by INT NOT NULL,
+                        banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        is_active TINYINT(1) DEFAULT 1,
+                        INDEX(user_id),
+                        INDEX(is_active)
+                    )");
+                    
+                    // Inserisci ban
+                    $stmt = $pdo->prepare("INSERT INTO sl_user_bans (user_id, reason, banned_by) VALUES (?, ?, ?)");
+                    $stmt->execute([$user_id, $reason, $_SESSION['user_id']]);
+                    
+                    echo json_encode(['success' => true, 'message' => 'Utente bannato con successo']);
+                } catch (PDOException $e) {
+                    echo json_encode(['success' => false, 'message' => 'Errore: ' . $e->getMessage()]);
+                }
+                break;
+                
+            case 'unban_user':
+                $user_id = (int)($_POST['user_id'] ?? 0);
+                
+                if ($user_id <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'ID utente non valido']);
+                    break;
+                }
+                
+                try {
+                    $stmt = $pdo->prepare("UPDATE sl_user_bans SET is_active = 0 WHERE user_id = ? AND is_active = 1");
+                    $stmt->execute([$user_id]);
+                    
+                    echo json_encode(['success' => true, 'message' => 'Ban rimosso con successo']);
+                } catch (PDOException $e) {
+                    echo json_encode(['success' => false, 'message' => 'Errore: ' . $e->getMessage()]);
+                }
+                break;
+                
+            case 'send_message':
+                $to_user_id = (int)($_POST['to_user_id'] ?? 0);
+                $subject = trim($_POST['subject'] ?? '');
+                $message = trim($_POST['message'] ?? '');
+                
+                if ($to_user_id <= 0 || empty($subject) || empty($message)) {
+                    echo json_encode(['success' => false, 'message' => 'Tutti i campi sono obbligatori']);
+                    break;
+                }
+                
+                try {
+                    // Crea tabella se non esiste
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_messages (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        from_user_id INT,
+                        to_user_id INT NOT NULL,
+                        subject VARCHAR(255) NOT NULL,
+                        message TEXT NOT NULL,
+                        is_read TINYINT(1) DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX(to_user_id),
+                        INDEX(is_read),
+                        INDEX(created_at)
+                    )");
+                    
+                    $stmt = $pdo->prepare("INSERT INTO sl_messages (from_user_id, to_user_id, subject, message) VALUES (?, ?, ?, ?)");
+                    $stmt->execute([null, $to_user_id, $subject, $message]); // from_user_id = null per admin
+                    
+                    echo json_encode(['success' => true, 'message' => 'Messaggio inviato con successo']);
+                } catch (PDOException $e) {
+                    echo json_encode(['success' => false, 'message' => 'Errore: ' . $e->getMessage()]);
+                }
+                break;
+
             case 'search_users':
                 $search = isset($_POST['search']) ? trim($_POST['search']) : '';
                 if (strlen($search) < 1) {
@@ -595,14 +679,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 }
                 $term = '%' . $search . '%';
                 $stmt = $pdo->prepare("
-                    SELECT u.id, u.minecraft_nick, u.email, ml.minecraft_nick AS verified_nick
+                    SELECT u.id, u.minecraft_nick, u.email, ml.minecraft_nick AS verified_nick,
+                           (SELECT COUNT(*) FROM sl_user_bans WHERE user_id = u.id AND is_active = 1) as is_banned
                     FROM sl_users u
                     LEFT JOIN sl_minecraft_links ml ON ml.user_id = u.id
-                    WHERE u.minecraft_nick LIKE ? OR u.email LIKE ?
-                    ORDER BY u.minecraft_nick ASC
+                    WHERE u.minecraft_nick LIKE ? 
+                       OR u.email LIKE ? 
+                       OR ml.minecraft_nick LIKE ?
+                    ORDER BY 
+                        CASE 
+                            WHEN u.minecraft_nick LIKE ? THEN 1
+                            WHEN ml.minecraft_nick LIKE ? THEN 2
+                            ELSE 3
+                        END,
+                        u.minecraft_nick ASC
                     LIMIT 10
                 ");
-                $stmt->execute([$term, $term]);
+                $stmt->execute([$term, $term, $term, $search . '%', $search . '%']);
                 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 echo json_encode(['success' => true, 'users' => $users]);
                 break;
@@ -1137,6 +1230,12 @@ include 'header.php';
                     <a href="?action=sponsors" class="admin-nav-item <?= $action === 'sponsors' ? 'active' : '' ?>">
                         <i class="bi bi-star"></i> Gestione Sponsor
                     </a>
+                    <a href="?action=logs" class="admin-nav-item <?= $action === 'logs' ? 'active' : '' ?>">
+                        <i class="bi bi-clock-history"></i> Log Attività
+                    </a>
+                    <a href="?action=messages" class="admin-nav-item <?= $action === 'messages' ? 'active' : '' ?>">
+                        <i class="bi bi-envelope"></i> Messaggi
+                    </a>
                     <hr>
             <a href="/" class="admin-nav-item">
                 <i class="bi bi-house"></i> Torna al Sito
@@ -1189,6 +1288,12 @@ include 'header.php';
                             break;
                         case 'forum':
                             include_forum_manager();
+                            break;
+                        case 'logs':
+                            include_logs();
+                            break;
+                        case 'messages':
+                            include_messages();
                             break;
                         default:
                             include_dashboard();
@@ -1538,7 +1643,8 @@ function include_users() {
                COUNT(DISTINCT v.id) as total_votes,
                MAX(v.data_voto) as last_vote,
                COUNT(DISTINCT s.id) as owned_servers,
-               GROUP_CONCAT(DISTINCT s.nome SEPARATOR ', ') as server_names
+               GROUP_CONCAT(DISTINCT s.nome SEPARATOR ', ') as server_names,
+               (SELECT COUNT(*) FROM sl_user_bans WHERE user_id = u.id AND is_active = 1) as is_banned
         FROM sl_users u 
         LEFT JOIN sl_votes v ON u.id = v.user_id 
         LEFT JOIN sl_servers s ON u.id = s.owner_id
@@ -1654,6 +1760,9 @@ function include_users() {
                             <?php if ($user['is_admin']): ?>
                                 <span class="badge bg-warning ms-1">Admin</span>
                             <?php endif; ?>
+                            <?php if ($user['is_banned']): ?>
+                                <span class="badge bg-danger ms-1">Bannato</span>
+                            <?php endif; ?>
                         </td>
                         <td><?= htmlspecialchars($user['email'] ?? '') ?></td>
                         <td>
@@ -1684,8 +1793,18 @@ function include_users() {
                             <button class="btn btn-sm btn-outline-warning btn-admin me-1" 
                                     onclick="toggleAdmin(<?= $user['id'] ?>, <?= $user['is_admin'] ?>)">
                                 <i class="bi bi-shield"></i>
-                                <?= $user['is_admin'] ? 'Rimuovi Admin' : 'Rendi Admin' ?>
                             </button>
+                            <?php if ($user['is_banned']): ?>
+                                <button class="btn btn-sm btn-outline-success btn-admin me-1" 
+                                        onclick="unbanUser(<?= $user['id'] ?>, '<?= htmlspecialchars($user['minecraft_nick']) ?>')">
+                                    <i class="bi bi-check-circle"></i> Sbanna
+                                </button>
+                            <?php else: ?>
+                                <button class="btn btn-sm btn-outline-danger btn-admin me-1" 
+                                        onclick="banUser(<?= $user['id'] ?>, '<?= htmlspecialchars($user['minecraft_nick']) ?>')">
+                                    <i class="bi bi-ban"></i> Banna
+                                </button>
+                            <?php endif; ?>
                             <button class="btn btn-sm btn-outline-danger btn-admin" 
                                     onclick="deleteUser(<?= $user['id'] ?>)">
                                 <i class="bi bi-trash"></i>
@@ -1734,6 +1853,38 @@ function include_users() {
     function deleteUser(userId) {
         confirmAction('Sei sicuro di voler eliminare questo utente? Questa azione è irreversibile!', () => {
             makeAjaxRequest('delete_user', {
+                user_id: userId
+            }, (response) => {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(response.message, 'danger');
+                }
+            });
+        });
+    }
+    
+    function banUser(userId, username) {
+        const reason = prompt(`Banna ${username}\n\nInserisci la motivazione del ban:`);
+        if (reason !== null && reason.trim() !== '') {
+            makeAjaxRequest('ban_user', {
+                user_id: userId,
+                reason: reason.trim()
+            }, (response) => {
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(response.message, 'danger');
+                }
+            });
+        }
+    }
+    
+    function unbanUser(userId, username) {
+        confirmAction(`Sei sicuro di voler sbannare ${username}?`, () => {
+            makeAjaxRequest('unban_user', {
                 user_id: userId
             }, (response) => {
                 if (response.success) {
@@ -4583,5 +4734,404 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<?php
+// Funzione per mostrare i log attività
+function include_logs() {
+    global $pdo;
+    
+    require_once 'api_log_activity.php';
+    
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $limit = 50;
+    $offset = ($page - 1) * $limit;
+    
+    // Recupera log
+    $stmt = $pdo->prepare("
+        SELECT l.*, u.minecraft_nick
+        FROM sl_activity_logs l
+        LEFT JOIN sl_users u ON l.user_id = u.id
+        ORDER BY l.created_at DESC
+        LIMIT ? OFFSET ?
+    ");
+    $stmt->execute([$limit, $offset]);
+    $logs = $stmt->fetchAll();
+    
+    $total_logs = $pdo->query("SELECT COUNT(*) FROM sl_activity_logs")->fetchColumn();
+    $total_pages = ceil($total_logs / $limit);
+    ?>
+    
+    <div class="admin-hero mb-3">
+        <div>
+            <h2 class="hero-title"><i class="bi bi-clock-history"></i> Log Attività</h2>
+            <p class="hero-subtitle">Cronologia delle modifiche e azioni</p>
+        </div>
+    </div>
+    
+    <div class="card bg-dark border-secondary">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data/Ora</th>
+                            <th>Utente</th>
+                            <th>Azione</th>
+                            <th>Entità</th>
+                            <th>Modifiche</th>
+                            <th>IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($logs as $log): ?>
+                        <tr>
+                            <td><?php echo date('d/m/Y H:i', strtotime($log['created_at'])); ?></td>
+                            <td><?php echo htmlspecialchars($log['minecraft_nick'] ?? 'Sistema'); ?></td>
+                            <td><span class="badge bg-info"><?php echo htmlspecialchars($log['action_type']); ?></span></td>
+                            <td>
+                                <?php if ($log['entity_type']): ?>
+                                    <?php echo htmlspecialchars($log['entity_type']); ?> #<?php echo $log['entity_id']; ?>
+                                <?php else: ?>
+                                    -
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($log['new_values']): ?>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="showLogDetails(<?php echo $log['id']; ?>, <?php echo htmlspecialchars(json_encode($log['new_values'])); ?>)">
+                                        <i class="bi bi-eye"></i> Dettagli
+                                    </button>
+                                <?php else: ?>
+                                    -
+                                <?php endif; ?>
+                            </td>
+                            <td><small><?php echo htmlspecialchars($log['ip_address']); ?></small></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <?php if ($total_pages > 1): ?>
+            <nav>
+                <ul class="pagination">
+                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                        <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                            <a class="page-link" href="?action=logs&page=<?= $i ?>"><?= $i ?></a>
+                        </li>
+                    <?php endfor; ?>
+                </ul>
+            </nav>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <script>
+    function showLogDetails(logId, changes) {
+        alert('Modifiche:\n' + JSON.stringify(changes, null, 2));
+    }
+    </script>
+    <?php
+}
+
+// Funzione per mostrare i messaggi
+function include_messages() {
+    global $pdo;
+    
+    // Crea tabella messaggi se non esiste
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sl_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            from_user_id INT,
+            to_user_id INT NOT NULL,
+            subject VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            parent_id INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX(to_user_id),
+            INDEX(is_read),
+            INDEX(parent_id),
+            INDEX(created_at)
+        )");
+    } catch (PDOException $e) {
+        error_log("Errore creazione tabella messages: " . $e->getMessage());
+    }
+    
+    // Visualizza singolo messaggio
+    if (isset($_GET['view']) && is_numeric($_GET['view'])) {
+        $msg_id = (int)$_GET['view'];
+        $stmt = $pdo->prepare("
+            SELECT m.*, 
+                   u_from.minecraft_nick as from_nick,
+                   u_to.minecraft_nick as to_nick
+            FROM sl_messages m
+            LEFT JOIN sl_users u_from ON m.from_user_id = u_from.id
+            JOIN sl_users u_to ON m.to_user_id = u_to.id
+            WHERE m.id = ?
+        ");
+        $stmt->execute([$msg_id]);
+        $message = $stmt->fetch();
+        
+        if ($message) {
+            // Segna come letto
+            $pdo->prepare("UPDATE sl_messages SET is_read = 1 WHERE id = ?")->execute([$msg_id]);
+            ?>
+            <div class="admin-hero mb-3">
+                <div>
+                    <h2 class="hero-title"><i class="bi bi-envelope-open"></i> Messaggio</h2>
+                </div>
+                <a href="?action=messages" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Torna alla lista
+                </a>
+            </div>
+            
+            <div class="card bg-dark border-secondary">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Da:</strong> <?php echo htmlspecialchars($message['from_nick'] ?? 'Admin'); ?>
+                    </div>
+                    <div class="mb-3">
+                        <strong>A:</strong> <?php echo htmlspecialchars($message['to_nick']); ?>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Data:</strong> <?php echo date('d/m/Y H:i', strtotime($message['created_at'])); ?>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Oggetto:</strong> <?php echo htmlspecialchars($message['subject']); ?>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <strong>Messaggio:</strong>
+                        <div class="mt-2 p-3 bg-secondary rounded">
+                            <?php echo nl2br(htmlspecialchars($message['message'])); ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php
+            return;
+        }
+    }
+    
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $limit = 20;
+    $offset = ($page - 1) * $limit;
+    
+    // Recupera messaggi
+    $stmt = $pdo->prepare("
+        SELECT m.*, 
+               u_from.minecraft_nick as from_nick,
+               u_to.minecraft_nick as to_nick
+        FROM sl_messages m
+        LEFT JOIN sl_users u_from ON m.from_user_id = u_from.id
+        JOIN sl_users u_to ON m.to_user_id = u_to.id
+        ORDER BY m.created_at DESC
+        LIMIT ? OFFSET ?
+    ");
+    $stmt->execute([$limit, $offset]);
+    $messages = $stmt->fetchAll();
+    
+    $total_messages = $pdo->query("SELECT COUNT(*) FROM sl_messages")->fetchColumn();
+    $unread_count = $pdo->query("SELECT COUNT(*) FROM sl_messages WHERE is_read = 0")->fetchColumn();
+    $total_pages = ceil($total_messages / $limit);
+    ?>
+    
+    <div class="admin-hero mb-3">
+        <div>
+            <h2 class="hero-title"><i class="bi bi-envelope"></i> Messaggi</h2>
+            <p class="hero-subtitle">Sistema di messaggistica admin-utente</p>
+        </div>
+        <button class="btn btn-primary" onclick="showNewMessageModal()">
+            <i class="bi bi-plus"></i> Nuovo Messaggio
+        </button>
+    </div>
+    
+    <div class="admin-stats-grid mb-4">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-envelope"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Messaggi Totali</p>
+                <h3 class="metric-value"><?= $total_messages ?></h3>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-envelope-exclamation"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Non Letti</p>
+                <h3 class="metric-value"><?= $unread_count ?></h3>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card bg-dark border-secondary">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-dark table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Da</th>
+                            <th>A</th>
+                            <th>Oggetto</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($messages as $msg): ?>
+                        <tr class="<?= $msg['is_read'] ? '' : 'table-warning' ?>">
+                            <td><?php echo date('d/m/Y H:i', strtotime($msg['created_at'])); ?></td>
+                            <td><?php echo htmlspecialchars($msg['from_nick'] ?? 'Admin'); ?></td>
+                            <td><?php echo htmlspecialchars($msg['to_nick']); ?></td>
+                            <td><?php echo htmlspecialchars($msg['subject']); ?></td>
+                            <td>
+                                <?php if ($msg['is_read']): ?>
+                                    <span class="badge bg-success">Letto</span>
+                                <?php else: ?>
+                                    <span class="badge bg-warning">Non letto</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewMessage(<?php echo $msg['id']; ?>)">
+                                    <i class="bi bi-eye"></i> Leggi
+                                </button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <?php if ($total_pages > 1): ?>
+            <nav>
+                <ul class="pagination">
+                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                        <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                            <a class="page-link" href="?action=messages&page=<?= $i ?>"><?= $i ?></a>
+                        </li>
+                    <?php endfor; ?>
+                </ul>
+            </nav>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <!-- Modal Nuovo Messaggio -->
+    <div class="modal fade" id="newMessageModal" tabindex="-1" aria-labelledby="newMessageModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newMessageModalLabel">Nuovo Messaggio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="newMessageForm">
+                        <div class="mb-3">
+                            <label class="form-label">Destinatario</label>
+                            <input type="text" class="form-control" id="messageUserSearch" placeholder="Cerca utente...">
+                            <input type="hidden" id="messageToUserId">
+                            <div id="userSearchResults" class="mt-2"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Oggetto</label>
+                            <input type="text" class="form-control" id="messageSubject" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Messaggio</label>
+                            <textarea class="form-control" id="messageBody" rows="5" required></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="button" class="btn btn-primary" onclick="sendMessage()">Invia Messaggio</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    let messageModal;
+    
+    function showNewMessageModal() {
+        if (!messageModal) {
+            messageModal = new bootstrap.Modal(document.getElementById('newMessageModal'));
+        }
+        document.getElementById('newMessageForm').reset();
+        document.getElementById('messageToUserId').value = '';
+        document.getElementById('userSearchResults').innerHTML = '';
+        messageModal.show();
+    }
+    
+    // Ricerca utenti per messaggio
+    document.getElementById('messageUserSearch')?.addEventListener('input', function() {
+        const search = this.value.trim();
+        if (search.length < 2) {
+            document.getElementById('userSearchResults').innerHTML = '';
+            return;
+        }
+        
+        makeAjaxRequest('search_users', { search: search }, (response) => {
+            if (response.success && response.users) {
+                const resultsHtml = response.users.map(user => `
+                    <div class="user-result p-2 border-bottom" style="cursor: pointer;" onclick="selectUser(${user.id}, '${user.minecraft_nick}')">
+                        <strong>${user.minecraft_nick}</strong>
+                        ${user.verified_nick ? '<span class="badge bg-success ms-1">Verificato</span>' : ''}
+                    </div>
+                `).join('');
+                document.getElementById('userSearchResults').innerHTML = resultsHtml || '<p class="text-muted">Nessun utente trovato</p>';
+            }
+        });
+    });
+    
+    function selectUser(userId, username) {
+        document.getElementById('messageToUserId').value = userId;
+        document.getElementById('messageUserSearch').value = username;
+        document.getElementById('messageUserSearch').style.borderColor = 'var(--accent-green)';
+        document.getElementById('userSearchResults').innerHTML = '<div class="alert alert-success mt-2 p-2"><i class="bi bi-check-circle"></i> Destinatario selezionato: <strong>' + username + '</strong></div>';
+    }
+    
+    function sendMessage() {
+        const toUserId = document.getElementById('messageToUserId').value;
+        const subject = document.getElementById('messageSubject').value.trim();
+        const message = document.getElementById('messageBody').value.trim();
+        
+        if (!toUserId) {
+            showAlert('Seleziona un destinatario dalla ricerca', 'danger');
+            return;
+        }
+        
+        if (!subject) {
+            showAlert('Inserisci un oggetto', 'danger');
+            return;
+        }
+        
+        if (!message) {
+            showAlert('Inserisci il messaggio', 'danger');
+            return;
+        }
+        
+        makeAjaxRequest('send_message', {
+            to_user_id: toUserId,
+            subject: subject,
+            message: message
+        }, (response) => {
+            if (response.success) {
+                showAlert(response.message, 'success');
+                messageModal.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(response.message, 'danger');
+            }
+        });
+    }
+    
+    function viewMessage(messageId) {
+        window.location.href = '?action=messages&view=' + messageId;
+    }
+    </script>
+    <?php
+}
+?>
 
  <?php include 'footer.php'; ?>

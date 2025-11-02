@@ -12,7 +12,7 @@ public class VerificaBlocksy extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
 
-        String baseUrl = getConfig().getString("api_base_url", "https://example.com");
+        String baseUrl = getConfig().getString("api_base_url", "https://www.blocksy.it");
         String registerPath = getConfig().getString("registration_endpoint_path", "/register_verification_code.php");
         String checkPath = getConfig().getString("check_verification_endpoint_path", "/check_minecraft_link.php");
         String countPath = getConfig().getString("count_unconsumed_endpoint_path", "/count_unused_verification_codes.php");

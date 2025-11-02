@@ -189,6 +189,9 @@ try {
 
     // Invia webhook con nickname Minecraft verificato
     sendVoteWebhook($server_id, $linked_nick, $pdo->lastInsertId());
+    
+    // Invia notifica Votifier al server Minecraft
+    $votifier_sent = sendVotifierNotification($server_id, $linked_nick);
 
     // Prepara la risposta di successo
     $response = [
@@ -197,7 +200,8 @@ try {
         'vote_time' => date('Y-m-d H:i:s'),
         'user_nick' => $linked_nick,
         'vote_code' => $vote_code,
-        'code_expires' => $expires_at
+        'code_expires' => $expires_at,
+        'votifier_sent' => $votifier_sent
     ];
     
     echo json_encode($response);
@@ -299,11 +303,11 @@ function getServerVoteStats($server_id) {
         $stmt->execute([$server_id]);
         $today_votes = $stmt->fetchColumn();
         
-        // Voti questa settimana
-        $stmt = $pdo->prepare("SELECT COUNT(*) as week_votes FROM sl_votes 
-                              WHERE server_id = ? AND data_voto >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)");
+        // Voti ultimi 30 giorni
+        $stmt = $pdo->prepare("SELECT COUNT(*) as month_votes FROM sl_votes 
+                              WHERE server_id = ? AND data_voto >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
         $stmt->execute([$server_id]);
-        $week_votes = $stmt->fetchColumn();
+        $month_votes_recent = $stmt->fetchColumn();
         
         // Voti questo mese
         $stmt = $pdo->prepare("SELECT COUNT(*) as month_votes FROM sl_votes 
@@ -401,6 +405,49 @@ function sendVoteWebhook($server_id, $player_name, $vote_id) {
     } catch (Exception $e) {
         // Log dell'errore
         error_log("Errore nell'invio webhook: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Funzione per inviare notifica Votifier al server Minecraft
+ */
+function sendVotifierNotification($server_id, $player_name) {
+    global $pdo;
+    
+    try {
+        // Recupera configurazione Votifier del server
+        $stmt = $pdo->prepare("SELECT votifier_host, votifier_port, votifier_key FROM sl_servers WHERE id = ?");
+        $stmt->execute([$server_id]);
+        $server = $stmt->fetch();
+        
+        if (!$server || empty($server['votifier_host']) || empty($server['votifier_key'])) {
+            return false; // Votifier non configurato
+        }
+        
+        // Carica la classe Votifier
+        require_once 'Votifier.php';
+        
+        $host = $server['votifier_host'];
+        $port = $server['votifier_port'] ?? 8192;
+        $publicKey = $server['votifier_key'];
+        
+        // Crea istanza Votifier
+        $votifier = new Votifier($host, $port, $publicKey);
+        
+        // Invia il voto
+        $result = $votifier->sendVote($player_name, 'Blocksy', 'blocksy.it');
+        
+        if ($result) {
+            error_log("Votifier: Voto inviato con successo a $host:$port per $player_name");
+        } else {
+            error_log("Votifier: Errore nell'invio del voto a $host:$port per $player_name");
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Votifier: Errore - " . $e->getMessage());
         return false;
     }
 }

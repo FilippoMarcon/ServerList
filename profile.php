@@ -150,6 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
     try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN social_links TEXT NULL"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN modalita JSON NULL"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN staff_list JSON NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE sl_servers ADD COLUMN in_costruzione TINYINT(1) DEFAULT 0"); } catch (Exception $e) {}
     
     // Modifica tipo_server per accettare i valori corretti
     try { 
@@ -175,6 +176,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
     $staff_list_json = $_POST['staff_list_json'] ?? '';
     // Social Links dinamici in JSON (array di {title, url})
     $social_links_json = $_POST['social_links_json'] ?? '';
+    // In costruzione
+    $in_costruzione = isset($_POST['in_costruzione']) ? 1 : 0;
+    // Votifier
+    $votifier_host = sanitize($_POST['votifier_host'] ?? '');
+    $votifier_port = isset($_POST['votifier_port']) ? (int)$_POST['votifier_port'] : 8192;
+    $votifier_key = trim($_POST['votifier_key'] ?? '');
     
     // Converti le modalità in JSON
     $modalita_json = json_encode(array_values($modalita));
@@ -187,10 +194,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
             $stmt->execute([$server_id, $user_id]);
             
             if ($stmt->fetch()) {
+                // Recupera valori vecchi per il log
+                $stmt = $pdo->prepare("SELECT * FROM sl_servers WHERE id = ?");
+                $stmt->execute([$server_id]);
+                $old_server = $stmt->fetch();
+                
                 // Prova ad aggiornare con tutti i campi
                 try {
-                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, website_url = ?, shop_url = ?, discord_url = ?, telegram_url = ?, modalita = ?, staff_list = ?, social_links = ? WHERE id = ? AND owner_id = ?");
-                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $website_url, $shop_url, $discord_url, $telegram_url, $modalita_json, $staff_list_json, $social_links_json, $server_id, $user_id]);
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET nome = ?, ip = ?, versione = ?, tipo_server = ?, descrizione = ?, banner_url = ?, logo_url = ?, website_url = ?, shop_url = ?, discord_url = ?, telegram_url = ?, modalita = ?, staff_list = ?, social_links = ?, in_costruzione = ?, votifier_host = ?, votifier_port = ?, votifier_key = ? WHERE id = ? AND owner_id = ?");
+                    $stmt->execute([$nome, $ip, $versione, $tipo_server, $descrizione, $banner_url, $logo_url, $website_url, $shop_url, $discord_url, $telegram_url, $modalita_json, $staff_list_json, $social_links_json, $in_costruzione, $votifier_host, $votifier_port, $votifier_key, $server_id, $user_id]);
+                    
+                    // Log modifiche
+                    require_once 'api_log_activity.php';
+                    $changes = [];
+                    if ($old_server['nome'] != $nome) $changes['nome'] = ['old' => $old_server['nome'], 'new' => $nome];
+                    if ($old_server['ip'] != $ip) $changes['ip'] = ['old' => $old_server['ip'], 'new' => $ip];
+                    if ($old_server['versione'] != $versione) $changes['versione'] = ['old' => $old_server['versione'], 'new' => $versione];
+                    if ($old_server['in_costruzione'] != $in_costruzione) $changes['in_costruzione'] = ['old' => $old_server['in_costruzione'], 'new' => $in_costruzione];
+                    
+                    if (!empty($changes)) {
+                        logActivity('server_updated', 'server', $server_id, $old_server, $changes);
+                    }
                 } catch (PDOException $e1) {
                     // Fallback: aggiorna solo i campi base se staff_list o social_links non esistono
                     error_log("Errore UPDATE completo: " . $e1->getMessage() . " - Provo fallback");
@@ -911,6 +935,62 @@ include 'header.php';
 
                         <!-- Link Social legacy rimossi: usare editor dinamico sopra -->
                         
+                        <div class="form-group">
+                            <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="in_costruzione" id="in_costruzione" 
+                                       <?php echo (!empty($server_to_edit['in_costruzione'])) ? 'checked' : ''; ?>
+                                       style="width: auto; cursor: pointer;">
+                                <span style="color: var(--text-primary); font-weight: 600;">
+                                    <i class="bi bi-tools"></i> Server in costruzione
+                                </span>
+                            </label>
+                            <small style="color: var(--text-secondary); display: block; margin-top: 0.5rem;">
+                                Spuntando questa opzione, il server verrà rimosso dalla lista pubblica fino a quando non sarà pronto.
+                            </small>
+                        </div>
+
+                        <!-- Configurazione Votifier -->
+                        <div class="form-group" style="background:#16213e; padding:16px; border-radius:8px; border:1px solid #28324b;">
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                                <i class="bi bi-broadcast" style="font-size:20px; color:var(--accent-purple);"></i>
+                                <label style="margin:0; font-weight:600; color:white;">Configurazione Votifier</label>
+                            </div>
+                            <p style="font-size:12px; color:#b8c1d9; margin-bottom:12px;">
+                                Votifier invia automaticamente i voti al tuo server Minecraft. 
+                                <a href="/VOTIFIER_SETUP.md" target="_blank" style="color:var(--accent-purple);">Leggi la guida setup</a>
+                            </p>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="votifier_host">Host Votifier</label>
+                                    <input type="text" id="votifier_host" name="votifier_host" 
+                                           value="<?php echo htmlspecialchars($server_to_edit['votifier_host'] ?? ''); ?>" 
+                                           placeholder="es. 123.45.67.89 o play.server.it">
+                                    <small style="color:#b8c1d9;">IP o hostname del server Minecraft</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="votifier_port">Porta</label>
+                                    <input type="number" id="votifier_port" name="votifier_port" 
+                                           value="<?php echo htmlspecialchars($server_to_edit['votifier_port'] ?? '8192'); ?>" 
+                                           placeholder="8192">
+                                    <small style="color:#b8c1d9;">Default: 8192</small>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="votifier_key">Chiave Pubblica RSA</label>
+                                <textarea id="votifier_key" name="votifier_key" rows="4" 
+                                          placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
+                                          style="font-family:monospace; font-size:11px; background:#0f1729; color:white; border:1px solid #28324b;"><?php echo htmlspecialchars($server_to_edit['votifier_key'] ?? ''); ?></textarea>
+                                <small style="color:#b8c1d9;">Copia da plugins/Votifier/rsa/public.pem</small>
+                            </div>
+                            
+                            <button type="button" class="btn btn-sm btn-outline-info" id="test-votifier-btn">
+                                <i class="bi bi-wifi"></i> Testa Connessione Votifier
+                            </button>
+                            <div id="votifier-test-result" style="margin-top:8px;"></div>
+                        </div>
+                        
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">
                                 <i class="bi bi-check"></i> Salva Modifiche
@@ -1417,6 +1497,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const initData = Array.isArray(initialSocial) && initialSocial.length ? initialSocial : [];
     renderSocial(initData);
+});
+</script>
+
+<script>
+// Test Votifier Connection
+document.addEventListener('DOMContentLoaded', function() {
+    const testBtn = document.getElementById('test-votifier-btn');
+    const resultDiv = document.getElementById('votifier-test-result');
+    
+    if (testBtn) {
+        testBtn.addEventListener('click', async function() {
+            const host = document.getElementById('votifier_host').value.trim();
+            const port = document.getElementById('votifier_port').value.trim();
+            const key = document.getElementById('votifier_key').value.trim();
+            
+            if (!host || !port || !key) {
+                resultDiv.innerHTML = '<div class="alert alert-warning" style="font-size:13px; padding:8px; margin-top:8px; background:#ffc107; color:#000; border-radius:6px;">Compila tutti i campi Votifier prima di testare.</div>';
+                return;
+            }
+            
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Test in corso...';
+            resultDiv.innerHTML = '<div class="alert alert-info" style="font-size:13px; padding:8px; margin-top:8px; background:#17a2b8; color:#fff; border-radius:6px;">Connessione a ' + host + ':' + port + '...</div>';
+            
+            try {
+                const response = await fetch('test_votifier.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ host, port, key })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = '<div class="alert alert-success" style="font-size:13px; padding:8px; margin-top:8px; background:#28a745; color:#fff; border-radius:6px;"><i class="bi bi-check-circle"></i> Connessione riuscita! Banner: ' + data.banner + '</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger" style="font-size:13px; padding:8px; margin-top:8px; background:#dc3545; color:#fff; border-radius:6px;"><i class="bi bi-x-circle"></i> Errore: ' + data.error + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="alert alert-danger" style="font-size:13px; padding:8px; margin-top:8px; background:#dc3545; color:#fff; border-radius:6px;"><i class="bi bi-x-circle"></i> Errore di rete: ' + error.message + '</div>';
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = '<i class="bi bi-wifi"></i> Testa Connessione Votifier';
+            }
+        });
+    }
 });
 </script>
 

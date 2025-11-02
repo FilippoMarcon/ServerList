@@ -59,6 +59,33 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Gestione Remember Me Token
+if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token'])) {
+    try {
+        $token = $_COOKIE['remember_token'];
+        $stmt = $pdo->prepare("
+            SELECT rt.user_id, u.minecraft_nick, u.is_admin 
+            FROM sl_remember_tokens rt
+            JOIN sl_users u ON rt.user_id = u.id
+            WHERE rt.token = ? AND rt.expires_at > NOW()
+        ");
+        $stmt->execute([$token]);
+        $user = $stmt->fetch();
+        
+        if ($user) {
+            // Login automatico
+            $_SESSION['user_id'] = $user['user_id'];
+            $_SESSION['minecraft_nick'] = $user['minecraft_nick'];
+            $_SESSION['is_admin'] = $user['is_admin'];
+        } else {
+            // Token scaduto o non valido, rimuovi cookie
+            setcookie('remember_token', '', time() - 3600, '/', '', true, true);
+        }
+    } catch (PDOException $e) {
+        error_log("Errore remember token: " . $e->getMessage());
+    }
+}
+
 // Configurazione fuso orario
 date_default_timezone_set('Europe/Rome');
 
@@ -71,6 +98,61 @@ define('ENABLE_DEV_RESET_LINK_DISPLAY', true); // Mostra link reset in dev
 // Configurazione reCAPTCHA Google
 define('RECAPTCHA_SITE_KEY', '6Lcm188rAAAAAK0x_JWgJjNii5XY6rkoqPA-i7fJ'); // Sostituisci con la tua Site Key
 define('RECAPTCHA_SECRET_KEY', '6Lcm188rAAAAAHlpFg9bYpicG-FspVf6Gq50QJ4r'); // Sostituisci con la tua Secret Key
+
+// Migrazioni automatiche
+try {
+    // Aggiungi campo in_costruzione se non esiste
+    $pdo->exec("ALTER TABLE sl_servers ADD COLUMN in_costruzione TINYINT(1) DEFAULT 0");
+} catch (PDOException $e) {
+    // Ignora se il campo esiste già
+}
+
+try {
+    // Crea tabella user_bans se non esiste
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_user_bans (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        reason TEXT,
+        banned_by INT NOT NULL,
+        banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_active TINYINT(1) DEFAULT 1,
+        INDEX(user_id),
+        INDEX(is_active)
+    )");
+} catch (PDOException $e) {
+    error_log("Errore creazione tabella user_bans: " . $e->getMessage());
+}
+
+try {
+    // Crea tabella messages se non esiste
+    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        from_user_id INT,
+        to_user_id INT NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        is_read TINYINT(1) DEFAULT 0,
+        parent_id INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(to_user_id),
+        INDEX(is_read),
+        INDEX(parent_id),
+        INDEX(created_at)
+    )");
+    // Aggiungi parent_id se non esiste
+    $pdo->exec("ALTER TABLE sl_messages ADD COLUMN parent_id INT NULL");
+} catch (PDOException $e) {
+    // Ignora se già esiste
+}
+
+try {
+    // Aggiungi campi Votifier alla tabella servers
+    $pdo->exec("ALTER TABLE sl_servers ADD COLUMN votifier_host VARCHAR(255) NULL");
+    $pdo->exec("ALTER TABLE sl_servers ADD COLUMN votifier_port INT DEFAULT 8192");
+    $pdo->exec("ALTER TABLE sl_servers ADD COLUMN votifier_key TEXT NULL");
+} catch (PDOException $e) {
+    // Ignora se già esistono
+}
 
 // Funzioni di utilità
 
@@ -299,5 +381,28 @@ function ensureVerificationTables($pdo) {
 // Inizializza risorsa necessaria
 ensurePasswordResetTable($pdo);
 ensureVerificationTables($pdo);
+
+// Salva player stats quando qualcuno visita il sito
+if (php_sapi_name() !== 'cli') {
+    $last_save_file = sys_get_temp_dir() . '/blocksy_last_save.txt';
+    $should_save = false;
+    
+    if (file_exists($last_save_file)) {
+        $last_save = (int)file_get_contents($last_save_file);
+        if ((time() - $last_save) >= 600) { // 10 minuti = 600 secondi
+            $should_save = true;
+        }
+    } else {
+        $should_save = true;
+    }
+    
+    if ($should_save && rand(1, 100) <= 50) { // 50% probabilità per distribuire carico
+        file_put_contents($last_save_file, time());
+        register_shutdown_function(function() {
+            global $pdo;
+            @include_once __DIR__ . '/cron_save_player_stats.php';
+        });
+    }
+}
 
 ?>

@@ -5638,6 +5638,29 @@
                 </ul>
                 
                 <ul class="navbar-nav">
+                    <?php if (isLoggedIn()): ?>
+                        <?php
+                        // Conta messaggi non letti
+                        $unread_messages = 0;
+                        try {
+                            $stmt = $pdo->prepare("SELECT COUNT(*) FROM sl_messages WHERE to_user_id = ? AND is_read = 0");
+                            $stmt->execute([$_SESSION['user_id']]);
+                            $unread_messages = (int)$stmt->fetchColumn();
+                        } catch (PDOException $e) {
+                            // Ignora errore se tabella non esiste ancora
+                        }
+                        ?>
+                        <li class="nav-item">
+                            <a class="nav-link position-relative" href="/messages" title="Messaggi">
+                                <i class="bi bi-envelope"></i>
+                                <?php if ($unread_messages > 0): ?>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.7rem;">
+                                        <?php echo $unread_messages; ?>
+                                    </span>
+                                <?php endif; ?>
+                            </a>
+                        </li>
+                    <?php endif; ?>
                     <li class="nav-item">
                         <button class="nav-link" type="button" onclick="toggleTheme()" title="Toggle tema">
                             <i id="themeToggleIcon" class="bi bi-moon-stars"></i>

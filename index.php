@@ -37,7 +37,7 @@ if (preg_match('#^/utente/([0-9]+)(?:-[A-Za-z0-9_-]+)?/?$#', $request_path, $m))
 }
 
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
-if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server|plugin-blocksy|eventi-server)/?$#', $request_path, $m)) {
+if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server|plugin-blocksy|eventi-server|messages)/?$#', $request_path, $m)) {
     $map = [
         'forum' => 'forum.php',
         'annunci' => 'annunci.php',
@@ -52,6 +52,7 @@ if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|veri
         'sponsorizza-il-tuo-server' => 'sponsorizza.php',
         'plugin-blocksy' => 'plugin-blocksy.php',
         'eventi-server' => 'eventi-server.php',
+        'messages' => 'messages.php',
     ];
     $target = $map[$m[1]] ?? null;
     if ($target) {
@@ -125,6 +126,7 @@ try {
             LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
             WHERE s.is_active = 1 AND ss.is_active = 1 
             AND (ss.expires_at IS NULL OR ss.expires_at > NOW())
+            AND (s.in_costruzione IS NULL OR s.in_costruzione = 0)
             GROUP BY s.id 
             ORDER BY ss.priority ASC, RAND()
             LIMIT 2
@@ -147,7 +149,7 @@ try {
         FROM sl_servers s 
         LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
         LEFT JOIN sl_sponsored_servers ss ON s.id = ss.server_id
-        WHERE s.is_active = 1 
+        WHERE s.is_active = 1 AND (s.in_costruzione IS NULL OR s.in_costruzione = 0)
         GROUP BY s.id 
         ORDER BY voti_totali DESC, s.nome ASC
     ");
@@ -956,8 +958,8 @@ include 'header.php';
             }
             ?>
             
-            <div class="events-section-standalone" id="eventsSection" <?php if (empty($upcoming_events)): ?>style="display: none;"<?php endif; ?>>
             <?php if (!empty($upcoming_events)): ?>
+            <div class="events-section-standalone" id="eventsSection">
                 <h5>
                     <i class="bi bi-calendar-event"></i> Eventi Prossimi
                     <button id="refreshEventsBtn" class="refresh-events-btn" title="Aggiorna eventi">
@@ -979,7 +981,16 @@ include 'header.php';
                             $date_label = $event_date->format('d/m');
                         }
                         ?>
-                        <div class="event-card" style="cursor: pointer;" onclick="openEventModal(<?php echo $event['server_id']; ?>)">
+                        <div class="event-card" style="cursor: pointer;" onclick='openEventModal(<?php echo json_encode([
+                            "id" => $event["id"],
+                            "title" => $event["title"],
+                            "description" => $event["description"] ?? "",
+                            "event_date" => $event["event_date"],
+                            "event_time" => $event["event_time"] ?? "",
+                            "server_id" => $event["server_id"],
+                            "server_name" => $event["server_name"],
+                            "logo_url" => $event["logo_url"] ?? ""
+                        ]); ?>)'>
                             <div class="event-date">
                                 <span class="date-label"><?php echo $date_label; ?></span>
                                 <?php if (!empty($event['event_time'])): ?>
@@ -1007,9 +1018,9 @@ include 'header.php';
                             </div>
                         </div>
                     <?php endforeach; ?>
-                <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
             
             <div class="filters-sidebar" id="filtersSection">
                 <div class="filters-header">
@@ -1064,37 +1075,28 @@ include 'header.php';
 
 <script>
 // Funzione per aprire il modal con i dettagli del server
-async function openEventModal(serverId) {
+async function openEventModal(eventData) {
     const modal = new bootstrap.Modal(document.getElementById('eventModal'));
     const modalBody = document.getElementById('eventModalBody');
     
-    // Mostra loading
-    modalBody.innerHTML = `
-        <div class="text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Caricamento...</span>
-            </div>
-        </div>
-    `;
-    
     modal.show();
     
+    // Formatta data e ora
+    const eventDate = new Date(eventData.event_date);
+    const dateStr = eventDate.toLocaleDateString('it-IT', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    const timeStr = eventData.event_time ? eventData.event_time.substring(0, 5) : '';
+    
+    // Carica info server per IP e social
     try {
-        const response = await fetch(`/api_get_server_info.php?server_id=${serverId}`);
+        const response = await fetch(`/api_get_server_info.php?server_id=${eventData.server_id}`);
         const data = await response.json();
+        const server = data.server || {};
         
-        if (data.error) {
-            modalBody.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i> ${data.error}
-                </div>
-            `;
-            return;
-        }
-        
-        const server = data.server;
-        
-        // Costruisci HTML del modal
         let socialLinksHtml = '';
         if (server.social_links && server.social_links.length > 0) {
             socialLinksHtml = server.social_links.map(link => {
@@ -1122,35 +1124,43 @@ async function openEventModal(serverId) {
         modalBody.innerHTML = `
             <div class="event-modal-content">
                 <div class="event-modal-header">
-                    ${server.logo_url ? 
-                        `<img src="${server.logo_url}" alt="${server.nome}" class="event-modal-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    ${eventData.logo_url ? 
+                        `<img src="${eventData.logo_url}" alt="${eventData.server_name}" class="event-modal-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                          <div class="event-modal-logo-fallback" style="display: none;">
-                            <i class="bi bi-server"></i>
+                            <i class="bi bi-calendar-event"></i>
                          </div>` :
                         `<div class="event-modal-logo-fallback">
-                            <i class="bi bi-server"></i>
+                            <i class="bi bi-calendar-event"></i>
                          </div>`
                     }
                     <div class="event-modal-info">
-                        <h3>${server.nome}</h3>
-                        <span class="event-modal-type">${server.tipo_server || 'Server'}</span>
+                        <h3>${eventData.title}</h3>
+                        <span class="event-modal-type"><i class="bi bi-server"></i> ${eventData.server_name}</span>
                     </div>
                 </div>
                 
-                ${server.descrizione ? `
+                <div class="event-modal-section">
+                    <h5><i class="bi bi-calendar3"></i> Data e Ora</h5>
+                    <div class="event-modal-description">
+                        <strong>${dateStr}</strong>
+                        ${timeStr ? `<br><i class="bi bi-clock"></i> Ore ${timeStr}` : ''}
+                    </div>
+                </div>
+                
+                ${eventData.description ? `
                     <div class="event-modal-section">
-                        <h5><i class="bi bi-file-text"></i> Descrizione</h5>
-                        <div class="event-modal-description">${server.descrizione.replace(/\n/g, '<br>')}</div>
+                        <h5><i class="bi bi-file-text"></i> Descrizione Evento</h5>
+                        <div class="event-modal-description">${eventData.description.replace(/\n/g, '<br>')}</div>
                     </div>
                 ` : ''}
                 
                 <div class="event-modal-section">
                     <h5><i class="bi bi-hdd-network"></i> IP Server</h5>
                     <div class="event-modal-ip">
-                        <span id="serverIpText">${server.ip}</span>
-                        <button onclick="copyServerIp('${server.ip}')">
+                        <span id="serverIpText">${server.ip || 'N/D'}</span>
+                        ${server.ip ? `<button onclick="copyServerIp('${server.ip}')">
                             <i class="bi bi-clipboard"></i> Copia
-                        </button>
+                        </button>` : ''}
                     </div>
                 </div>
                 
@@ -1164,7 +1174,6 @@ async function openEventModal(serverId) {
                 ` : ''}
             </div>
         `;
-        
     } catch (error) {
         modalBody.innerHTML = `
             <div class="alert alert-danger">
@@ -1234,8 +1243,19 @@ async function refreshEvents() {
                         <i class="bi bi-server"></i>
                      </div>`;
                 
+                const eventDataJson = JSON.stringify({
+                    id: event.id,
+                    title: event.title,
+                    description: event.description || '',
+                    event_date: event.event_date,
+                    event_time: event.event_time || '',
+                    server_id: event.server_id,
+                    server_name: event.server_name,
+                    logo_url: event.logo_url || ''
+                }).replace(/'/g, "\\'");
+                
                 return `
-                    <div class="event-card" style="cursor: pointer;" onclick="openEventModal(${event.server_id})">
+                    <div class="event-card" style="cursor: pointer;" onclick='openEventModal(${eventDataJson})'>
                         <div class="event-date">
                             <span class="date-label">${dateLabel}</span>
                             ${eventTime}
@@ -1387,30 +1407,46 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inizializza ordinamento salvato
     loadSavedSort();
     
-    // Controlla player-count e aggiorna status offline
-    function checkPlayerStatus() {
-        document.querySelectorAll('.server-players').forEach(playerSection => {
-            const playerCount = playerSection.querySelector('.player-count');
-            const playerStatus = playerSection.querySelector('.player-status');
+    // Aggiorna player count per tutti i server
+    async function updatePlayerCounts() {
+        const playerCounters = document.querySelectorAll('[data-playercounter-ip]');
+        
+        for (const counter of playerCounters) {
+            const serverIp = counter.getAttribute('data-playercounter-ip');
+            if (!serverIp) continue;
             
-            if (playerCount && playerStatus) {
-                const countText = playerCount.textContent.trim();
-                if (countText === '...' || countText === 'Offline' || countText === '0/0') {
-                    playerStatus.textContent = 'offline';
-                    playerStatus.style.color = '#ef4444';
+            try {
+                const response = await fetch(`/api_get_server_status.php?ip=${encodeURIComponent(serverIp)}`);
+                const data = await response.json();
+                
+                const playerSection = counter.closest('.server-players');
+                const playerStatus = playerSection?.querySelector('.player-status');
+                
+                if (data.success && data.online) {
+                    // Mostra solo il numero di giocatori online, non il max
+                    counter.textContent = data.players.online;
+                    if (playerStatus) {
+                        playerStatus.textContent = 'online';
+                        playerStatus.style.color = 'var(--accent-green)';
+                    }
                 } else {
-                    playerStatus.textContent = 'online';
-                    playerStatus.style.color = 'var(--accent-green)';
+                    counter.textContent = '0';
+                    if (playerStatus) {
+                        playerStatus.textContent = 'offline';
+                        playerStatus.style.color = '#ef4444';
+                    }
                 }
+            } catch (error) {
+                counter.textContent = '...';
             }
-        });
+        }
     }
     
-    // Controlla subito
-    checkPlayerStatus();
+    // Aggiorna subito
+    updatePlayerCounts();
     
-    // Controlla ogni 2 secondi per aggiornamenti dinamici
-    setInterval(checkPlayerStatus, 2000);
+    // Aggiorna ogni 30 secondi
+    setInterval(updatePlayerCounts, 30000);
     
     // Applica filtro da URL se presente
     <?php if (!empty($active_filter)): ?>

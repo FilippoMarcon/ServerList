@@ -18,6 +18,7 @@ $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $identifier = sanitize($_POST['minecraft_nick'] ?? '');
     $password = $_POST['password'] ?? '';
+    $remember_me = isset($_POST['remember_me']);
     $captcha_response = $_POST['g-recaptcha-response'] ?? '';
     
     // Validazione input
@@ -66,11 +67,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['minecraft_nick'] = $user['minecraft_nick'];
                     $_SESSION['is_admin'] = $user['is_admin'];
+                    
+                    // Remember Me - Cookie per 30 giorni
+                    if ($remember_me) {
+                        $token = bin2hex(random_bytes(32));
+                        $expires = time() + (30 * 24 * 60 * 60); // 30 giorni
+                        
+                        // Salva token nel database
+                        try {
+                            $pdo->exec("CREATE TABLE IF NOT EXISTS sl_remember_tokens (
+                                id INT AUTO_INCREMENT PRIMARY KEY,
+                                user_id INT NOT NULL,
+                                token VARCHAR(64) NOT NULL,
+                                expires_at DATETIME NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                INDEX(user_id),
+                                INDEX(token)
+                            )");
+                            
+                            $stmt = $pdo->prepare("INSERT INTO sl_remember_tokens (user_id, token, expires_at) VALUES (?, ?, FROM_UNIXTIME(?))");
+                            $stmt->execute([$user['id'], $token, $expires]);
+                            
+                            // Imposta cookie
+                            setcookie('remember_token', $token, $expires, '/', '', true, true);
+                        } catch (PDOException $e) {
+                            error_log("Errore remember token: " . $e->getMessage());
+                        }
+                    }
 
                     $success = 'Login effettuato con successo! Reindirizzamento...';
                     
-                    // Reindirizza dopo 2 secondi
-                    echo '<meta http-equiv="refresh" content="2;url=index.php">';
+                    // Reindirizza alla homepage
+                    $redirect_url = $_GET['next'] ?? '/';
+                    header("Location: " . $redirect_url);
+                    exit;
                 } else {
                     $error = 'Nome utente/email o password non validi.';
                 }
@@ -168,7 +198,12 @@ include 'header.php';
                                 </div>
                             </div>
                             
-
+                            <div class="form-group" style="margin-top: 1rem;">
+                                <label class="remember-me-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" name="remember_me" id="remember_me" style="width: auto; cursor: pointer;">
+                                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Ricordami per 30 giorni</span>
+                                </label>
+                            </div>
                             
                             <button type="submit" class="auth-button">
                                 <i class="bi bi-box-arrow-in-right"></i>

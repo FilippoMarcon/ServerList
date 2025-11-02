@@ -63,7 +63,7 @@ redirect('/');
 try {
     // Recupera le informazioni del server con conteggio voti
     $stmt = $pdo->prepare("SELECT s.*, 
-                          (SELECT COUNT(*) FROM sl_votes WHERE server_id = s.id) as vote_count 
+                          (SELECT COUNT(*) FROM sl_votes WHERE server_id = s.id AND MONTH(data_voto) = MONTH(CURRENT_DATE()) AND YEAR(data_voto) = YEAR(CURRENT_DATE())) as vote_count 
                           FROM sl_servers s 
                           WHERE s.id = ? AND s.is_active = 1");
     $stmt->execute([$server_id]);
@@ -89,11 +89,11 @@ redirect('/');
         }
     }
     
-    // Calcola il ranking del server usando la stessa query dell'index.php
+    // Calcola il ranking del server usando la stessa query dell'index.php (mese corrente)
     $stmt = $pdo->query("
         SELECT s.id, COUNT(v.id) as voti_totali 
         FROM sl_servers s 
-        LEFT JOIN sl_votes v ON s.id = v.server_id 
+        LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
         WHERE s.is_active = 1 
         GROUP BY s.id 
         ORDER BY voti_totali DESC, s.nome ASC
@@ -115,7 +115,7 @@ redirect('/');
         $debug_stmt = $pdo->query("
             SELECT s.nome, s.id, COUNT(v.id) as voti_totali 
             FROM sl_servers s 
-            LEFT JOIN sl_votes v ON s.id = v.server_id 
+            LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
             WHERE s.is_active = 1 
             GROUP BY s.id 
             ORDER BY voti_totali DESC, s.nome ASC
@@ -1013,6 +1013,10 @@ include 'header.php';
                             <div class="server-ip-display" title="Clicca per copiare">
                                 <?php echo htmlspecialchars($server['ip']); ?>
                             </div>
+                            <div class="server-players-live" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                                <i class="bi bi-people"></i> 
+                                <span id="livePlayerCount">...</span> giocatori online
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1143,16 +1147,46 @@ include 'header.php';
                     
                     <!-- Stats Tab -->
                     <div class="tab-content" id="stats">
-                        <div class="stats-section">
-                            <h3>Ultimi 30 giorni</h3>
-                            <div class="chart-container">
-                                <canvas id="votes30daysChart" height="140"></canvas>
+                        <!-- Stats Type Selector -->
+                        <div class="stats-type-selector" style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem; justify-content: center;">
+                            <button class="stats-type-btn active" data-type="votes">
+                                <i class="bi bi-trophy"></i> Voti
+                            </button>
+                            <button class="stats-type-btn" data-type="players">
+                                <i class="bi bi-people"></i> Player
+                            </button>
+                        </div>
+                        
+                        <!-- Voti Stats -->
+                        <div id="votes-stats" class="stats-group">
+                            <div class="stats-section">
+                                <h3><i class="bi bi-trophy"></i> Voti - Ultimi 30 giorni</h3>
+                                <div class="chart-container">
+                                    <canvas id="votes30daysChart" height="140"></canvas>
+                                </div>
+                            </div>
+                            <div class="stats-section" style="margin-top: 1.5rem;">
+                                <h3><i class="bi bi-trophy"></i> Voti - Ultimi 12 mesi</h3>
+                                <div class="chart-container">
+                                    <canvas id="votes12monthsChart" height="140"></canvas>
+                                </div>
                             </div>
                         </div>
-                        <div class="stats-section" style="margin-top: 1.5rem;">
-                            <h3>Ultimi 12 mesi</h3>
-                            <div class="chart-container">
-                                <canvas id="votes12monthsChart" height="140"></canvas>
+                        
+                        <!-- Player Stats -->
+                        <div id="players-stats" class="stats-group" style="display: none;">
+                            <!-- Period Selector -->
+                            <div class="period-selector" style="margin-bottom: 1rem; display: flex; gap: 0.5rem; justify-content: center;">
+                                <button class="period-btn active" data-period="today">Oggi</button>
+                                <button class="period-btn" data-period="7days">7 Giorni</button>
+                                <button class="period-btn" data-period="30days">30 Giorni</button>
+                            </div>
+                            
+                            <div class="stats-section">
+                                <h3 id="players-chart-title"><i class="bi bi-people"></i> Player Online - Oggi</h3>
+                                <div class="chart-container">
+                                    <canvas id="playersChart" height="140"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1519,6 +1553,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Aggiorna giocatori online in tempo reale
+    async function updateLivePlayerCount() {
+        const liveCount = document.getElementById('livePlayerCount');
+        if (!liveCount) return;
+        
+        try {
+            const response = await fetch(`/api_get_server_status.php?ip=<?php echo urlencode($server['ip']); ?>`);
+            const data = await response.json();
+            
+            if (data.success && data.online) {
+                liveCount.textContent = data.players.online;
+                liveCount.style.color = 'var(--accent-green)';
+            } else {
+                liveCount.textContent = '0';
+                liveCount.style.color = '#ef4444';
+            }
+        } catch (error) {
+            liveCount.textContent = '...';
+        }
+    }
+    
+    // Aggiorna subito e poi ogni 30 secondi
+    updateLivePlayerCount();
+    setInterval(updateLivePlayerCount, 30000);
+    
     // Server IP click to copy
     const serverIP = document.querySelector('.server-ip-display');
     if (serverIP) {
@@ -1647,11 +1706,157 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Gestione tab Voti/Player
+    const statsTypeBtns = document.querySelectorAll('.stats-type-btn');
+    const votesStats = document.getElementById('votes-stats');
+    const playersStats = document.getElementById('players-stats');
+    
+    statsTypeBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            statsTypeBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            const type = this.getAttribute('data-type');
+            if (type === 'votes') {
+                votesStats.style.display = 'block';
+                playersStats.style.display = 'none';
+            } else {
+                votesStats.style.display = 'none';
+                playersStats.style.display = 'block';
+                // Carica player stats se non già caricato
+                if (!window.playersChartLoaded) {
+                    loadPlayerStats('today');
+                    window.playersChartLoaded = true;
+                }
+            }
+        });
+    });
+    
+    // Gestione periodi player stats
+    const periodBtns = document.querySelectorAll('.period-btn');
+    periodBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            periodBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            const period = this.getAttribute('data-period');
+            loadPlayerStats(period);
+        });
+    });
+    
+    // Funzione per caricare player stats
+    let playersChartInstance = null;
+    function loadPlayerStats(period) {
+        const ctx = document.getElementById('playersChart');
+        const title = document.getElementById('players-chart-title');
+        
+        if (!ctx) return;
+        
+        // Aggiorna titolo
+        const titles = {
+            'today': 'Player Online - Oggi',
+            '7days': 'Player Online - Ultimi 7 Giorni',
+            '30days': 'Player Online - Ultimi 30 Giorni'
+        };
+        title.innerHTML = `<i class="bi bi-people"></i> ${titles[period]}`;
+        
+        // Carica dati
+        fetch(`/api_get_player_stats.php?server_id=<?php echo $server_id; ?>&period=${period}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.stats && data.stats.length > 0) {
+                    // Distruggi grafico esistente
+                    if (playersChartInstance) {
+                        playersChartInstance.destroy();
+                    }
+                    
+                    // Crea nuovo grafico
+                    playersChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.stats.map(s => {
+                                const d = new Date(s.recorded_at);
+                                if (period === 'today') {
+                                    return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                                } else {
+                                    return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+                                }
+                            }),
+                            datasets: [{
+                                label: 'Player Online',
+                                data: data.stats.map(s => s.player_count),
+                                backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                                borderColor: 'rgba(168, 85, 247, 1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 3,
+                                pointHoverRadius: 5
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: (item) => 'Player: ' + item.formattedValue
+                                    }
+                                },
+                                legend: { display: false }
+                            },
+                            scales: {
+                                x: { 
+                                    grid: { display: false },
+                                    ticks: { maxTicksLimit: 10 }
+                                },
+                                y: { 
+                                    display: true, 
+                                    beginAtZero: true,
+                                    ticks: { precision: 0 }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    // Nessun dato
+                    if (playersChartInstance) {
+                        playersChartInstance.destroy();
+                        playersChartInstance = null;
+                    }
+                    ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+                }
+            })
+            .catch(error => console.error('Errore caricamento player stats:', error));
+    }
 </script>
 
 <style>
     .stats-section h3 { margin-bottom: 0.75rem; }
     .chart-container { position: relative; width: 100%; height: 220px; }
+    
+    .stats-type-btn, .period-btn {
+        padding: 0.6rem 1.2rem;
+        border: 2px solid var(--border-color);
+        background: var(--card-bg);
+        color: var(--text-secondary);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 600;
+    }
+    
+    .stats-type-btn:hover, .period-btn:hover {
+        border-color: var(--accent-purple);
+        color: var(--text-primary);
+    }
+    
+    .stats-type-btn.active, .period-btn.active {
+        background: var(--accent-purple);
+        border-color: var(--accent-purple);
+        color: white;
+    }
 </style>
 
 
