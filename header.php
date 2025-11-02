@@ -1104,11 +1104,22 @@
         
         @media (max-width: 768px) {
             
+            .server-list {
+                margin: 0;
+                padding: 0;
+                border-radius: 0 0 16px 16px;
+                overflow-x: hidden;
+                max-width: 100%;
+            }
+            
             .server-card {
                 flex-direction: column;
                 text-align: center;
                 gap: 1.5rem;
                 padding: 2rem 1rem;
+                margin: 0;
+                max-width: 100%;
+                box-sizing: border-box;
             }
             
             .server-info {
@@ -3160,6 +3171,37 @@
             
             body {
                 overflow-x: hidden;
+            }
+            
+            /* Fix homepage server cards */
+            .homepage-server-card {
+                margin-left: 0;
+                margin-right: 0;
+                padding: 1rem;
+                max-width: 100%;
+            }
+            
+            .homepage-server-card .server-rank-container,
+            .homepage-server-card .server-logo,
+            .homepage-server-card .server-info {
+                margin-right: 0.5rem;
+            }
+            
+            .server-list {
+                padding: 0;
+                margin: 0;
+            }
+            
+            /* Fix colonne Bootstrap su mobile */
+            .col-lg-9,
+            .col-lg-3 {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            
+            .row {
+                margin-left: 0;
+                margin-right: 0;
             }
             
             .profile-container .container {
