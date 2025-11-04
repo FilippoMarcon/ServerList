@@ -131,8 +131,30 @@ try {
     echo "Salvati: $saved\n";
     echo "Errori: $errors\n";
     
-    // Pulizia vecchi dati
-    $deleted = $pdo->exec("DELETE FROM sl_player_stats WHERE recorded_at < DATE_SUB(NOW(), INTERVAL 2 DAY)");
+    // Aggregazione giornaliera (oggi e ieri)
+    echo "\nAggregazione giornaliera...\n";
+    $today = date('Y-m-d');
+    $yesterday = date('Y-m-d', strtotime('-1 day'));
+    
+    $aggregated = 0;
+    foreach ([$today, $yesterday] as $date) {
+        $stmt = $pdo->query("SELECT DISTINCT server_id FROM sl_player_stats WHERE DATE(recorded_at) = '$date'");
+        $servers_date = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        foreach ($servers_date as $sid) {
+            $stmt = $pdo->prepare("SELECT MAX(player_count) as max_players FROM sl_player_stats WHERE server_id = ? AND DATE(recorded_at) = ?");
+            $stmt->execute([$sid, $date]);
+            $max = $stmt->fetch()['max_players'] ?? 0;
+            
+            $stmt = $pdo->prepare("INSERT INTO sl_player_stats_daily (server_id, date, max_players) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE max_players = GREATEST(max_players, ?)");
+            $stmt->execute([$sid, $date, $max, $max]);
+            $aggregated++;
+        }
+    }
+    echo "Record aggregati: $aggregated\n";
+    
+    // Pulizia vecchi dati (mantieni solo ultimi 2 giorni)
+    $deleted = $pdo->exec("DELETE FROM sl_player_stats WHERE DATE(recorded_at) < DATE_SUB(CURDATE(), INTERVAL 2 DAY)");
     echo "Record vecchi eliminati: $deleted\n";
     
     echo "\n✓ Completato: " . date('Y-m-d H:i:s') . "\n";

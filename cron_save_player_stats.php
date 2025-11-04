@@ -78,22 +78,28 @@ try {
     // Pulizia: elimina record più vecchi di 2 giorni
     $pdo->exec("DELETE FROM sl_player_stats WHERE recorded_at < DATE_SUB(NOW(), INTERVAL 2 DAY)");
     
-    // Aggregazione giornaliera automatica (crea record giornaliero con max)
+    // Aggregazione giornaliera automatica (crea/aggiorna record giornaliero con max)
+    // Aggrega sia oggi che ieri
+    $today = date('Y-m-d');
     $yesterday = date('Y-m-d', strtotime('-1 day'));
-    $stmt = $pdo->query("SELECT DISTINCT server_id FROM sl_player_stats WHERE DATE(recorded_at) = '$yesterday'");
-    $servers_yesterday = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
-    foreach ($servers_yesterday as $sid) {
-        $stmt = $pdo->prepare("SELECT MAX(player_count) as max_players FROM sl_player_stats WHERE server_id = ? AND DATE(recorded_at) = ?");
-        $stmt->execute([$sid, $yesterday]);
-        $max = $stmt->fetch()['max_players'] ?? 0;
+    foreach ([$today, $yesterday] as $date) {
+        $stmt = $pdo->query("SELECT DISTINCT server_id FROM sl_player_stats WHERE DATE(recorded_at) = '$date'");
+        $servers_date = $stmt->fetchAll(PDO::FETCH_COLUMN);
         
-        $stmt = $pdo->prepare("INSERT INTO sl_player_stats_daily (server_id, date, max_players) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE max_players = ?");
-        $stmt->execute([$sid, $yesterday, $max, $max]);
+        foreach ($servers_date as $sid) {
+            $stmt = $pdo->prepare("SELECT MAX(player_count) as max_players FROM sl_player_stats WHERE server_id = ? AND DATE(recorded_at) = ?");
+            $stmt->execute([$sid, $date]);
+            $max = $stmt->fetch()['max_players'] ?? 0;
+            
+            // Usa GREATEST per mantenere il valore massimo se esiste già
+            $stmt = $pdo->prepare("INSERT INTO sl_player_stats_daily (server_id, date, max_players) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE max_players = GREATEST(max_players, ?)");
+            $stmt->execute([$sid, $date, $max, $max]);
+        }
     }
     
-    // Elimina dati dettagliati di ieri dopo aggregazione
-    $pdo->exec("DELETE FROM sl_player_stats WHERE DATE(recorded_at) = '$yesterday'");
+    // Elimina solo dati dettagliati più vecchi di 2 giorni (mantieni oggi e ieri)
+    $pdo->exec("DELETE FROM sl_player_stats WHERE DATE(recorded_at) < DATE_SUB(CURDATE(), INTERVAL 2 DAY)");
     
     // Aggregazione mensile automatica (primo giorno del mese, aggrega il mese precedente)
     if (date('d') === '01') {
@@ -106,7 +112,7 @@ try {
             $stmt->execute([$sid, $last_month]);
             $max = $stmt->fetch()['max_players'] ?? 0;
             
-            $stmt = $pdo->prepare("INSERT INTO sl_player_stats_monthly (server_id, year_month, max_players) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE max_players = ?");
+            $stmt = $pdo->prepare("INSERT INTO sl_player_stats_monthly (server_id, `year_month`, max_players) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE max_players = ?");
             $stmt->execute([$sid, $last_month, $max, $max]);
         }
         
