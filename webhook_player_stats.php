@@ -36,6 +36,80 @@ file_put_contents($last_save_file, time());
 
 require_once 'config.php';
 
+/**
+ * Query diretta al server Minecraft usando il protocollo Server List Ping
+ * Più affidabile di API esterne
+ */
+function queryMinecraftServer($address, $timeout = 3) {
+    // Separa IP e porta
+    $parts = explode(':', $address);
+    $host = $parts[0];
+    $port = isset($parts[1]) ? (int)$parts[1] : 25565;
+    
+    try {
+        // Crea socket
+        $socket = @fsockopen($host, $port, $errno, $errstr, $timeout);
+        if (!$socket) {
+            return false;
+        }
+        
+        // Imposta timeout
+        stream_set_timeout($socket, $timeout);
+        
+        // Handshake packet (Protocol 47 = 1.8.x, ma funziona per tutte le versioni moderne)
+        $data = "\x00"; // Packet ID
+        $data .= "\x2F"; // Protocol version (47)
+        $data .= pack('c', strlen($host)) . $host; // Server address
+        $data .= pack('n', $port); // Server port
+        $data .= "\x01"; // Next state (1 = status)
+        
+        // Invia handshake
+        $handshake = pack('c', strlen($data)) . $data;
+        fwrite($socket, $handshake);
+        
+        // Request packet
+        fwrite($socket, "\x01\x00");
+        
+        // Leggi risposta
+        $length = unpack('c', fread($socket, 1))[1];
+        if ($length < 1) {
+            fclose($socket);
+            return false;
+        }
+        
+        // Leggi packet ID
+        $packetId = unpack('c', fread($socket, 1))[1];
+        if ($packetId !== 0x00) {
+            fclose($socket);
+            return false;
+        }
+        
+        // Leggi lunghezza JSON
+        $jsonLength = 0;
+        $shift = 0;
+        do {
+            $byte = unpack('c', fread($socket, 1))[1];
+            $jsonLength |= ($byte & 0x7F) << $shift;
+            $shift += 7;
+        } while ($byte & 0x80);
+        
+        // Leggi JSON
+        $json = fread($socket, $jsonLength);
+        fclose($socket);
+        
+        // Parse JSON
+        $data = json_decode($json, true);
+        if ($data && isset($data['players']['online'])) {
+            return (int)$data['players']['online'];
+        }
+        
+        return false;
+        
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
 // Crea tabelle se non esistono
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS sl_player_stats (
@@ -82,34 +156,46 @@ try {
         echo "Processing: {$server['nome']} ({$server['ip']})... ";
         flush();
         
-        // Chiama API con timeout breve
-        $ch = curl_init("https://api.mcsrvstat.us/3/" . urlencode($server['ip']));
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 5,
-            CURLOPT_CONNECTTIMEOUT => 3,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_USERAGENT => 'Blocksy-ServerList/1.0 (https://blocksy.it)',
-            CURLOPT_SSL_VERIFYPEER => true
-        ]);
-        
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curl_error = curl_error($ch);
-        curl_close($ch);
-        
+        // Prova prima con query diretta al server, poi fallback su API
         $player_count = 0;
         $status = 'offline';
         
-        if ($http_code === 200 && $response) {
-            $data = json_decode($response, true);
-            if ($data && isset($data['online']) && $data['online']) {
-                $player_count = $data['players']['online'] ?? 0;
-                $status = 'online';
+        // Metodo 1: Query diretta al server Minecraft (più affidabile)
+        $direct_result = queryMinecraftServer($server['ip']);
+        if ($direct_result !== false) {
+            $player_count = $direct_result;
+            $status = 'online';
+            echo "✓ $status ($player_count players) [direct]\n";
+        } else {
+            // Metodo 2: Fallback su API mcsrvstat.us
+            $ch = curl_init("https://api.mcsrvstat.us/3/" . urlencode($server['ip']));
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_USERAGENT => 'Blocksy-ServerList/1.0 (https://blocksy.it)',
+                CURLOPT_SSL_VERIFYPEER => true
+            ]);
+            
+            $response = curl_exec($ch);
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($http_code === 200 && $response) {
+                $data = json_decode($response, true);
+                if ($data && isset($data['online']) && $data['online']) {
+                    $player_count = $data['players']['online'] ?? 0;
+                    $status = 'online';
+                    echo "✓ $status ($player_count players) [api]\n";
+                } else {
+                    echo "✗ offline\n";
+                    $errors++;
+                }
+            } else {
+                echo "✗ api error\n";
+                $errors++;
             }
-        } elseif ($curl_error) {
-            echo "CURL Error: $curl_error ";
-            $errors++;
         }
         
         // Salva nel database
