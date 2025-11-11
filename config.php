@@ -1,21 +1,4 @@
 <?php
-// Avvio sessione e configurazione database
-session_start();
-
-$servername = "phpmyadmin.namedhosting.com";
-$username = "user_6909";
-$password = "AIsxFxqH-d0DW5BxPQN9nkwpf5_yACano3z6hER8nD8";
-$dbname = "site_6909";
-
-try {
-    $pdo = new PDO("mysql:host=$servername;dbname=$dbname;charset=utf8mb4", $username, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
-} catch (PDOException $e) {
-    die("Connessione fallita: " . $e->getMessage());
-}
-
 /**
  * Configurazione database e impostazioni generali
  * Database configuration and general settings
@@ -101,10 +84,23 @@ define('RECAPTCHA_SECRET_KEY', '6Lcm188rAAAAAHlpFg9bYpicG-FspVf6Gq50QJ4r'); // S
 
 // Migrazioni automatiche
 try {
+    // Assicura che non ci siano transazioni aperte prima delle migrazioni
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+        error_log("ATTENZIONE: Transazione aperta trovata in config.php prima delle migrazioni");
+    }
+    
     // Aggiungi campo in_costruzione se non esiste
     $pdo->exec("ALTER TABLE sl_servers ADD COLUMN in_costruzione TINYINT(1) DEFAULT 0");
 } catch (PDOException $e) {
     // Ignora se il campo esiste già
+    if ($pdo->inTransaction()) {
+        try {
+            $pdo->rollBack();
+        } catch (PDOException $rollbackError) {
+            error_log("Errore rollback in config.php: " . $rollbackError->getMessage());
+        }
+    }
 }
 
 try {

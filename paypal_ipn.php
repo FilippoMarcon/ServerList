@@ -31,6 +31,9 @@ if (!isLoggedIn()) {
 
 $user_id = $_SESSION['user_id'];
 
+// Variabile per tracciare se abbiamo iniziato una transazione
+$transaction_started = false;
+
 try {
     // Recupera dati dal form
     $server_id = (int)($_POST['server_id'] ?? 0);
@@ -60,11 +63,13 @@ try {
         throw new Exception('Pagamento già processato');
     }
     
-    // Calcola data scadenza
-    $expires_at = date('Y-m-d H:i:s', strtotime("+$plan_days days"));
+    // Calcola data scadenza in ore (1 giorno = 24 ore)
+    $hours = $plan_days * 24;
+    $expires_at = date('Y-m-d H:i:s', strtotime("+$hours hours"));
     
     // Inizia transazione
     $pdo->beginTransaction();
+    $transaction_started = true;
     
     // Salva il pagamento
     $stmt = $pdo->prepare("
@@ -80,22 +85,27 @@ try {
         VALUES (?, 1, 1, NOW(), ?) 
         ON DUPLICATE KEY UPDATE 
             is_active = 1,
-            expires_at = IF(expires_at > NOW(), DATE_ADD(expires_at, INTERVAL ? DAY), ?),
+            expires_at = IF(expires_at > NOW(), DATE_ADD(expires_at, INTERVAL ? HOUR), ?),
             priority = 1
     ");
-    $stmt->execute([$server_id, $expires_at, $plan_days, $expires_at]);
-    
-    // Log attività
-    if (file_exists(__DIR__ . '/api_log_activity.php')) {
-        require_once __DIR__ . '/api_log_activity.php';
-        logActivity('sponsor_activated', 'server', $server_id, null, [
-            'plan_days' => $plan_days,
-            'amount' => $plan_price,
-            'expires_at' => $expires_at
-        ]);
-    }
+    $stmt->execute([$server_id, $expires_at, $hours, $expires_at]);
     
     $pdo->commit();
+    $transaction_started = false; // Transazione completata
+    
+    // Log attività DOPO il commit per evitare interferenze
+    if (file_exists(__DIR__ . '/api_log_activity.php')) {
+        try {
+            require_once __DIR__ . '/api_log_activity.php';
+            logActivity('sponsor_activated', 'server', $server_id, null, [
+                'plan_days' => $plan_days,
+                'amount' => $plan_price,
+                'expires_at' => $expires_at
+            ]);
+        } catch (Exception $logError) {
+            error_log("Errore durante log attività: " . $logError->getMessage());
+        }
+    }
     
     // Invia email di conferma (opzionale)
     // TODO: Implementare invio email
@@ -108,8 +118,13 @@ try {
     ]);
     
 } catch (Exception $e) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
+    // Rollback solo se abbiamo effettivamente iniziato una transazione E c'è ancora una transazione attiva
+    if ($transaction_started && $pdo->inTransaction()) {
+        try {
+            $pdo->rollBack();
+        } catch (PDOException $rollbackError) {
+            error_log("Errore durante rollback: " . $rollbackError->getMessage());
+        }
     }
     
     error_log("Errore PayPal IPN: " . $e->getMessage());

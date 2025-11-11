@@ -4,25 +4,27 @@
  */
 require_once 'config.php';
 
-// Crea tabella se non esiste
+// Crea tabella se non esiste (solo se non siamo in una transazione)
 try {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_activity_logs (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT,
-        action_type VARCHAR(50) NOT NULL,
-        entity_type VARCHAR(50),
-        entity_id INT,
-        old_values TEXT,
-        new_values TEXT,
-        ip_address VARCHAR(45),
-        user_agent TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX(user_id),
-        INDEX(action_type),
-        INDEX(entity_type),
-        INDEX(entity_id),
-        INDEX(created_at)
-    )");
+    if (!$pdo->inTransaction()) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sl_activity_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            action_type VARCHAR(50) NOT NULL,
+            entity_type VARCHAR(50),
+            entity_id INT,
+            old_values TEXT,
+            new_values TEXT,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX(user_id),
+            INDEX(action_type),
+            INDEX(entity_type),
+            INDEX(entity_id),
+            INDEX(created_at)
+        )");
+    }
 } catch (PDOException $e) {
     error_log("Errore creazione tabella activity_logs: " . $e->getMessage());
 }

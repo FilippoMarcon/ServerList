@@ -1281,7 +1281,6 @@
         /* Modern Footer */
         .modern-footer {
             background: var(--secondary-bg);
-            margin-top: 4rem;
             position: relative;
             overflow: hidden;
         }

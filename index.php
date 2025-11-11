@@ -37,7 +37,7 @@ if (preg_match('#^/utente/([0-9]+)(?:-[A-Za-z0-9_-]+)?/?$#', $request_path, $m))
 }
 
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
-if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server|plugin-blocksy|eventi-server|messages)/?$#', $request_path, $m)) {
+if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server|sponsor-payment|plugin-blocksy|eventi-server|messages)/?$#', $request_path, $m)) {
     $map = [
         'forum' => 'forum.php',
         'annunci' => 'annunci.php',
@@ -50,6 +50,7 @@ if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|veri
         'verifica-nickname' => 'verifica-nickname.php',
         'logout' => 'logout.php',
         'sponsorizza-il-tuo-server' => 'sponsorizza.php',
+        'sponsor-payment' => 'sponsor_payment.php',
         'plugin-blocksy' => 'plugin-blocksy.php',
         'eventi-server' => 'eventi-server.php',
         'messages' => 'messages.php',

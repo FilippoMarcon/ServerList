@@ -52,57 +52,24 @@ include 'header.php';
     font-size: 1.1rem;
 }
 
-.pricing-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
+.input-group {
+    display: flex;
+    align-items: stretch;
 }
 
-.pricing-card {
-    background: var(--primary-bg);
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
-    padding: 1.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
+.input-group input {
+    flex: 1;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
 }
 
-.pricing-card:hover {
-    transform: translateY(-4px);
-    border-color: var(--accent-purple);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-}
-
-.pricing-card.selected {
-    border-color: #FFD700;
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
-    box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
-}
-
-.pricing-card .price {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0.5rem 0;
-}
-
-.pricing-card .duration {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-.pricing-card .features {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-}
-
-.pricing-card .feature {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    margin: 0.5rem 0;
+.input-group-text {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    border-left: none;
 }
 
 .form-section {
@@ -165,6 +132,16 @@ include 'header.php';
 .paypal-button-container {
     text-align: center;
     margin-top: 2rem;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#paypal-button-container {
+    max-width: 400px;
+    width: 100%;
 }
 
 .payment-info {
@@ -179,6 +156,22 @@ include 'header.php';
     color: var(--text-primary);
     margin: 0.5rem 0;
     font-size: 0.9rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    color: white;
 }
 </style>
 
@@ -233,35 +226,24 @@ include 'header.php';
             </div>
 
             <div class="form-section">
-                <h3>Scegli il Piano</h3>
-                <div class="pricing-grid">
-                    <div class="pricing-card" data-plan="7" data-price="5.00">
-                        <div class="duration">7 Giorni</div>
-                        <div class="price">€5</div>
-                        <div class="features">
-                            <div class="feature">✓ Sponsorizzazione 7 giorni</div>
-                            <div class="feature">✓ Badge dorato</div>
-                        </div>
+                <h3>Scegli la Durata</h3>
+                <div class="form-group">
+                    <label for="duration">Numero di Giorni</label>
+                    <div class="input-group">
+                        <input type="number" name="duration" id="duration" class="form-control" min="1" max="30" value="7" required style="color: var(--text-primary); font-size: 1rem;">
+                        <span class="input-group-text" style="background: var(--primary-bg); border: 1px solid var(--border-color); color: var(--text-secondary);">giorni</span>
                     </div>
-                    <div class="pricing-card" data-plan="30" data-price="15.00">
-                        <div class="duration">30 Giorni</div>
-                        <div class="price">€15</div>
-                        <div class="features">
-                            <div class="feature">✓ Sponsorizzazione 30 giorni</div>
-                            <div class="feature">✓ Badge dorato</div>
-                            <div class="feature">✓ Risparmio 25%</div>
-                        </div>
-                    </div>
-                    <div class="pricing-card" data-plan="90" data-price="35.00">
-                        <div class="duration">90 Giorni</div>
-                        <div class="price">€35</div>
-                        <div class="features">
-                            <div class="feature">✓ Sponsorizzazione 90 giorni</div>
-                            <div class="feature">✓ Badge dorato</div>
-                            <div class="feature">✓ Risparmio 42%</div>
-                        </div>
-                    </div>
+                    <small class="form-text" style="display: block; margin-top: 0.5rem; color: var(--text-secondary); opacity: 0.9;">Inserisci il numero di giorni (minimo 1, massimo 30)</small>
                 </div>
+                
+                <div class="pricing-info mt-3" style="background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; text-align: center;">
+                    <h6 style="color: var(--text-primary); margin-bottom: 0.5rem;"><i class="bi bi-calculator"></i> Calcolo Prezzo</h6>
+                    <div class="price-display" style="font-size: 2.5rem; font-weight: 700; color: #FFD700; margin: 1rem 0;">
+                        €<span id="totalPrice">35.00</span>
+                    </div>
+                    <small style="color: var(--text-secondary); font-size: 0.95rem;">€5.00 per giorno × <span id="daysDisplay">7</span> giorni</small>
+                </div>
+                
                 <input type="hidden" name="plan_days" id="plan_days" required>
                 <input type="hidden" name="plan_price" id="plan_price" required>
             </div>
@@ -275,6 +257,9 @@ include 'header.php';
 
             <div class="paypal-button-container">
                 <div id="paypal-button-container"></div>
+                <p id="paypal-instructions" style="text-align: center; color: var(--text-secondary); margin-top: 1rem;">
+                    Seleziona un server e un piano per procedere con il pagamento
+                </p>
             </div>
         </form>
 
@@ -282,31 +267,51 @@ include 'header.php';
     </div>
 </div>
 
-<script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=EUR"></script>
+<script src="https://www.paypal.com/sdk/js?client-id=Abuq7FRL7WQPaqKz2fOGd0S1169QgHzbZuv7hA_s5VdD2PtxPOLUsf1gN7KMCSI2w7iThh_p8E9XPDmY&currency=EUR"></script>
 <script>
-// Gestione selezione piano
-document.querySelectorAll('.pricing-card').forEach(card => {
-    card.addEventListener('click', function() {
-        document.querySelectorAll('.pricing-card').forEach(c => c.classList.remove('selected'));
-        this.classList.add('selected');
-        
-        const days = this.dataset.plan;
-        const price = this.dataset.price;
-        
-        document.getElementById('plan_days').value = days;
-        document.getElementById('plan_price').value = price;
-        
-        // Reinizializza PayPal button
-        initPayPalButton();
-    });
-});
+const pricePerDay = 5.00;
+
+// Calcola prezzo in base ai giorni
+function updatePrice() {
+    const durationInput = document.getElementById('duration');
+    const totalPriceElement = document.getElementById('totalPrice');
+    const daysDisplayElement = document.getElementById('daysDisplay');
+    const planDaysInput = document.getElementById('plan_days');
+    const planPriceInput = document.getElementById('plan_price');
+    
+    const days = parseInt(durationInput.value) || 1;
+    const total = (days * pricePerDay).toFixed(2);
+    
+    totalPriceElement.textContent = total;
+    daysDisplayElement.textContent = days;
+    planDaysInput.value = days;
+    planPriceInput.value = total;
+    
+    // Reinizializza PayPal button
+    initPayPalButton();
+}
 
 function initPayPalButton() {
     const price = document.getElementById('plan_price').value;
     const serverId = document.getElementById('server_id').value;
+    const instructions = document.getElementById('paypal-instructions');
     
     if (!price || !serverId) {
+        document.getElementById('paypal-button-container').innerHTML = '';
+        if (instructions) {
+            instructions.style.display = 'block';
+            if (!serverId) {
+                instructions.textContent = 'Seleziona un server per continuare';
+            } else if (!price) {
+                instructions.textContent = 'Inserisci i giorni per continuare';
+            }
+        }
         return;
+    }
+    
+    // Nascondi istruzioni
+    if (instructions) {
+        instructions.style.display = 'none';
     }
     
     // Pulisci container
@@ -335,14 +340,52 @@ function initPayPalButton() {
                     method: 'POST',
                     body: formData
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => {
+                            throw new Error(err.error || 'Errore del server');
+                        });
+                    }
+                    return response.json();
+                })
                 .then(result => {
                     if (result.success) {
-                        alert('Pagamento completato! La tua sponsorizzazione è ora attiva.');
-                        window.location.href = '/profile';
+                        // Mostra messaggio di successo
+                        document.querySelector('.sponsor-payment-card').innerHTML = `
+                            <div style="text-align: center; padding: 3rem;">
+                                <div style="font-size: 4rem; color: #10b981; margin-bottom: 1rem;">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                </div>
+                                <h2 style="color: var(--text-primary); margin-bottom: 1rem;">Pagamento Completato!</h2>
+                                <p style="color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 0.5rem;">
+                                    La sponsorizzazione per <strong>${result.server_name}</strong> è ora attiva
+                                </p>
+                                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                                    Scadenza: ${new Date(result.expires_at).toLocaleString('it-IT')}
+                                </p>
+                                <a href="/profile" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1.1rem;">
+                                    <i class="bi bi-arrow-left"></i> Vai al Profilo
+                                </a>
+                            </div>
+                        `;
                     } else {
-                        alert('Errore nell\'attivazione della sponsorizzazione. Contatta il supporto.');
+                        console.error('Errore:', result);
+                        // Mostra errore nella pagina
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'alert alert-danger';
+                        errorDiv.style.marginTop = '1rem';
+                        errorDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Errore: ' + (result.error || 'Errore sconosciuto');
+                        document.querySelector('.paypal-button-container').prepend(errorDiv);
                     }
+                })
+                .catch(error => {
+                    console.error('Errore completo:', error);
+                    // Mostra errore nella pagina
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'alert alert-danger';
+                    errorDiv.style.marginTop = '1rem';
+                    errorDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Errore nell\'attivazione: ' + error.message;
+                    document.querySelector('.paypal-button-container').prepend(errorDiv);
                 });
             });
         },
@@ -353,8 +396,12 @@ function initPayPalButton() {
     }).render('#paypal-button-container');
 }
 
-// Reinizializza quando cambia il server
+// Event listeners
+document.getElementById('duration').addEventListener('input', updatePrice);
 document.getElementById('server_id').addEventListener('change', initPayPalButton);
+
+// Calcolo iniziale
+updatePrice();
 </script>
 
 <?php include 'footer.php'; ?>
