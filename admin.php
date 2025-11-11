@@ -1458,6 +1458,73 @@ function include_dashboard() {
         'pending_vote_codes' => $pdo->query("SELECT COUNT(*) FROM sl_vote_codes WHERE status = 'pending'")->fetchColumn()
     ];
     
+    // NOTIFICHE - Azioni da fare
+    $notifications = [];
+    
+    // Server in attesa di approvazione
+    if ($stats['pending_servers'] > 0) {
+        $notifications[] = [
+            'type' => 'warning',
+            'icon' => 'bi-server',
+            'title' => 'Server in Attesa',
+            'message' => $stats['pending_servers'] . ' server in attesa di approvazione',
+            'action' => '?action=servers',
+            'action_text' => 'Gestisci Server',
+            'priority' => 'high'
+        ];
+    }
+    
+    // Messaggi non letti
+    try {
+        $unread_messages = $pdo->query("SELECT COUNT(*) FROM sl_messages WHERE is_read = 0 AND parent_id IS NULL")->fetchColumn();
+        if ($unread_messages > 0) {
+            $notifications[] = [
+                'type' => 'info',
+                'icon' => 'bi-envelope',
+                'title' => 'Messaggi Non Letti',
+                'message' => $unread_messages . ' messaggi da leggere',
+                'action' => '?action=messages',
+                'action_text' => 'Leggi Messaggi',
+                'priority' => 'medium'
+            ];
+        }
+    } catch (PDOException $e) {}
+    
+    // Richieste licenze pendenti
+    try {
+        $pending_licenses = $pdo->query("SELECT COUNT(*) FROM sl_license_requests WHERE status = 'pending'")->fetchColumn();
+        if ($pending_licenses > 0) {
+            $notifications[] = [
+                'type' => 'warning',
+                'icon' => 'bi-key',
+                'title' => 'Richieste Licenze',
+                'message' => $pending_licenses . ' richieste di licenza in attesa',
+                'action' => '?action=licenses',
+                'action_text' => 'Gestisci Licenze',
+                'priority' => 'high'
+            ];
+        }
+    } catch (PDOException $e) {}
+    
+    // Reward falliti
+    if ($stats['failed_rewards'] > 0) {
+        $notifications[] = [
+            'type' => 'danger',
+            'icon' => 'bi-exclamation-triangle',
+            'title' => 'Reward Falliti',
+            'message' => $stats['failed_rewards'] . ' reward non consegnati',
+            'action' => '?action=rewards',
+            'action_text' => 'Verifica Reward',
+            'priority' => 'medium'
+        ];
+    }
+    
+    // Ordina notifiche per priorità
+    usort($notifications, function($a, $b) {
+        $priority_order = ['high' => 0, 'medium' => 1, 'low' => 2];
+        return $priority_order[$a['priority']] - $priority_order[$b['priority']];
+    });
+    
     // Utenti recenti
     $recent_users = $pdo->query("SELECT minecraft_nick, data_registrazione FROM sl_users ORDER BY data_registrazione DESC LIMIT 5")->fetchAll();
     
@@ -1497,6 +1564,32 @@ function include_dashboard() {
             <a href="?action=sponsors" class="btn btn-hero"><i class="bi bi-star-fill"></i> Sponsor</a>
         </div>
     </div>
+
+    <!-- Notifiche e Azioni Urgenti -->
+    <?php if (!empty($notifications)): ?>
+    <div class="admin-notifications-section">
+        <h3 style="color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="bi bi-bell-fill" style="color: var(--accent-orange);"></i>
+            Azioni Richieste
+        </h3>
+        <div class="notifications-grid">
+            <?php foreach ($notifications as $notif): ?>
+            <div class="notification-card notification-<?= $notif['type'] ?>">
+                <div class="notification-icon">
+                    <i class="bi <?= $notif['icon'] ?>"></i>
+                </div>
+                <div class="notification-content">
+                    <h4 class="notification-title"><?= $notif['title'] ?></h4>
+                    <p class="notification-message"><?= $notif['message'] ?></p>
+                    <a href="<?= $notif['action'] ?>" class="notification-action">
+                        <?= $notif['action_text'] ?> <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Statistiche principali - nuove metriche -->
     <div class="admin-stats-grid">

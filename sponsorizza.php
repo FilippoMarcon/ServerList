@@ -126,6 +126,18 @@ include 'header.php';
                     </div>
                 <?php endif; ?>
 
+                <!-- Pulsante Pagamento PayPal -->
+                <div class="text-center mb-5">
+                    <a href="/sponsor_payment.php" class="btn btn-lg" style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #000; font-weight: 700; padding: 1rem 2rem; border-radius: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.75rem; box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4); transition: all 0.3s ease;">
+                        <i class="bi bi-credit-card" style="font-size: 1.5rem;"></i>
+                        <span>Sponsorizza Ora con PayPal</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                    <p style="color: var(--text-secondary); margin-top: 1rem; font-size: 0.9rem;">
+                        Pagamento sicuro • Attivazione immediata • A partire da €5
+                    </p>
+                </div>
+
                 <!-- Come Funziona -->
                 <div class="info-section mb-5">
                     <h2 class="section-title">

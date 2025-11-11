@@ -165,10 +165,11 @@ function sanitize($data) {
 
 /**
  * Sanitizza il contenuto HTML di Quill preservando la formattazione sicura
+ * Supporta anche immagini da Imgur
  */
 function sanitizeQuillContent($data) {
-    // Lista di tag HTML sicuri permessi da Quill
-    $allowed_tags = '<p><br><strong><b><em><i><u><ol><ul><li><h1><h2><h3><h4><h5><h6><blockquote><a><span><div>';
+    // Lista di tag HTML sicuri permessi da Quill + img per le immagini
+    $allowed_tags = '<p><br><strong><b><em><i><u><ol><ul><li><h1><h2><h3><h4><h5><h6><blockquote><a><span><div><img>';
     
     // Rimuove tag non sicuri ma preserva quelli di formattazione
     $cleaned = strip_tags(trim($data), $allowed_tags);

@@ -5545,6 +5545,121 @@
               font-weight: 500;
           }
 
+          /* Notifiche Dashboard */
+          .admin-notifications-section {
+              margin-bottom: 2rem;
+          }
+          
+          .notifications-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+              gap: 1rem;
+          }
+          
+          .notification-card {
+              background: var(--card-bg);
+              border-radius: 12px;
+              padding: 1.5rem;
+              border-left: 4px solid;
+              display: flex;
+              gap: 1rem;
+              transition: all 0.3s ease;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          }
+          
+          .notification-card:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+          }
+          
+          .notification-warning {
+              border-left-color: #f59e0b;
+              background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%);
+          }
+          
+          .notification-danger {
+              border-left-color: #ef4444;
+              background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, transparent 100%);
+          }
+          
+          .notification-info {
+              border-left-color: #3b82f6;
+              background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+          }
+          
+          .notification-success {
+              border-left-color: #10b981;
+              background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, transparent 100%);
+          }
+          
+          .notification-icon {
+              width: 48px;
+              height: 48px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 1.5rem;
+              flex-shrink: 0;
+          }
+          
+          .notification-warning .notification-icon {
+              background: rgba(245, 158, 11, 0.1);
+              color: #f59e0b;
+          }
+          
+          .notification-danger .notification-icon {
+              background: rgba(239, 68, 68, 0.1);
+              color: #ef4444;
+          }
+          
+          .notification-info .notification-icon {
+              background: rgba(59, 130, 246, 0.1);
+              color: #3b82f6;
+          }
+          
+          .notification-success .notification-icon {
+              background: rgba(16, 185, 129, 0.1);
+              color: #10b981;
+          }
+          
+          .notification-content {
+              flex: 1;
+          }
+          
+          .notification-title {
+              font-size: 1rem;
+              font-weight: 700;
+              color: var(--text-primary);
+              margin: 0 0 0.5rem 0;
+          }
+          
+          .notification-message {
+              font-size: 0.9rem;
+              color: var(--text-secondary);
+              margin: 0 0 1rem 0;
+          }
+          
+          .notification-action {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.5rem;
+              padding: 0.5rem 1rem;
+              background: var(--gradient-primary);
+              color: white;
+              text-decoration: none;
+              border-radius: 8px;
+              font-size: 0.875rem;
+              font-weight: 600;
+              transition: all 0.3s ease;
+          }
+          
+          .notification-action:hover {
+              transform: translateX(4px);
+              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+              color: white;
+          }
+
           .stat-icon {
               width: 60px;
               height: 60px;

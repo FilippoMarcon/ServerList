@@ -448,6 +448,22 @@ include 'header.php';
     margin: 1rem 0;
 }
 
+/* Immagini nella descrizione (Imgur) */
+.server-description .description-text img {
+    max-width: 100%;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 1rem 0;
+    display: block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.server-description .description-text img[style*="width"] {
+    width: auto !important;
+    max-width: 100%;
+}
+
 .server-description .description-text pre code {
     background: transparent;
     padding: 0;

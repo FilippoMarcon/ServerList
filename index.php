@@ -61,6 +61,12 @@ if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|veri
     }
 }
 
+// Se la richiesta non è la homepage e non corrisponde a nessuna route, mostra 404
+if ($request_path !== '/' && $request_path !== '/index.php' && $request_path !== '') {
+    include __DIR__ . '/404.php';
+    exit();
+}
+
 // Titolo pagina
 $page_title = "Lista Server";
 
