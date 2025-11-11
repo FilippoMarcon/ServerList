@@ -761,6 +761,15 @@ include 'header.php';
         .server-description .description-text * {
             /* Gli stili inline hanno automaticamente precedenza */
         }
+        
+        /* Stili per le immagini nella descrizione */
+        .server-description .description-text img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: block;
+            cursor: pointer;
+        }
 
 /* Server Header Layout */
 .server-header-container {
@@ -2031,8 +2040,76 @@ document.addEventListener('DOMContentLoaded', function() {
         border-color: var(--accent-purple);
         color: white;
     }
+    
+    /* Lightbox per immagini */
+    .image-lightbox {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+    }
+    
+    .image-lightbox.active {
+        display: flex;
+    }
+    
+    .image-lightbox img {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+    }
+    
+    .image-lightbox-close {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        font-size: 40px;
+        color: white;
+        cursor: pointer;
+        z-index: 10000;
+    }
 </style>
 
+<!-- Lightbox per immagini -->
+<div class="image-lightbox" id="imageLightbox" onclick="closeLightbox()">
+    <span class="image-lightbox-close">&times;</span>
+    <img id="lightboxImage" src="" alt="Immagine ingrandita">
+</div>
 
+<script>
+// Lightbox per immagini nella descrizione
+document.addEventListener('DOMContentLoaded', function() {
+    const descriptionImages = document.querySelectorAll('.server-description .description-text img');
+    const lightbox = document.getElementById('imageLightbox');
+    const lightboxImg = document.getElementById('lightboxImage');
+    
+    descriptionImages.forEach(img => {
+        img.style.cursor = 'pointer';
+        img.addEventListener('click', function(e) {
+            e.stopPropagation();
+            lightboxImg.src = this.src;
+            lightbox.classList.add('active');
+        });
+    });
+});
+
+function closeLightbox() {
+    document.getElementById('imageLightbox').classList.remove('active');
+}
+
+// Chiudi lightbox con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeLightbox();
+    }
+});
+</script>
 
 <?php include 'footer.php'; ?>

@@ -192,6 +192,14 @@
                 editorContainer.style.color = 'white';
                 textarea.parentNode.insertBefore(editorContainer, textarea);
                 
+                // Aggiungi suggerimento per le immagini
+                const imageHint = document.createElement('small');
+                imageHint.style.display = 'block';
+                imageHint.style.marginTop = '0.5rem';
+                imageHint.style.color = '#6c757d';
+                imageHint.innerHTML = '<i class="bi bi-info-circle"></i> Per aggiungere immagini: caricale su <a href="https://imgur.com" target="_blank" style="color: #667eea;">Imgur</a> e usa il pulsante immagine nell\'editor';
+                textarea.parentNode.insertBefore(imageHint, textarea);
+                
                 // Inizializza Quill
                 const quill = new Quill('#quill-editor', {
                     theme: 'snow',
@@ -205,6 +213,23 @@
                             ['link', 'image'],
                             ['clean']
                         ]
+                    }
+                });
+                
+                // Handler personalizzato per le immagini Imgur
+                const toolbar = quill.getModule('toolbar');
+                toolbar.addHandler('image', function() {
+                    const url = prompt('Inserisci l\'URL dell\'immagine Imgur:\n\n1. Carica la tua immagine su https://imgur.com\n2. Copia il link diretto (es: https://i.imgur.com/xxxxx.png)\n3. Incollalo qui sotto:');
+                    
+                    if (url) {
+                        // Verifica che sia un URL valido
+                        if (url.match(/^https?:\/\/(i\.)?imgur\.com\/.+\.(jpg|jpeg|png|gif|webp)$/i) || url.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i)) {
+                            const range = quill.getSelection(true);
+                            quill.insertEmbed(range.index, 'image', url);
+                            quill.setSelection(range.index + 1);
+                        } else {
+                            alert('⚠️ URL non valido!\n\nAssicurati che:\n- Sia un link diretto all\'immagine\n- Termini con .png, .jpg, .jpeg, .gif o .webp\n\nEsempio: https://i.imgur.com/xxxxx.png');
+                        }
                     }
                 });
                 

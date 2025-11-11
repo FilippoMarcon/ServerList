@@ -173,8 +173,33 @@ function sanitizeQuillContent($data) {
     // Sanitizza gli attributi dei link per sicurezza
     $cleaned = preg_replace('/<a\s+[^>]*href\s*=\s*["\']([^"\']*)["\'][^>]*>/i', '<a href="$1" target="_blank" rel="noopener noreferrer">', $cleaned);
     
+    // Sanitizza le immagini mantenendo src e alt
+    $cleaned = preg_replace_callback('/<img\s+[^>]*>/i', function($matches) {
+        $img_tag = $matches[0];
+        $src = '';
+        $alt = '';
+        
+        // Estrai src
+        if (preg_match('/src\s*=\s*["\']([^"\']*)["\']/', $img_tag, $src_match)) {
+            $src = $src_match[1];
+            // Verifica che sia un URL sicuro (https)
+            if (preg_match('/^https:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i', $src)) {
+                $src = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
+            } else {
+                return ''; // Rimuovi immagini non sicure
+            }
+        }
+        
+        // Estrai alt (opzionale)
+        if (preg_match('/alt\s*=\s*["\']([^"\']*)["\']/', $img_tag, $alt_match)) {
+            $alt = htmlspecialchars($alt_match[1], ENT_QUOTES, 'UTF-8');
+        }
+        
+        return $src ? '<img src="' . $src . '" alt="' . $alt . '">' : '';
+    }, $cleaned);
+    
     // Rimuove solo attributi pericolosi ma preserva style e class per Quill
-    $cleaned = preg_replace('/<(\w+)\s+[^>]*?(on\w+|javascript:|data:)[^>]*?>/i', '<$1>', $cleaned);
+    $cleaned = preg_replace('/<(\w+)\s+[^>]*?(on\w+|javascript:)[^>]*?>/i', '<$1>', $cleaned);
     
     // Sanitizza gli attributi style per permettere solo proprietà CSS sicure
     $cleaned = preg_replace_callback('/style\s*=\s*["\']([^"\']*)["\']/', function($matches) {
