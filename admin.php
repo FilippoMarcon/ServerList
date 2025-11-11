@@ -2535,8 +2535,8 @@ function include_sponsors() {
                                         <span class="badge bg-danger">Disattivato</span>
                                     <?php endif; ?>
                                 </td>
-                                <td style="max-width:180px;">
-                                    <input type="date" class="form-control form-control-sm" id="expires-<?= (int)$sp['id'] ?>" value="<?= !empty($sp['expires_at']) ? date('Y-m-d', strtotime($sp['expires_at'])) : '' ?>">
+                                <td style="max-width:200px;">
+                                    <input type="datetime-local" class="form-control form-control-sm" id="expires-<?= (int)$sp['id'] ?>" value="<?= !empty($sp['expires_at']) ? date('Y-m-d\TH:i', strtotime($sp['expires_at'])) : '' ?>">
                                     <small class="text-secondary">Vuoto = senza scadenza</small>
                                 </td>
                                 <td><small><?= htmlspecialchars(date('Y-m-d H:i', strtotime($sp['created_at']))) ?></small></td>
@@ -2592,7 +2592,7 @@ function include_sponsors() {
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Scadenza (opzionale)</label>
-                                    <input type="date" id="sponsorExpires" class="form-control">
+                                    <input type="datetime-local" id="sponsorExpires" class="form-control">
                                 </div>
                                 <div class="col-md-4 d-flex align-items-end">
                                     <button class="btn btn-warning btn-admin w-100" onclick="addSponsorship()"><i class="bi bi-plus-lg"></i> Crea Sponsor</button>
