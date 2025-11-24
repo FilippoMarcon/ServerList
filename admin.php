@@ -35,8 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                     'sponsored_servers' => $pdo->query("SELECT COUNT(*) FROM sl_sponsored_servers WHERE is_active = 1")->fetchColumn(),
                     'total_votes' => $pdo->query("SELECT COUNT(*) FROM sl_votes")->fetchColumn(),
                     'today_votes' => $pdo->query("SELECT COUNT(*) FROM sl_votes WHERE DATE(data_voto) = CURDATE()")->fetchColumn(),
-                    'total_licenses' => $pdo->query("SELECT COUNT(*) FROM sl_server_licenses")->fetchColumn(),
-                    'active_licenses' => $pdo->query("SELECT COUNT(*) FROM sl_server_licenses WHERE is_active = 1")->fetchColumn(),
+                    'servers_with_api_key' => $pdo->query("SELECT COUNT(*) FROM sl_servers WHERE api_key IS NOT NULL")->fetchColumn(),
                     'total_rewards' => $pdo->query("SELECT COUNT(*) FROM sl_reward_logs")->fetchColumn(),
                     'successful_rewards' => $pdo->query("SELECT COUNT(*) FROM sl_reward_logs WHERE reward_status = 'success'")->fetchColumn(),
                     'failed_rewards' => $pdo->query("SELECT COUNT(*) FROM sl_reward_logs WHERE reward_status = 'error'")->fetchColumn(),
@@ -383,6 +382,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 echo json_encode(['success' => true, 'message' => 'Licenza eliminata']);
                 break;
 
+            case 'generate_api_key':
+                $server_id = isset($_POST['server_id']) ? (int)$_POST['server_id'] : null;
+                
+                if (!$server_id) {
+                    echo json_encode(['success' => false, 'message' => 'Server ID mancante']);
+                    exit;
+                }
+                
+                try {
+                    // Verifica che il server esista
+                    $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE id = ?");
+                    $stmt->execute([$server_id]);
+                    $server = $stmt->fetch();
+                    
+                    if (!$server) {
+                        echo json_encode(['success' => false, 'message' => 'Server non trovato']);
+                        exit;
+                    }
+                    
+                    // Genera API key univoca (64 caratteri)
+                    $api_key = bin2hex(random_bytes(32));
+                    
+                    // Aggiorna il server
+                    $stmt = $pdo->prepare("UPDATE sl_servers SET api_key = ? WHERE id = ?");
+                    $stmt->execute([$api_key, $server_id]);
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'API key generata con successo',
+                        'api_key' => $api_key,
+                        'server_name' => $server['nome']
+                    ]);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'message' => 'Errore: ' . $e->getMessage()]);
+                }
+                break;
+            
             case 'generate_license':
                 $server_id = isset($_POST['server_id']) ? (int)$_POST['server_id'] : null;
                 
@@ -1224,8 +1260,8 @@ include 'header.php';
                     <a href="?action=rewards" class="admin-nav-item <?= $action === 'rewards' ? 'active' : '' ?>">
                         <i class="bi bi-gift"></i> Gestione Reward
                     </a>
-                    <a href="?action=licenses" class="admin-nav-item <?= $action === 'licenses' ? 'active' : '' ?>">
-                        <i class="bi bi-key"></i> Gestione Licenze
+                    <a href="?action=api_keys" class="admin-nav-item <?= $action === 'api_keys' ? 'active' : '' ?>">
+                        <i class="bi bi-key"></i> Gestione API Keys
                     </a>
                     <a href="?action=verify_minecraft" class="admin-nav-item <?= $action === 'verify_minecraft' ? 'active' : '' ?>">
                         <i class="bi bi-check2-circle"></i> Verifica Minecraft (SP)
@@ -1283,8 +1319,8 @@ include 'header.php';
                         case 'rewards':
                             include_rewards();
                             break;
-                        case 'licenses':
-                            include_licenses();
+                        case 'api_keys':
+                            include_api_keys();
                             break;
                         case 'annunci':
                             include_annunci();
@@ -1620,9 +1656,9 @@ function include_dashboard() {
         <div class="metric-card">
             <div class="metric-icon"><i class="bi bi-key-fill"></i></div>
             <div class="metric-content">
-                <p class="metric-label">Licenze</p>
-                <h3 class="metric-value" id="total_licenses" data-count="<?= (int)$stats['total_licenses'] ?>"><?= (int)$stats['total_licenses'] ?></h3>
-                <span class="metric-meta">Attive: <?= (int)$stats['active_licenses'] ?></span>
+                <p class="metric-label">API Keys</p>
+                <h3 class="metric-value" id="servers_with_api_key" data-count="<?= (int)$stats['servers_with_api_key'] ?>"><?= (int)$stats['servers_with_api_key'] ?></h3>
+                <span class="metric-meta"><a href="/admin_generate_api_key" class="text-primary">Gestisci →</a></span>
             </div>
         </div>
     </div>
@@ -3309,7 +3345,271 @@ function include_rewards() {
      <?php
  }
  
- function include_licenses() {
+ function include_api_keys() {
+    global $pdo;
+    
+    $page = (int)($_GET['page'] ?? 1);
+    $limit = 20;
+    $offset = ($page - 1) * $limit;
+    $search = $_GET['search'] ?? '';
+    
+    // Statistiche API Keys
+    try {
+        $total_servers = $pdo->query("SELECT COUNT(*) FROM sl_servers")->fetchColumn();
+        $servers_with_api_key = $pdo->query("SELECT COUNT(*) FROM sl_servers WHERE api_key IS NOT NULL")->fetchColumn();
+        $servers_without_api_key = $total_servers - $servers_with_api_key;
+    } catch (PDOException $e) {
+        $total_servers = 0;
+        $servers_with_api_key = 0;
+        $servers_without_api_key = 0;
+    }
+    
+    // Query server con filtro ricerca
+    $where_clause = '';
+    $params = [];
+    
+    if ($search) {
+        $where_clause = "WHERE s.nome LIKE ? OR s.ip LIKE ? OR s.api_key LIKE ?";
+        $params = ["%$search%", "%$search%", "%$search%"];
+    }
+    
+    $query = "
+        SELECT s.id, s.nome, s.ip, s.api_key, s.is_active, s.data_inserimento,
+               COALESCE(ml.minecraft_nick, u.minecraft_nick) as owner_name
+        FROM sl_servers s
+        LEFT JOIN sl_users u ON s.owner_id = u.id
+        LEFT JOIN sl_minecraft_links ml ON u.id = ml.user_id
+        $where_clause
+        ORDER BY s.data_inserimento DESC
+        LIMIT $limit OFFSET $offset
+    ";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    $servers = $stmt->fetchAll();
+    
+    // Conta totale per paginazione
+    $count_query = "SELECT COUNT(*) FROM sl_servers s $where_clause";
+    $stmt = $pdo->prepare($count_query);
+    $stmt->execute($params);
+    $total = $stmt->fetchColumn();
+    $total_pages = ceil($total / $limit);
+    ?>
+    
+    <h2><i class="bi bi-key"></i> Gestione API Keys</h2>
+    <p class="text-secondary">Gestisci le API keys per il sistema di voti</p>
+    
+    <!-- Statistiche -->
+    <div class="admin-stats-grid mb-4">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-collection"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Server Totali</p>
+                <h3 class="metric-value text-light"><?= $total_servers ?></h3>
+                <span class="metric-meta">Registrati</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-key-fill"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Con API Key</p>
+                <h3 class="metric-value text-success"><?= $servers_with_api_key ?></h3>
+                <span class="metric-meta">Configurate</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="metric-content">
+                <p class="metric-label">Senza API Key</p>
+                <h3 class="metric-value text-warning"><?= $servers_without_api_key ?></h3>
+                <span class="metric-meta">Da configurare</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filtri e Ricerca -->
+    <div class="mb-4">
+        <form method="GET" class="row g-3">
+            <input type="hidden" name="action" value="api_keys">
+            <div class="col-md-6">
+                <input type="text" name="search" class="form-control" placeholder="Cerca per nome, IP o API key..." value="<?= htmlspecialchars($search) ?>">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Cerca
+                </button>
+            </div>
+            <div class="col-md-3">
+                <a href="?action=api_keys" class="btn btn-secondary w-100">
+                    <i class="bi bi-x-circle"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Tabella Server -->
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Server e API Keys</h5>
+            <span class="badge bg-primary"><?= $total ?> server</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome Server</th>
+                            <th>IP</th>
+                            <th>Owner</th>
+                            <th>API Key</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($servers)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
+                                    <p class="text-muted mt-2">Nessun server trovato</p>
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($servers as $server): ?>
+                                <tr>
+                                    <td><?= $server['id'] ?></td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($server['nome']) ?></strong>
+                                    </td>
+                                    <td>
+                                        <code><?= htmlspecialchars($server['ip']) ?></code>
+                                    </td>
+                                    <td><?= htmlspecialchars($server['owner_name'] ?? 'N/A') ?></td>
+                                    <td>
+                                        <?php if ($server['api_key']): ?>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <code class="api-key-display" style="font-size: 0.85rem;">
+                                                    <?= substr($server['api_key'], 0, 16) ?>...
+                                                </code>
+                                                <button class="btn btn-sm btn-outline-secondary copy-api-key" 
+                                                        data-key="<?= htmlspecialchars($server['api_key']) ?>"
+                                                        title="Copia API key">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="badge bg-warning">Non generata</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($server['is_active'] == 1): ?>
+                                            <span class="badge bg-success">Attivo</span>
+                                        <?php elseif ($server['is_active'] == 2): ?>
+                                            <span class="badge bg-warning">In attesa</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-danger">Disattivato</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($server['api_key']): ?>
+                                            <button class="btn btn-sm btn-warning regenerate-api-key" 
+                                                    data-server-id="<?= $server['id'] ?>"
+                                                    data-server-name="<?= htmlspecialchars($server['nome']) ?>">
+                                                <i class="bi bi-arrow-clockwise"></i> Rigenera
+                                            </button>
+                                        <?php else: ?>
+                                            <button class="btn btn-sm btn-success generate-api-key" 
+                                                    data-server-id="<?= $server['id'] ?>"
+                                                    data-server-name="<?= htmlspecialchars($server['nome']) ?>">
+                                                <i class="bi bi-plus-circle"></i> Genera
+                                            </button>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        
+        <!-- Paginazione -->
+        <?php if ($total_pages > 1): ?>
+            <nav class="mt-3">
+                <ul class="pagination justify-content-center mb-0">
+                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                        <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                            <a class="page-link" href="?action=api_keys&page=<?= $i ?><?= $search ? '&search=' . urlencode($search) : '' ?>">
+                                <?= $i ?>
+                            </a>
+                        </li>
+                    <?php endfor; ?>
+                </ul>
+            </nav>
+        <?php endif; ?>
+    </div>
+    
+    <!-- Info Box -->
+    <div class="alert alert-info mt-4">
+        <h5><i class="bi bi-info-circle"></i> Come funziona</h5>
+        <ul class="mb-0">
+            <li>Ogni server ha una API key univoca di 64 caratteri</li>
+            <li>Il plugin usa questa key per recuperare i voti tramite polling</li>
+            <li>Puoi rigenerare una key in qualsiasi momento (il plugin dovrà essere riconfigurato)</li>
+            <li>Le API keys sono necessarie per il nuovo sistema di voti (identico a MinecraftITALIA)</li>
+        </ul>
+    </div>
+    
+    <script>
+    // Genera API Key
+    document.querySelectorAll('.generate-api-key, .regenerate-api-key').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+            const isRegenerate = this.classList.contains('regenerate-api-key');
+            
+            if (isRegenerate && !confirm(`Vuoi rigenerare l'API key per "${serverName}"?\n\nATTENZIONE: La vecchia key smetterà di funzionare!`)) {
+                return;
+            }
+            
+            if (!isRegenerate && !confirm(`Generare API key per "${serverName}"?`)) {
+                return;
+            }
+            
+            fetch('', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `ajax=1&action=generate_api_key&server_id=${serverId}`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✓ API key generata con successo!\n\nKey: ' + data.api_key + '\n\nLa key è stata copiata negli appunti.');
+                    navigator.clipboard.writeText(data.api_key);
+                    location.reload();
+                } else {
+                    alert('✗ Errore: ' + data.message);
+                }
+            });
+        });
+    });
+    
+    // Copia API Key
+    document.querySelectorAll('.copy-api-key').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const key = this.dataset.key;
+            navigator.clipboard.writeText(key).then(() => {
+                const icon = this.querySelector('i');
+                icon.className = 'bi bi-check';
+                setTimeout(() => icon.className = 'bi bi-clipboard', 2000);
+            });
+        });
+    });
+    </script>
+    
+    <?php
+}
+
+function include_licenses_old() {
     global $pdo;
     
     $page = (int)($_GET['page'] ?? 1);

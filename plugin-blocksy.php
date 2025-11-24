@@ -31,10 +31,20 @@ include 'header.php';
                     </h2>
                     <div class="info-card">
                         <p>
-                            <strong>Blocksy</strong> è un plugin per server Minecraft che permette di ricevere automaticamente i reward quando voti per un server su <?php echo SITE_NAME; ?>.
+                            <strong>Blocksy</strong> è un plugin avanzato per server Minecraft (Spigot/Paper) che automatizza completamente la gestione dei voti. 
+                            Utilizza un sistema di <strong>polling API</strong> per recuperare i voti dal sito e si integra con <strong>NuVotifier</strong> per la massima compatibilità.
                         </p>
                         <p>
-                            Quando voti per un server, il plugin rileva automaticamente il tuo voto e esegue i comandi configurati dall'owner del server, permettendoti di ricevere istantaneamente i premi senza dover inserire codici manualmente.
+                            Quando un giocatore vota per il tuo server su <?php echo SITE_NAME; ?>, il plugin:
+                        </p>
+                        <ul>
+                            <li>Rileva automaticamente il voto tramite API (nessuna configurazione porte necessaria)</li>
+                            <li>Crea un evento Votifier standard che tutti i plugin compatibili possono ricevere</li>
+                            <li>Esegue i comandi reward configurati dall'owner del server</li>
+                            <li>Consegna i premi istantaneamente al giocatore (se online) o al prossimo login</li>
+                        </ul>
+                        <p class="mb-0">
+                            <strong>Zero configurazione di rete richiesta</strong> - funziona ovunque, anche dietro NAT o proxy!
                         </p>
                     </div>
                 </div>
@@ -42,24 +52,79 @@ include 'header.php';
                 <!-- Come Funziona -->
                 <div class="info-section mb-5">
                     <h2 class="section-title">
-                        <i class="bi bi-gear"></i> Come Funziona?
+                        <i class="bi bi-gear"></i> Come Funziona il Sistema?
                     </h2>
+                    
+                    <div class="info-card mb-4">
+                        <h4><i class="bi bi-diagram-3"></i> Architettura del Sistema</h4>
+                        <p>
+                            Blocksy utilizza un sistema di <strong>polling API</strong> moderno e affidabile che elimina la necessità di configurare porte o firewall. 
+                            Il plugin si integra perfettamente con <strong>NuVotifier</strong>, rendendolo compatibile con tutti i plugin che supportano Votifier.
+                        </p>
+                        
+                        <div class="alert-card alert-success mt-3">
+                            <i class="bi bi-check-circle-fill"></i>
+                            <div>
+                                <strong>Vantaggi:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>✅ Nessuna configurazione porte o firewall</li>
+                                    <li>✅ Funziona dietro NAT e proxy</li>
+                                    <li>✅ Compatibile con tutti i plugin Votifier</li>
+                                    <li>✅ Sistema affidabile al 100%</li>
+                                    <li>✅ Facile da configurare</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4 class="mb-3"><i class="bi bi-arrow-repeat"></i> Flusso del Voto</h4>
                     <div class="steps-grid">
                         <div class="step-card">
                             <div class="step-number">1</div>
-                            <h3>Vota il Server</h3>
-                            <p>Vota il tuo server preferito dalla lista</p>
+                            <h3>Voti sul Sito</h3>
+                            <p>Il voto viene salvato nel database con stato "pendente"</p>
                         </div>
                         <div class="step-card">
                             <div class="step-number">2</div>
-                            <h3>Entra nel Server</h3>
-                            <p>Connettiti al server Minecraft</p>
+                            <h3>Plugin Fa Polling</h3>
+                            <p>Ogni 15 secondi il plugin controlla se ci sono nuovi voti tramite API</p>
                         </div>
                         <div class="step-card">
                             <div class="step-number">3</div>
-                            <h3>Ricevi il Reward</h3>
-                            <p>Il plugin esegue automaticamente i comandi configurati</p>
+                            <h3>Evento Votifier</h3>
+                            <p>Il plugin crea un evento Votifier che viene ricevuto da tutti i plugin compatibili</p>
                         </div>
+                        <div class="step-card">
+                            <div class="step-number">4</div>
+                            <h3>Reward Automatici</h3>
+                            <p>I comandi configurati vengono eseguiti e ricevi i premi istantaneamente</p>
+                        </div>
+                    </div>
+                    
+                    <div class="info-card mt-4">
+                        <h4><i class="bi bi-key"></i> Sistema API Key</h4>
+                        <p>
+                            Ogni server ha una <strong>API key univoca</strong> di 64 caratteri che il plugin usa per autenticarsi con il sito. 
+                            Questa chiave sostituisce il vecchio sistema di licenze ed è molto più semplice da gestire.
+                        </p>
+                        <p class="mb-0">
+                            <strong>Nota:</strong> Solo gli amministratori del sito possono generare le API keys. 
+                            Se sei un owner di un server, contatta un admin per richiedere la tua API key.
+                        </p>
+                    </div>
+                    
+                    <div class="info-card mt-3">
+                        <h4><i class="bi bi-plugin"></i> Integrazione con Votifier</h4>
+                        <p>
+                            Blocksy si integra nativamente con <strong>NuVotifier</strong>, il sistema standard per gestire i voti nei server Minecraft. 
+                            Questo significa che:
+                        </p>
+                        <ul class="mb-0">
+                            <li>Tutti i plugin che supportano Votifier funzioneranno automaticamente</li>
+                            <li>Puoi usare plugin come VotingPlugin, SuperbVote, GAListener insieme a Blocksy</li>
+                            <li>Gli eventi di voto vengono gestiti in modo standard e compatibile</li>
+                            <li>Non serve configurare Votifier direttamente - Blocksy lo fa per te</li>
+                        </ul>
                     </div>
                 </div>
 
@@ -82,13 +147,13 @@ include 'header.php';
                         <div class="alert-card alert-info mt-3 mb-3" style="background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.3);">
                             <i class="bi bi-key-fill" style="color: #7c3aed;"></i>
                             <div>
-                                <strong>Nota sulla Licenza:</strong> La licenza del server deve essere la stessa in tutte le modalità dove installi il plugin Blocksy. Usa la stessa license key nel config.yml di ogni modalità.
+                                <strong>Nota sull'API Key:</strong> L'API key del server deve essere la stessa in tutte le modalità dove installi il plugin Blocksy. Usa la stessa api-key nel config.yml di ogni modalità.
                             </div>
                         </div>
                         <h4 class="mt-3">Esempio:</h4>
                         <ul>
                             <li>Hai votato per "MioServer" che ha 3 modalità: Survival, Skyblock e Creative</li>
-                            <li>Tutte e 3 le modalità hanno il plugin Blocksy installato con la <strong>stessa licenza</strong> ma comandi diversi:
+                            <li>Tutte e 3 le modalità hanno il plugin Blocksy installato con la <strong>stessa API key</strong> ma comandi diversi:
                                 <ul style="margin-top: 0.5rem;">
                                     <li><strong>Survival:</strong> <code>give %player% diamond 5</code></li>
                                     <li><strong>Skyblock:</strong> <code>is level add %player% 100</code></li>
@@ -122,9 +187,9 @@ include 'header.php';
                         <div class="install-step">
                             <div class="install-step-header">
                                 <span class="install-step-number">2</span>
-                                <h3>Richiedi la Licenza</h3>
+                                <h3>Richiedi l'API Key</h3>
                             </div>
-                            <p>Una volta approvato il server, vai nella sezione <strong>Gestione Server</strong> del tuo profilo e clicca su <strong>"Richiedi Licenza"</strong> per il tuo server. Gli admin approveranno la richiesta.</p>
+                            <p>Una volta approvato il server, contatta un amministratore per richiedere l'API key del tuo server. Gli admin la genereranno tramite il pannello di controllo.</p>
                         </div>
 
                         <div class="install-step">
@@ -132,7 +197,7 @@ include 'header.php';
                                 <span class="install-step-number">3</span>
                                 <h3>Scarica il Plugin</h3>
                             </div>
-                            <p>Dopo l'approvazione della licenza, nella sezione <strong>Licenze dei Server</strong> del tuo profilo troverai il link per scaricare il plugin Blocksy (.jar)</p>
+                            <p>Scarica il plugin Blocksy (.jar) direttamente da questa pagina o dal tuo profilo.</p>
                         </div>
 
                         <div class="install-step">
@@ -148,10 +213,11 @@ include 'header.php';
                                 <span class="install-step-number">5</span>
                                 <h3>Configura il Plugin</h3>
                             </div>
-                            <p>Copia la tua license key dalla sezione <strong>Licenze dei Server</strong> (clicca su "Visualizza" per vederla) e inseriscila nel file di configurazione insieme ai comandi reward:</p>
+                            <p>Ricevi l'API key dall'amministratore e inseriscila nel file di configurazione insieme ai comandi reward:</p>
                             <div class="code-block">
                                 <pre><code># plugins/Blocksy/config.yml
-license-key: "TUA-LICENZA-QUI"
+api-key: "TUA-API-KEY-QUI"
+check-interval: 15
 commands:
   - "give %player% diamond 5"
   - "eco give %player% 1000"
@@ -208,7 +274,7 @@ commands:
                         <div class="code-block">
                             <pre><code># Comandi disponibili (solo per OP/Admin)
 /blocksy help                  - Mostra l'elenco dei comandi disponibili
-/blocksy debug                 - Mostra informazioni di debug (licenza, endpoint, stato)
+/blocksy debug                 - Mostra informazioni di debug (API key, endpoint, stato)
 /blocksy reload                - Ricarica la configurazione del plugin
 /blocksy interval &lt;secondi&gt;    - Imposta l'intervallo di controllo voti (10-3600 secondi)
 
@@ -249,7 +315,7 @@ commands:
                         </div>
                         <div class="faq-item">
                             <h4>Devo installare il plugin su tutte le modalità del mio network?</h4>
-                            <p>Sì, se vuoi che i reward vengano consegnati su tutte le modalità. Ricorda di usare la stessa licenza ma puoi configurare comandi diversi per ogni modalità.</p>
+                            <p>Sì, se vuoi che i reward vengano consegnati su tutte le modalità. Ricorda di usare la stessa API key ma puoi configurare comandi diversi per ogni modalità.</p>
                         </div>
                         <div class="faq-item">
                             <h4>Il plugin funziona con BungeeCord/Velocity?</h4>
@@ -257,7 +323,7 @@ commands:
                         </div>
                         <div class="faq-item">
                             <h4>Come faccio a sapere se il plugin funziona?</h4>
-                            <p>Dopo l'installazione, controlla la console del server per messaggi di conferma. Puoi anche usare il comando <code>/blocksy debug</code> per verificare lo stato della licenza e la configurazione.</p>
+                            <p>Dopo l'installazione, controlla la console del server per messaggi di conferma. Puoi anche usare il comando <code>/blocksy debug</code> per verificare lo stato dell'API key e la configurazione.</p>
                         </div>
                         <div class="faq-item">
                             <h4>Il plugin rallenta il server?</h4>
@@ -268,8 +334,8 @@ commands:
                             <p>Sì! Puoi usare <code>%player%</code> per il nome del giocatore. Se hai PlaceholderAPI installato, puoi usare anche tutti i suoi placeholder.</p>
                         </div>
                         <div class="faq-item">
-                            <h4>Cosa succede se la mia licenza scade o viene disattivata?</h4>
-                            <p>Il plugin smetterà di funzionare e i reward non verranno più consegnati. Contatta gli amministratori di <?php echo SITE_NAME; ?> per risolvere eventuali problemi con la licenza.</p>
+                            <h4>Cosa succede se la mia API key viene disattivata?</h4>
+                            <p>Il plugin smetterà di funzionare e i reward non verranno più consegnati. Contatta gli amministratori di <?php echo SITE_NAME; ?> per risolvere eventuali problemi con l'API key.</p>
                         </div>
                         <div class="faq-item">
                             <h4>Posso vedere quanti reward sono stati consegnati?</h4>
@@ -277,7 +343,7 @@ commands:
                         </div>
                         <div class="faq-item">
                             <h4>Il plugin supporta più server con lo stesso IP ma porte diverse?</h4>
-                            <p>Sì, ogni server registrato su <?php echo SITE_NAME; ?> ha la sua licenza univoca, indipendentemente dall'IP o dalla porta.</p>
+                            <p>Sì, ogni server registrato su <?php echo SITE_NAME; ?> ha la sua API key univoca, indipendentemente dall'IP o dalla porta.</p>
                         </div>
                         <div class="faq-item">
                             <h4>Dove posso trovare supporto se ho problemi?</h4>

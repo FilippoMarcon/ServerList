@@ -15,18 +15,14 @@ public class PlayerJoinListener implements Listener {
     
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        // Invia un messaggio di benvenuto con informazioni sul voto
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            if (plugin.getConfig().getBoolean("show-vote-reminder-on-join", true)) {
-                plugin.getRewardManager().sendVoteReminder(event.getPlayer());
-            }
-        }, 60L); // Aspetta 3 secondi dopo il join
+        // Sistema di polling voti - non serve controllare al login
+        // I voti vengono processati automaticamente ogni X secondi
         
-        // Avvia immediatamente il controllo per ricompense automatiche per questo giocatore
-        if (plugin.getConfig().getBoolean("auto-reward.enabled", true)) {
+        // Opzionale: invia messaggio di benvenuto
+        if (plugin.getConfig().getBoolean("show-vote-reminder-on-join", false)) {
             plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                plugin.getRewardManager().checkAutoRewardForPlayer(event.getPlayer());
-            }, 100L); // Aspetta 5 secondi dopo il join
+                event.getPlayer().sendMessage("§7Vota per il server su §bhttps://www.blocksy.it");
+            }, 60L);
         }
     }
 }

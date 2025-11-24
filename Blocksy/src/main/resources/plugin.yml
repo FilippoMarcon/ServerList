@@ -4,6 +4,7 @@ main: me.ph1llyon.blocksy.Blocksy
 api-version: '1.21'
 authors: [ Ph1llyOn_ ]
 description: Blocksy Vote Plugin - Gestione voti e ricompense
+softdepend: [Votifier, NuVotifier]
 
 commands:
   blocksy:

@@ -36,6 +36,12 @@ if (preg_match('#^/utente/([0-9]+)(?:-[A-Za-z0-9_-]+)?/?$#', $request_path, $m))
     exit();
 }
 
+// API route - deve essere prima delle altre per evitare conflitti
+if (preg_match('#^/api/vote/fetch/?$#', $request_path)) {
+    include __DIR__ . '/api_vote_fetch.php';
+    exit();
+}
+
 // Pagine top-level senza estensione: /forum, /annunci, /login, /register, /profile, /admin
 if (preg_match('#^/(forum|annunci|login|register|profile|admin|forgot|reset|verifica-nickname|logout|sponsorizza-il-tuo-server|sponsor-payment|plugin-blocksy|eventi-server|messages)/?$#', $request_path, $m)) {
     $map = [

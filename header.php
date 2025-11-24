@@ -995,7 +995,7 @@
         .filters-sidebar {
             background: var(--card-bg);
             border-radius: 16px;
-            padding: 2rem;
+            padding: 1rem;
             margin-bottom: 2rem;
             backdrop-filter: blur(20px);
             border: 1px solid var(--border-color);
@@ -1039,7 +1039,7 @@
             font-weight: 500;
             position: relative;
             overflow: hidden;
-            width: 47%;
+            flex: 0 0 calc(50% - 0.375rem);
         }
         
         .filter-tag::before {
@@ -1112,7 +1112,7 @@
         
         @media (max-width: 992px) {
             .server-card {
-                padding: 1.5rem;
+                padding: 1rem;
                 gap: 1rem;
             }
             
@@ -1123,10 +1123,27 @@
             
             .filters-sidebar {
                 margin-top: 2rem;
+                padding: 1rem;
+            }
+            
+            .filter-tag {
+                flex: 0 0 calc(50% - 0.375rem);
             }
         }
         
         @media (max-width: 768px) {
+            .filters-sidebar {
+                padding: 1.25rem;
+            }
+            
+            .filter-tag {
+                flex: 0 0 calc(50% - 0.375rem);
+                font-size: 0.8rem;
+                padding: 0.5rem 0.75rem;
+            }
+        }
+        
+        @media (max-width: 576px) {
             
             .server-list {
                 margin: 0;

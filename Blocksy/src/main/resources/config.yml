@@ -1,35 +1,31 @@
-# Configurazione Blocksy Vote Plugin
 # Blocksy Vote Plugin Configuration
+# Sistema di voti identico a MinecraftITALIA
 
-# Licenza del server (24 caratteri univoci) - IDENTIFICAZIONE UNICA
-# Server License (24 unique characters) - UNIQUE IDENTIFICATION
-# OBBLIGATORIO: Inserisci la tua licenza qui 
-server-license: "" # ES: AbC123dEF456gHi789jKL012
+# API Key del tuo server (ottienila dal pannello admin su blocksy.it)
+# IMPORTANTE: Questa chiave è unica per il tuo server
+api-key: ""
 
-# Impostazioni generali
-# General settings
-debug: false  # Abilita la modalità debug per vedere i log dettagliati
-show-vote-reminder-on-join: false  # Mostra promemoria voto quando il giocatore entra
+# Intervallo di controllo voti in secondi
+# Consigliato: 10-30 secondi
+# Più basso = voti più veloci, ma più richieste al server
+check-interval: 15
 
-# Messaggi personalizzati
-# Custom messages
-messages:
-  vote-command: "§6§l[Blocksy] §eVota per il nostro server e ricevi ricompense!"
-  invalid-code-format: "§cFormato codice non valido. Usa: XXXX-XXXX-XXXX"
-  code-validating: "§7§oValidazione codice in corso..."
-  reward-success: "§a§l[Blocksy] §aRicompensa ricevuta con successo!"
-  reward-error: "§c§l[Blocksy] §cErrore durante il recupero della ricompensa"
-  vote-reminder: "§6§l[Blocksy] §eHai un codice di voto da riscuotere!"
+# Configurazione ricompense (opzionale)
+rewards:
+  enabled: true
+  
+  # Ricompense da dare quando un giocatore vota
+  commands:
+    - "give {player} diamond 1"
+    - "eco give {player} 100"
+    - "broadcast §a{player} ha votato per il server!"
+  
+  # Messaggio da inviare al giocatore
+  message: "§aGrazie per aver votato! Hai ricevuto le tue ricompense!"
 
-# Comandi per le ricompense automatiche (eseguiti quando un giocatore ha votato)
-# Commands for automatic rewards (executed when a player has voted)
-auto-reward-commands:
-  - "crate key give {player} vote 1"
-  - "voteparty addvote {player} true 1"
-  - "bc &b{player} ha votato il server su &nBlocksy"
-
-# Impostazioni ricompense automatiche
-# Automatic reward settings
+# Ricompense automatiche (vecchio sistema - DISABILITATO)
 auto-reward:
-  check-interval: 20  # Secondi tra un controllo e l'altro (default: 20 secondi)
-  only-online-players: true  # Dai ricompense solo ai giocatori online
+  enabled: false
+
+# Debug mode (mostra più informazioni nei log)
+debug: false

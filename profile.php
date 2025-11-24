@@ -242,71 +242,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_server'])) {
     }
 }
 
-// Crea tabella richieste licenza se non esiste
-try {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS sl_license_requests (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        server_id INT NOT NULL,
-        user_id INT NOT NULL,
-        status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        processed_at TIMESTAMP NULL,
-        processed_by INT NULL,
-        admin_notes TEXT,
-        FOREIGN KEY (server_id) REFERENCES sl_servers(id) ON DELETE CASCADE,
-        FOREIGN KEY (user_id) REFERENCES sl_users(id) ON DELETE CASCADE,
-        UNIQUE KEY unique_server_request (server_id),
-        INDEX(status)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-} catch (PDOException $e) {
-    // Tabella già esistente
-}
-
-// Gestione richiesta licenza
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_license'])) {
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        $error = 'Sessione scaduta o token CSRF non valido.';
-    } else {
-        $server_id = (int)($_POST['server_id'] ?? 0);
-        
-        if ($server_id <= 0) {
-            $error = 'Server non valido.';
-        } else {
-            try {
-                // Verifica che il server appartenga all'utente
-                $stmt = $pdo->prepare("SELECT id, nome FROM sl_servers WHERE id = ? AND owner_id = ?");
-                $stmt->execute([$server_id, $user_id]);
-                $server = $stmt->fetch();
-                
-                if (!$server) {
-                    $error = 'Server non trovato o non hai i permessi.';
-                } else {
-                    // Verifica se esiste già una licenza
-                    $stmt = $pdo->prepare("SELECT id FROM sl_server_licenses WHERE server_id = ?");
-                    $stmt->execute([$server_id]);
-                    if ($stmt->fetch()) {
-                        $error = 'Questo server ha già una licenza.';
-                    } else {
-                        // Verifica se esiste già una richiesta pendente
-                        $stmt = $pdo->prepare("SELECT id FROM sl_license_requests WHERE server_id = ? AND status = 'pending'");
-                        $stmt->execute([$server_id]);
-                        if ($stmt->fetch()) {
-                            $error = 'Esiste già una richiesta pendente per questo server.';
-                        } else {
-                            // Crea la richiesta
-                            $stmt = $pdo->prepare("INSERT INTO sl_license_requests (server_id, user_id, status, created_at) VALUES (?, ?, 'pending', NOW())");
-                            $stmt->execute([$server_id, $user_id]);
-                            $_SESSION['success_message'] = 'Richiesta di licenza inviata con successo! Un amministratore la esaminerà a breve.';
-                            redirect('/profile');
-                        }
-                    }
-                }
-            } catch (PDOException $e) {
-                $error = 'Errore durante l\'invio della richiesta: ' . $e->getMessage();
-            }
-        }
-    }
-}
+// Sistema API key - le API key vengono generate dagli admin tramite /admin_generate_api_key
+// Non serve più gestione richieste licenza
+// Le API key vengono generate dagli admin tramite /admin_generate_api_key
 
 // Recupera i dati dell'utente dal database
 try {
@@ -374,13 +312,9 @@ try {
     $stmt = $pdo->prepare("
         SELECT s.*, 
                COUNT(v.id) as vote_count,
-               sl.id as has_license,
-               sl.is_active as license_is_active,
-               lr.status as license_request_status
+               CASE WHEN s.api_key IS NOT NULL THEN 1 ELSE 0 END as has_api_key
         FROM sl_servers s 
         LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
-        LEFT JOIN sl_server_licenses sl ON s.id = sl.server_id
-        LEFT JOIN sl_license_requests lr ON s.id = lr.server_id AND lr.status = 'pending'
         WHERE s.owner_id = ? AND s.is_active IN (0, 1, 2)
         GROUP BY s.id 
         ORDER BY s.is_active DESC, vote_count DESC
@@ -391,7 +325,7 @@ try {
     error_log("Errore nel recupero server utente: " . $e->getMessage());
 }
 
-// Recupera le licenze dei server di proprietà dell'utente
+// Sistema API key - le licenze non servono più
 $server_licenses = [];
 try {
     $stmt = $pdo->prepare("
@@ -452,14 +386,14 @@ include 'header.php';
                     box-shadow: none !important;
                 }
                 
-                /* License Status Styles */
-                .license-status-container {
+                /* API Key Status Styles */
+                .api-key-status-container {
                     display: flex;
                     justify-content: center;
                     margin-bottom: 1rem;
                 }
                 
-                .license-status {
+                .api-key-status {
                     display: inline-flex;
                     align-items: center;
                     gap: 0.5rem;
@@ -469,28 +403,16 @@ include 'header.php';
                     font-weight: 600;
                 }
                 
-                .license-status.active {
+                .api-key-status.active {
                     background: rgba(16, 185, 129, 0.1);
                     color: #10b981;
                     border: 1px solid rgba(16, 185, 129, 0.3);
                 }
                 
-                .license-status.pending {
-                    background: rgba(251, 191, 36, 0.1);
-                    color: #fbbf24;
-                    border: 1px solid rgba(251, 191, 36, 0.3);
-                }
-                
-                .license-status.missing {
+                .api-key-status.missing {
                     background: rgba(239, 68, 68, 0.1);
                     color: #ef4444;
                     border: 1px solid rgba(239, 68, 68, 0.3);
-                }
-                
-                .license-status.disabled {
-                    background: rgba(220, 38, 38, 0.1);
-                    color: #dc2626;
-                    border: 1px solid rgba(220, 38, 38, 0.3);
                 }
                 
                 .btn-request-license {
@@ -513,7 +435,7 @@ include 'header.php';
                     vertical-align: middle;
                 }
                 
-                .btn-request-license:hover {
+                .btn-view-api-key:hover {
                     background: linear-gradient(135deg, #059669 0%, #047857 100%);
                     transform: translateY(-2px);
                     box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
@@ -832,7 +754,7 @@ include 'header.php';
                 <?php else: ?>
                 <div class="section-header">
                     <h2><i class="bi bi-server"></i> Gestione Server</h2>
-                    <p>Gestisci i tuoi server e visualizza le licenze</p>
+                    <p>Gestisci i tuoi server e le API key per il plugin</p>
                 </div>
 
                 <!-- Form Modifica Server -->
@@ -1057,23 +979,15 @@ include 'header.php';
                                     
                                     <div class="server-card-body">
                                         <?php if ($server['is_active'] == 1): ?>
-                                            <!-- License Status -->
-                                            <div class="license-status-container mb-3">
-                                                <?php if ($server['has_license'] && $server['license_is_active'] == 1): ?>
-                                                    <span class="license-status active">
-                                                        <i class="bi bi-check-circle-fill"></i> Licenza Attiva
-                                                    </span>
-                                                <?php elseif ($server['has_license'] && $server['license_is_active'] == 0): ?>
-                                                    <span class="license-status disabled">
-                                                        <i class="bi bi-x-circle-fill"></i> Licenza Disattivata da un Amministratore
-                                                    </span>
-                                                <?php elseif ($server['license_request_status'] === 'pending'): ?>
-                                                    <span class="license-status pending">
-                                                        <i class="bi bi-clock-history"></i> Licenza in Approvazione
+                                            <!-- API Key Status -->
+                                            <div class="api-key-status-container mb-3">
+                                                <?php if ($server['has_api_key']): ?>
+                                                    <span class="api-key-status active">
+                                                        <i class="bi bi-check-circle-fill"></i> API Key Configurata
                                                     </span>
                                                 <?php else: ?>
-                                                    <span class="license-status missing">
-                                                        <i class="bi bi-exclamation-triangle-fill"></i> Licenza Mancante
+                                                    <span class="api-key-status missing">
+                                                        <i class="bi bi-exclamation-triangle-fill"></i> API Key Mancante
                                                     </span>
                                                 <?php endif; ?>
                                             </div>
@@ -1085,15 +999,10 @@ include 'header.php';
                                 <a href="/profile?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
                                     <i class="bi bi-pencil"></i> Modifica
                                 </a>
-                                <?php if (!$server['has_license'] && $server['license_request_status'] !== 'pending'): ?>
-                                    <form method="POST" style="display: inline;">
-                                        <?php echo csrfInput(); ?>
-                                        <input type="hidden" name="request_license" value="1">
-                                        <input type="hidden" name="server_id" value="<?php echo $server['id']; ?>">
-                                        <button type="submit" class="btn-request-license">
-                                            <i class="bi bi-key"></i> Richiedi Licenza
-                                        </button>
-                                    </form>
+                                <?php if (isAdmin()): ?>
+                                    <a href="/admin_generate_api_key" class="btn btn-sm btn-success">
+                                        <i class="bi bi-key"></i> Gestisci API Key
+                                    </a>
                                 <?php endif; ?>
                             </div>
                         <?php elseif ($server['is_active'] == 2): ?>
@@ -1127,80 +1036,20 @@ include 'header.php';
                     </div>
                 <?php endif; ?>
 
-                <!-- Licenze Server -->
-                <?php if (!empty($server_licenses)): ?>
-                    <div class="licenses-section">
-                        <h3><i class="bi bi-key-fill"></i> Licenze dei Server</h3>
+                <!-- Sistema API Key -->
+                <?php if (isAdmin()): ?>
+                    <div class="api-key-info-section">
+                        <h3><i class="bi bi-key-fill"></i> Gestione API Keys</h3>
                         <p class="section-subtitle">
-                            Scarica il <a href="/plugin-blocksy" class="text-primary" style="text-decoration: underline;"><i class="bi bi-plugin"></i> plugin Blocksy</a> per utilizzare le tue licenze: 
-                            <a href="/Blocksy-2.3.jar" class="text-primary" style="text-decoration: underline;" download><i class="bi bi-download"></i> Download</a>
+                            Le API keys permettono al plugin di ricevere i voti automaticamente. 
+                            <a href="/admin_generate_api_key" class="btn btn-primary">
+                                <i class="bi bi-gear"></i> Gestisci API Keys
+                            </a>
                         </p>
-                        
-                        <div class="licenses-grid">
-                            <?php foreach ($server_licenses as $license): ?>
-                                <div class="license-card">
-                                    <div class="license-card-header">
-                                        <div class="license-server-info">
-                                            <?php if ($license['server_logo']): ?>
-                                                <img src="<?php echo htmlspecialchars($license['server_logo']); ?>" 
-                                                     alt="Logo" class="server-logo-small">
-                                            <?php else: ?>
-                                                <div class="server-logo-small default-logo">
-                                                    <i class="bi bi-server"></i>
-                                                </div>
-                                            <?php endif; ?>
-                                            <h4 class="license-server-name">
-                                                <?php echo htmlspecialchars($license['server_name']); ?>
-                                            </h4>
-                                        </div>
-                                        <span class="license-status <?php echo $license['is_active'] ? 'active' : 'inactive'; ?>">
-                                            <i class="bi bi-<?php echo $license['is_active'] ? 'check-circle-fill' : 'x-circle-fill'; ?>"></i>
-                                            <?php echo $license['is_active'] ? 'Attiva' : 'Inattiva'; ?>
-                                        </span>
-                                    </div>
-                                    
-                                    <div class="license-card-body">
-                                        <div class="license-key-display">
-                                            <span class="license-label">License Key:</span>
-                                            <div class="license-key-container">
-                                                <code class="license-key-value license-hidden">
-                                                    <span class="license-dots">•••••••••••••••••••••</span>
-                                                    <span class="license-text" style="display: none;"><?php echo htmlspecialchars($license['license_key']); ?></span>
-                                                </code>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="license-meta">
-                                            <div class="license-meta-item">
-                                                <i class="bi bi-calendar"></i>
-                                                <span>Creata: <?php echo date('d/m/Y', strtotime($license['created_at'])); ?></span>
-                                            </div>
-                                            <?php if ($license['last_used']): ?>
-                                                <div class="license-meta-item">
-                                                    <i class="bi bi-clock-history"></i>
-                                                    <span>Ultimo uso: <?php echo date('d/m/Y H:i', strtotime($license['last_used'])); ?></span>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                        
-                                        <div class="license-actions">
-                                            <button class="view-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>">
-                                                <i class="bi bi-eye"></i> Visualizza
-                                            </button>
-                                            <button class="copy-license-btn" data-license="<?php echo htmlspecialchars($license['license_key']); ?>" title="Copia licenza">
-                                                <i class="bi bi-clipboard"></i> Copia
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <div class="no-licenses-section">
-                        <i class="bi bi-key no-licenses-icon"></i>
-                        <h3>Nessuna Licenza</h3>
-                        <p>Non hai licenze attive per i tuoi server. Le licenze vengono generate automaticamente quando un server viene aggiunto; se il server risulta attivo ma non ha licenza, è stata disattivata da un amministratore.</p>
+                        <p class="text-secondary">
+                            Scarica il <a href="/plugin-blocksy" class="text-primary"><i class="bi bi-plugin"></i> plugin Blocksy</a>: 
+                            <a href="/Blocksy-2.3.jar" class="text-primary" download><i class="bi bi-download"></i> Download JAR</a>
+                        </p>
                     </div>
                 <?php endif; ?>
                 <?php endif; ?>

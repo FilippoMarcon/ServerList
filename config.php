@@ -150,6 +150,21 @@ try {
     // Ignora se già esistono
 }
 
+try {
+    // Aggiungi campo processed per il sistema di polling API (come MinecraftITALIA)
+    $pdo->exec("ALTER TABLE sl_votes ADD COLUMN processed TINYINT(1) DEFAULT 0");
+    $pdo->exec("CREATE INDEX idx_votes_processed ON sl_votes(server_id, processed)");
+} catch (PDOException $e) {
+    // Ignora se già esiste
+}
+
+try {
+    // Aggiungi API key per autenticazione polling (come MinecraftITALIA)
+    $pdo->exec("ALTER TABLE sl_servers ADD COLUMN api_key VARCHAR(64) NULL");
+} catch (PDOException $e) {
+    // Ignora se già esiste
+}
+
 // Funzioni di utilità
 
 /**

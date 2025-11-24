@@ -425,29 +425,27 @@ function sendVotifierNotification($server_id, $player_name) {
             return false; // Votifier non configurato
         }
         
-        // Carica la classe Votifier
-        require_once 'Votifier.php';
+        // Usa la versione semplice di Votifier
+        require_once 'VotifierSimple.php';
         
         $host = $server['votifier_host'];
         $port = $server['votifier_port'] ?? 8192;
-        $publicKey = $server['votifier_key'];
+        $token = $server['votifier_key'];
         
-        // Crea istanza Votifier
-        $votifier = new Votifier($host, $port, $publicKey);
-        
-        // Invia il voto
+        // Crea istanza e invia
+        $votifier = new VotifierSimple($host, $port, $token);
         $result = $votifier->sendVote($player_name, 'Blocksy', 'blocksy.it');
         
         if ($result) {
-            error_log("Votifier: Voto inviato con successo a $host:$port per $player_name");
+            error_log("Votifier: ✓ Voto inviato per $player_name");
         } else {
-            error_log("Votifier: Errore nell'invio del voto a $host:$port per $player_name");
+            error_log("Votifier: ✗ Errore invio voto per $player_name");
         }
         
         return $result;
         
     } catch (Exception $e) {
-        error_log("Votifier: Errore - " . $e->getMessage());
+        error_log("Votifier: Exception - " . $e->getMessage());
         return false;
     }
 }

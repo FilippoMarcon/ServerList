@@ -262,8 +262,8 @@ if (!empty($server['social_links'])) {
                         <label class="form-label mb-0">Configurazione Votifier</label>
                     </div>
                     <p class="text-secondary" style="font-size:12px; margin-bottom:12px;">
-                        Votifier invia automaticamente i voti al tuo server Minecraft. 
-                        <a href="/VOTIFIER_SETUP.md" target="_blank" style="color:var(--accent-purple);">Leggi la guida setup</a>
+                        <strong>NuVotifier v2:</strong> Inserisci il token da <code>plugins/Votifier/config.yml</code><br>
+                        <strong>Votifier v1:</strong> Inserisci la chiave pubblica da <code>plugins/Votifier/rsa/public.pem</code>
                     </p>
                 </div>
                 <div class="col-md-4">
@@ -277,9 +277,9 @@ if (!empty($server['social_links'])) {
                     <small class="text-secondary">Default: 8192</small>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Chiave Pubblica RSA</label>
-                    <textarea class="form-control" name="votifier_key" rows="3" placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----" style="font-family:monospace; font-size:11px;"><?= htmlspecialchars($server['votifier_key'] ?? '') ?></textarea>
-                    <small class="text-secondary">Copia da plugins/Votifier/rsa/public.pem</small>
+                    <label class="form-label">Token o Chiave Pubblica RSA</label>
+                    <textarea class="form-control" name="votifier_key" rows="3" placeholder="Token NuVotifier v2 o chiave RSA v1" style="font-family:monospace; font-size:11px;"><?= htmlspecialchars($server['votifier_key'] ?? '') ?></textarea>
+                    <small class="text-secondary">NuVotifier v2: token | Votifier v1: chiave RSA</small>
                 </div>
                 <div class="col-md-12">
                     <button type="button" class="btn btn-sm btn-outline-info" id="test-votifier-btn">
