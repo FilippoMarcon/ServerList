@@ -309,10 +309,16 @@ try {
 // Recupera i server di proprietà dell'utente (attivi e in attesa di approvazione)
 $owned_servers = [];
 try {
+    // Assicura che esista la colonna api_key_active
+    try {
+        $pdo->exec("ALTER TABLE sl_servers ADD COLUMN api_key_active TINYINT(1) DEFAULT 1");
+    } catch (Exception $e) {}
+    
     $stmt = $pdo->prepare("
         SELECT s.*, 
                COUNT(v.id) as vote_count,
-               CASE WHEN s.api_key IS NOT NULL THEN 1 ELSE 0 END as has_api_key
+               CASE WHEN s.api_key IS NOT NULL THEN 1 ELSE 0 END as has_api_key,
+               COALESCE(s.api_key_active, 1) as api_key_active
         FROM sl_servers s 
         LEFT JOIN sl_votes v ON s.id = v.server_id AND MONTH(v.data_voto) = MONTH(CURRENT_DATE()) AND YEAR(v.data_voto) = YEAR(CURRENT_DATE())
         WHERE s.owner_id = ? AND s.is_active IN (0, 1, 2)
@@ -415,7 +421,14 @@ include 'header.php';
                     border: 1px solid rgba(239, 68, 68, 0.3);
                 }
                 
-                .btn-request-license {
+                /* API Key Header in Server Cards */
+                .api-key-header {
+                    display: flex;
+                    justify-content: center;
+                    margin-bottom: 1rem;
+                }
+                
+                .btn-request-license, .btn-request-api-key {
                     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                     color: white;
                     border: none;
@@ -433,12 +446,152 @@ include 'header.php';
                     line-height: 1.5;
                     text-decoration: none;
                     vertical-align: middle;
+                    width: 100%;
                 }
                 
-                .btn-view-api-key:hover {
+                .btn-request-license:hover, .btn-request-api-key:hover {
                     background: linear-gradient(135deg, #059669 0%, #047857 100%);
                     transform: translateY(-2px);
                     box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+                }
+                
+                /* API Keys Section Styles (sezione separata sotto "I Miei Server") */
+                .api-keys-section {
+                    margin-top: 2rem;
+                }
+                
+                .api-keys-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+                    gap: 1.5rem;
+                    margin-top: 1rem;
+                }
+                
+                .api-key-card {
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 12px;
+                    overflow: hidden;
+                    transition: all 0.3s ease;
+                }
+                
+                .api-key-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+                    border-color: rgba(255, 255, 255, 0.2);
+                }
+                
+                .api-key-card-header {
+                    padding: 1.5rem;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                
+                .api-key-server-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+                
+                .server-logo-small {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 8px;
+                    object-fit: cover;
+                }
+                
+                .server-logo-small.default-logo {
+                    background: rgba(255, 255, 255, 0.1);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.5rem;
+                    color: #adb5bd;
+                }
+                
+                .api-key-server-name {
+                    margin: 0;
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    color: #fff;
+                }
+                
+                .api-key-card-body {
+                    padding: 1.5rem;
+                }
+                
+                .api-key-display {
+                    margin-bottom: 1rem;
+                }
+                
+                .api-key-label {
+                    display: block;
+                    font-size: 0.9rem;
+                    color: #adb5bd;
+                    margin-bottom: 0.5rem;
+                    font-weight: 500;
+                }
+                
+                .api-key-container {
+                    background: rgba(0, 0, 0, 0.3);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 6px;
+                    padding: 0.75rem;
+                }
+                
+                .api-key-value {
+                    font-family: 'Courier New', monospace;
+                    font-size: 0.85rem;
+                    color: #e9ecef;
+                    word-break: break-all;
+                    display: block;
+                }
+                
+                .api-key-meta {
+                    margin-bottom: 1rem;
+                }
+                
+                .api-key-meta-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    color: #adb5bd;
+                    font-size: 0.9rem;
+                }
+                
+                .api-key-actions {
+                    display: flex;
+                    gap: 0.75rem;
+                }
+                
+                .view-api-key-btn, .copy-api-key-btn {
+                    flex: 1;
+                    padding: 0.5rem 1rem;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    background: rgba(255, 255, 255, 0.1);
+                    color: #fff;
+                    border-radius: 6px;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
+                }
+                
+                .view-api-key-btn:hover {
+                    background: rgba(13, 110, 253, 0.2);
+                    border-color: #0d6efd;
+                    color: #0d6efd;
+                }
+                
+                .copy-api-key-btn:hover {
+                    background: rgba(25, 135, 84, 0.2);
+                    border-color: #198754;
+                    color: #198754;
                 }
                 </style>
                 <script>
@@ -980,7 +1133,7 @@ include 'header.php';
                                     <div class="server-card-body">
                                         <?php if ($server['is_active'] == 1): ?>
                                             <!-- API Key Status -->
-                                            <div class="api-key-status-container mb-3">
+                                            <div class="api-key-header mb-2">
                                                 <?php if ($server['has_api_key']): ?>
                                                     <span class="api-key-status active">
                                                         <i class="bi bi-check-circle-fill"></i> API Key Configurata
@@ -989,23 +1142,23 @@ include 'header.php';
                                                     <span class="api-key-status missing">
                                                         <i class="bi bi-exclamation-triangle-fill"></i> API Key Mancante
                                                     </span>
+                                                    <button class="btn-request-api-key mt-2" 
+                                                            data-server-id="<?= $server['id'] ?>"
+                                                            data-server-name="<?= htmlspecialchars($server['nome']) ?>">
+                                                        <i class="bi bi-key"></i> Richiedi API Key
+                                                    </button>
                                                 <?php endif; ?>
                                             </div>
                                             
-                            <div class="server-actions">
-                                <a href="<?php $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($server['nome'])); echo '/server/' . urlencode(trim($slug, '-')); ?>" class="btn-view-server">
-                                    <i class="bi bi-eye"></i> Visualizza
-                                </a>
-                                <a href="/profile?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
-                                    <i class="bi bi-pencil"></i> Modifica
-                                </a>
-                                <?php if (isAdmin()): ?>
-                                    <a href="/admin_generate_api_key" class="btn btn-sm btn-success">
-                                        <i class="bi bi-key"></i> Gestisci API Key
-                                    </a>
-                                <?php endif; ?>
-                            </div>
-                        <?php elseif ($server['is_active'] == 2): ?>
+                                            <div class="server-actions">
+                                                <a href="<?php $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($server['nome'])); echo '/server/' . urlencode(trim($slug, '-')); ?>" class="btn-view-server">
+                                                    <i class="bi bi-eye"></i> Visualizza
+                                                </a>
+                                                <a href="/profile?edit_server=<?php echo $server['id']; ?>" class="btn-edit-server">
+                                                    <i class="bi bi-pencil"></i> Modifica
+                                                </a>
+                                            </div>
+                                        <?php elseif ($server['is_active'] == 2): ?>
                             <div class="pending-server-info">
                                 <p class="pending-message">
                                     <i class="bi bi-info-circle"></i>
@@ -1037,17 +1190,99 @@ include 'header.php';
                 <?php endif; ?>
 
                 <!-- Sistema API Key -->
-                <?php if (isAdmin()): ?>
-                    <div class="api-key-info-section">
-                        <h3><i class="bi bi-key-fill"></i> Gestione API Keys</h3>
+                <!-- API Keys dei Server -->
+                <?php
+                // Recupera le API keys dei server dell'utente
+                $server_api_keys = [];
+                try {
+                    $stmt = $pdo->prepare("
+                        SELECT s.id, s.nome, s.ip, s.logo_url, s.api_key, COALESCE(s.api_key_active, 1) as api_key_active
+                        FROM sl_servers s
+                        WHERE s.owner_id = ? AND s.api_key IS NOT NULL
+                        ORDER BY s.nome
+                    ");
+                    $stmt->execute([$user_id]);
+                    $server_api_keys = $stmt->fetchAll();
+                } catch (PDOException $e) {
+                    error_log("Errore nel recupero API keys: " . $e->getMessage());
+                }
+                ?>
+                
+                <?php if (!empty($server_api_keys)): ?>
+                    <div class="api-keys-section mt-4">
+                        <h3><i class="bi bi-key-fill"></i> API Keys dei Server</h3>
                         <p class="section-subtitle">
-                            Le API keys permettono al plugin di ricevere i voti automaticamente. 
-                            <a href="/admin_generate_api_key" class="btn btn-primary">
-                                <i class="bi bi-gear"></i> Gestisci API Keys
-                            </a>
+                            Scarica il <a href="/plugin-blocksy" class="text-primary" style="text-decoration: underline;"><i class="bi bi-plugin"></i> plugin Blocksy</a> per utilizzare le tue API keys: 
+                            <a href="/Blocksy-2.3.jar" class="text-primary" style="text-decoration: underline;" download><i class="bi bi-download"></i> Download</a>
                         </p>
-                        <p class="text-secondary">
-                            Scarica il <a href="/plugin-blocksy" class="text-primary"><i class="bi bi-plugin"></i> plugin Blocksy</a>: 
+                        
+                        <div class="api-keys-grid">
+                            <?php foreach ($server_api_keys as $server): ?>
+                                <div class="api-key-card">
+                                    <div class="api-key-card-header">
+                                        <div class="api-key-server-info">
+                                            <?php if ($server['logo_url']): ?>
+                                                <img src="<?= htmlspecialchars($server['logo_url']) ?>" 
+                                                     alt="Logo" class="server-logo-small">
+                                            <?php else: ?>
+                                                <div class="server-logo-small default-logo">
+                                                    <i class="bi bi-server"></i>
+                                                </div>
+                                            <?php endif; ?>
+                                            <h4 class="api-key-server-name">
+                                                <?= htmlspecialchars($server['nome']) ?>
+                                            </h4>
+                                        </div>
+                                        <?php if ($server['api_key_active']): ?>
+                                            <span class="api-key-status active">
+                                                <i class="bi bi-check-circle-fill"></i> Attiva
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="api-key-status missing">
+                                                <i class="bi bi-x-circle-fill"></i> Disattivata
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <div class="api-key-card-body">
+                                        <div class="api-key-display">
+                                            <span class="api-key-label">API Key:</span>
+                                            <div class="api-key-container">
+                                                <code class="api-key-value api-key-hidden">
+                                                    <span class="api-key-dots">••••••••••••••••••••••••••••••••</span>
+                                                    <span class="api-key-text" style="display: none;"><?= htmlspecialchars($server['api_key']) ?></span>
+                                                </code>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="api-key-meta">
+                                            <div class="api-key-meta-item">
+                                                <i class="bi bi-hdd-network"></i>
+                                                <span><?= htmlspecialchars($server['ip']) ?></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="api-key-actions">
+                                            <button class="view-api-key-btn" data-api-key="<?= htmlspecialchars($server['api_key']) ?>">
+                                                <i class="bi bi-eye"></i> Visualizza
+                                            </button>
+                                            <button class="copy-api-key-btn" data-api-key="<?= htmlspecialchars($server['api_key']) ?>" title="Copia API key">
+                                                <i class="bi bi-clipboard"></i> Copia
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-info mt-4">
+                        <h5><i class="bi bi-info-circle"></i> Nessuna API Key</h5>
+                        <p class="mb-2">
+                            Non hai API keys configurate per i tuoi server. Le API keys vengono generate dagli amministratori.
+                        </p>
+                        <p class="mb-0">
+                            <a href="/plugin-blocksy" class="text-primary"><i class="bi bi-plugin"></i> Scopri il Plugin Blocksy</a> | 
                             <a href="/Blocksy-2.3.jar" class="text-primary" download><i class="bi bi-download"></i> Download JAR</a>
                         </p>
                     </div>
@@ -1156,7 +1391,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    
     // Gestione automatica della sezione attiva in base ai parametri URL
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('edit_server') || urlParams.get('action') === 'servers') {
@@ -1393,6 +1627,97 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+});
+</script>
+
+<script>
+// Visualizza API Key
+document.querySelectorAll('.view-api-key-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const card = this.closest('.api-key-card');
+        const dotsSpan = card.querySelector('.api-key-dots');
+        const textSpan = card.querySelector('.api-key-text');
+        const icon = this.querySelector('i');
+        
+        if (textSpan.style.display === 'none') {
+            // Mostra
+            dotsSpan.style.display = 'none';
+            textSpan.style.display = 'inline';
+            icon.className = 'bi bi-eye-slash';
+            this.innerHTML = '<i class="bi bi-eye-slash"></i> Nascondi';
+        } else {
+            // Nascondi
+            dotsSpan.style.display = 'inline';
+            textSpan.style.display = 'none';
+            icon.className = 'bi bi-eye';
+            this.innerHTML = '<i class="bi bi-eye"></i> Visualizza';
+        }
+    });
+});
+
+// Copia API Key
+document.querySelectorAll('.copy-api-key-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const key = this.dataset.apiKey;
+        navigator.clipboard.writeText(key).then(() => {
+            const icon = this.querySelector('i');
+            const originalHTML = this.innerHTML;
+            this.innerHTML = '<i class="bi bi-check"></i> Copiata!';
+            this.classList.add('btn-success');
+            this.classList.remove('btn-outline-secondary');
+            setTimeout(() => {
+                this.innerHTML = originalHTML;
+                this.classList.remove('btn-success');
+                this.classList.add('btn-outline-secondary');
+            }, 2000);
+        });
+    });
+});
+</script>
+
+<script>
+// Richiesta API Key
+document.addEventListener('DOMContentLoaded', function() {
+    const requestButtons = document.querySelectorAll('.btn-request-api-key');
+    
+    requestButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+            
+            if (!confirm(`Vuoi richiedere l'API key per "${serverName}"?\n\nUn amministratore dovrà approvarla.`)) {
+                return;
+            }
+            
+            // Disabilita il bottone
+            this.disabled = true;
+            this.innerHTML = '<i class="bi bi-hourglass-split"></i> Invio...';
+            
+            fetch('/api/request_api_key.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    server_id: serverId
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✓ Richiesta inviata con successo!\n\nUn amministratore genererà l\'API key a breve.');
+                    location.reload();
+                } else {
+                    alert('✗ Errore: ' + data.message);
+                    this.disabled = false;
+                    this.innerHTML = '<i class="bi bi-key"></i> Richiedi API Key';
+                }
+            })
+            .catch(err => {
+                alert('✗ Errore di connessione');
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-key"></i> Richiedi API Key';
+            });
+        });
+    });
 });
 </script>
 

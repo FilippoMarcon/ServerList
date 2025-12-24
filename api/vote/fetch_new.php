@@ -1,8 +1,6 @@
 <?php
 /**
- * API Endpoint per recuperare voti pendenti
- * Simile a MinecraftITALIA /vote/fetch
- * Usato dal plugin Blocksy per fare polling dei voti
+ * API Endpoint per recuperare voti pendenti - NEW VERSION
  */
 
 require_once '../../config.php';
@@ -21,12 +19,7 @@ if (empty($api_key)) {
 }
 
 try {
-    // Assicura che esista la colonna api_key_active
-    try {
-        $pdo->exec("ALTER TABLE sl_servers ADD COLUMN api_key_active TINYINT(1) DEFAULT 1");
-    } catch (Exception $e) {}
-    
-    // Verifica che l'API key corrisponda a un server
+    // Query diretta
     $stmt = $pdo->prepare("SELECT id, nome, api_key_active FROM sl_servers WHERE api_key = ? LIMIT 1");
     $stmt->execute([$api_key]);
     $server = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -37,7 +30,7 @@ try {
         exit;
     }
     
-    // Verifica che l'API key sia attiva
+    // Controllo semplice e diretto
     if ((int)$server['api_key_active'] === 0) {
         http_response_code(403);
         echo json_encode(['error' => 'API key disattivata']);
@@ -46,7 +39,7 @@ try {
     
     $server_id = $server['id'];
     
-    // Recupera voti pendenti
+    // Recupera voti
     $stmt = $pdo->prepare("
         SELECT v.id, v.server_id as serverId, ml.minecraft_nick as username, v.data_voto as timestamp
         FROM sl_votes v
@@ -58,7 +51,6 @@ try {
     $stmt->execute([$server_id]);
     $votes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Formatta i voti
     $formatted_votes = [];
     foreach ($votes as $vote) {
         $formatted_votes[] = [
@@ -69,7 +61,6 @@ try {
         ];
     }
     
-    // Marca i voti come processati
     if (!empty($votes)) {
         $vote_ids = array_column($votes, 'id');
         $placeholders = implode(',', array_fill(0, count($vote_ids), '?'));
@@ -81,6 +72,5 @@ try {
     
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Errore server: ' . $e->getMessage()]);
-    error_log("API vote/fetch error: " . $e->getMessage());
+    echo json_encode(['error' => $e->getMessage()]);
 }

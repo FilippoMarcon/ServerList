@@ -1,7 +1,9 @@
-RewriteEngine On
+# Disabilita cache per API endpoints
+<FilesMatch "\.(php)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+</FilesMatch>
 
-# Rimuovi .php dalle URL mantenendo query string
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteRule ^(.*)$ $1.php [L,QSA]
+# Disabilita opcache per questo folder
+php_flag opcache.enable Off
